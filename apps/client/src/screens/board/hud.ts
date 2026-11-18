@@ -11,7 +11,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { artUrl, emblemSvg, iconSvg, type EmblemName } from '../../ui/assets';
-import { ultimateHtml } from '../../ui/card';
+import { parseHistoryEntry, ultimateHtml } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
 const RESOURCE_EMBLEM: Record<Resource, EmblemName> = { piedra: 'piedra', acero: 'acero', mana: 'mana' };
@@ -239,37 +239,41 @@ export class SidePanel {
   }
 
   /** The last cards this player played, newest first; the newest is shown larger. */
-  setHistory(cardIds: readonly string[]): void {
-    const key = cardIds.join('|');
+  /** `entries` are history entries (see `historyEntry`): played or discarded cards, newest first. */
+  setHistory(entries: readonly string[]): void {
+    const key = entries.join('|');
     if (key === this.historyKey) return;
     this.historyKey = key;
     this.onPreview(null);
     this.history.replaceChildren(
-      ...cardIds.map((cardId, i) => {
+      ...entries.map((entry, i) => {
+        const { cardId, discarded } = parseHistoryEntry(entry);
         const card = getCard(cardId);
+        const name = discarded ? `${L(card.name)} (${t('discardedStamp')})` : L(card.name);
         const el = h(
           'button.hist-card',
           {
             type: 'button',
-            class: `s-${card.school} r-${card.rarity}${i === 0 ? ' newest' : ''}`,
-            title: L(card.name),
-            'aria-label': `${L(card.name)}: ${L(card.text)}`,
+            class: `s-${card.school} r-${card.rarity}${i === 0 ? ' newest' : ''}${discarded ? ' discarded' : ''}`,
+            title: name,
+            'aria-label': `${name}: ${L(card.text)}`,
             onclick: () => {
               this.onPreview(null);
-              this.onInspect(cardId);
+              this.onInspect(entry);
             },
           },
           h('img', { src: artUrl(card.art), alt: '', draggable: 'false', onerror: hideMissingArt }),
           h('span.hist-cost', null, String(card.cost)),
+          discarded ? h('span.discard-overlay', { 'aria-hidden': 'true' }, h('b', null, t('discardedStamp'))) : null,
         );
         el.addEventListener('pointerenter', (e) => {
-          if (e.pointerType === 'mouse') this.onPreview(cardId, el.getBoundingClientRect());
+          if (e.pointerType === 'mouse') this.onPreview(entry, el.getBoundingClientRect());
         });
         el.addEventListener('pointerleave', () => this.onPreview(null));
         return el;
       }),
     );
-    this.history.hidden = cardIds.length === 0;
+    this.history.hidden = entries.length === 0;
   }
 
   /** Online presence: a dropped opponent shows a countdown. */

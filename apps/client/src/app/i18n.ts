@@ -241,6 +241,7 @@ const STRINGS = {
   reducedMotion: { es: 'Reducir movimiento', en: 'Reduce motion' },
   screenShake: { es: 'Sacudida de pantalla', en: 'Screen shake' },
   localTimer: { es: 'Reloj de turno con dos jugadores en un dispositivo', en: 'Turn clock with two players on one device' },
+  discardedStamp: { es: 'Descartada', en: 'Discarded' },
   installApp: { es: 'Instalar en el móvil', en: 'Install on your phone' },
   continueGame: { es: 'Continuar partida', en: 'Continue game' },
   continueGameHint: { es: 'Retoma la partida que dejaste a medias', en: 'Pick up the game you left unfinished' },

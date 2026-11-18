@@ -26,7 +26,7 @@ import { describeEvent } from '../../game/describe';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
-import { cardBack, cardFace, eventCard, heroCard } from '../../ui/card';
+import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
@@ -143,7 +143,7 @@ class BoardScreen implements Screen {
       const id = this.discardTopId();
       if (!id) return;
       this.hidePilePreview();
-      this.inspectCard(id, this.discardHero);
+      this.inspectCard(id, this.discardHero, this.discardTopDiscarded);
     });
     this.eventChip.addEventListener('click', () => this.inspectEvent());
 
@@ -167,10 +167,16 @@ class BoardScreen implements Screen {
 
     for (const panel of this.panels) {
       panel.onUltimate = () => this.act({ type: 'ultimate', player: this.view?.viewer ?? 0 });
-      panel.onInspect = (cardId) => this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)));
+      panel.onInspect = (entry) => {
+        const { cardId, discarded } = parseHistoryEntry(entry);
+        this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded);
+      };
       panel.onInspectHero = (heroId) => this.inspectHero(heroId);
       panel.onPreview = (cardId, anchor) => {
-        if (cardId && anchor) this.showCardPreview(cardId, anchor, panel.side === 0 ? 'right' : 'left', this.heroOf(this.seatOfSide(panel.side)));
+        if (cardId && anchor) {
+          const entry = parseHistoryEntry(cardId);
+          this.showCardPreview(entry.cardId, anchor, panel.side === 0 ? 'right' : 'left', this.heroOf(this.seatOfSide(panel.side)), entry.discarded);
+        }
         else this.hidePilePreview();
       };
     }
@@ -571,7 +577,12 @@ class BoardScreen implements Screen {
     // After a reload the server only sends the current state: pick up the figures saved before it.
     else if (update.resumed) this.loadStats();
     this.stats.add(events);
-    for (const e of events) if (e.type === 'cardPlayed') this.history[e.player] = [e.cardId, ...this.history[e.player]].slice(0, HISTORY_SIZE);
+    for (const e of events) {
+      if (e.type === 'cardPlayed' || e.type === 'cardDiscarded') {
+        const entry = historyEntry(e.cardId, e.type === 'cardDiscarded');
+        this.history[e.player] = [entry, ...this.history[e.player]].slice(0, HISTORY_SIZE);
+      }
+    }
     if (events.length) this.saveStats();
     for (const e of events) {
       const line = describeEvent(e, (seat) => this.name(seat));
@@ -781,6 +792,7 @@ class BoardScreen implements Screen {
         const p = shown[e.player];
         p.hand = p.hand.filter((c) => c.uid !== e.uid);
         p.discardCount++;
+        this.shownHistory[e.player] = [historyEntry(e.cardId, true), ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
         const from = this.takeFromHand(e.player, e.uid);
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
@@ -1066,17 +1078,21 @@ class BoardScreen implements Screen {
       .finished.catch(() => undefined)
       .then(() => {
         card.remove();
-        if (id) this.setDiscardTop(id, hero);
+        if (id) this.setDiscardTop(id, hero, false);
       });
   }
 
   /** Hero of whoever put the top card on the discard pile, for its numbers. */
   private discardHero: HeroId | undefined;
+  /** The top card of the pile was discarded, not played. */
+  private discardTopDiscarded = false;
 
-  private setDiscardTop(cardId: string | null, hero?: HeroId): void {
+  private setDiscardTop(cardId: string | null, hero?: HeroId, discarded = false): void {
     this.hidePilePreview();
     this.discardHero = hero;
+    this.discardTopDiscarded = discarded;
     const top = cardId ? cardFace(cardId, { calm: true, hero }) : cardBack();
+    if (cardId && discarded) markDiscarded(top);
     const count = this.discardPile.querySelector('.pile-count');
     this.discardPile.replaceChildren(top, count ?? h('span.pile-count'));
     this.discardPile.classList.toggle('has-card', !!cardId);
@@ -1095,7 +1111,7 @@ class BoardScreen implements Screen {
   /** Large copy of the last card played, next to the discard pile, to read what it did. */
   private showPilePreview(): void {
     const id = this.discardTopId();
-    if (id) this.showCardPreview(id, this.discardPile.getBoundingClientRect(), 'above', this.discardHero);
+    if (id) this.showCardPreview(id, this.discardPile.getBoundingClientRect(), 'above', this.discardHero, this.discardTopDiscarded);
     else this.hidePilePreview();
   }
 
@@ -1104,10 +1120,11 @@ class BoardScreen implements Screen {
    * discard pile, or a revealed card of the rival). Not on touch screens,
    * where a tap opens the inspect view instead.
    */
-  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId): void {
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId, discarded = false): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
     const big = cardFace(cardId, { calm: true, hero });
+    if (discarded) markDiscarded(big);
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
     const minTop = host.top + 56;
@@ -1165,7 +1182,7 @@ class BoardScreen implements Screen {
     );
     await anim.finished.catch(() => undefined);
     card.remove();
-    if (cardId) this.setDiscardTop(cardId, hero);
+    if (cardId) this.setDiscardTop(cardId, hero, true);
   }
 
   /** Dismisses the battle event card left on screen, if any. */
@@ -1473,9 +1490,11 @@ class BoardScreen implements Screen {
     return panel;
   }
 
-  private inspectCard(cardId: string, hero?: HeroId): void {
+  private inspectCard(cardId: string, hero?: HeroId, discarded = false): void {
     audio.play('cardSelect');
-    this.openInspect(cardFace(cardId, { tilt: true, hero }), L(getCard(cardId).text));
+    const face = cardFace(cardId, { tilt: true, hero });
+    if (discarded) markDiscarded(face);
+    this.openInspect(face, L(getCard(cardId).text));
   }
 
   private inspectHero(heroId: string): void {

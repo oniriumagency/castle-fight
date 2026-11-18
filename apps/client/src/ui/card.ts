@@ -13,7 +13,7 @@ import {
   type LocalizedText,
 } from '@cardcraft-castles/engine';
 import { escapeHtml, h } from '../app/dom';
-import { L, locale } from '../app/i18n';
+import { L, locale, t } from '../app/i18n';
 import { settings } from '../app/settings';
 import { SCHOOL_EMBLEM, artUrl, emblemSvg } from './assets';
 
@@ -212,6 +212,27 @@ export function heroParts(heroId: HeroId): { passive: string; ultimate: string }
   const text = L(getHero(heroId).text);
   const match = /^[^:]+:\s*(.*?)\s*(?:Definitiva|Ultimate):\s*(.*)$/s.exec(text);
   return match ? { passive: match[1], ultimate: match[2] } : { passive: text, ultimate: '' };
+}
+
+/** Red tint and a "Discarded" stamp over a card that was thrown away rather than played. */
+export function markDiscarded(el: HTMLElement): HTMLElement {
+  el.classList.add('discarded');
+  el.append(h('span.discard-overlay', { 'aria-hidden': 'true' }, h('b', null, t('discardedStamp'))));
+  return el;
+}
+
+/**
+ * History entries: a card id, with this prefix when the card was discarded.
+ * Kept as plain strings so saved histories stay readable.
+ */
+const DISCARDED_PREFIX = 'x:';
+
+export function historyEntry(cardId: string, discarded: boolean): string {
+  return discarded ? DISCARDED_PREFIX + cardId : cardId;
+}
+
+export function parseHistoryEntry(entry: string): { cardId: string; discarded: boolean } {
+  return entry.startsWith(DISCARDED_PREFIX) ? { cardId: entry.slice(DISCARDED_PREFIX.length), discarded: true } : { cardId: entry, discarded: false };
 }
 
 /** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */
