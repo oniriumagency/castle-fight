@@ -27,7 +27,8 @@ function onTurn(turn: number, extra: Parameters<typeof scenario>[0] = {}): GameS
 describe('Twilight Fury', () => {
   it('is on by default and starts around the sixth minute', () => {
     expect(DEFAULT_RULES.twilightTurn).toBeGreaterThan(0);
-    expect(twilightDeadline(DEFAULT_RULES)).toBe(DEFAULT_RULES.twilightTurn + DEFAULT_RULES.twilightTurns - 1);
+    // No deadline: it keeps escalating until someone wins by the usual rules.
+    expect(twilightDeadline(DEFAULT_RULES)).toBe(0);
   });
 
   it('rises one level every few turns from its first turn', () => {
@@ -83,7 +84,7 @@ describe('Twilight Fury', () => {
     expect(after.players[ME]!.keep).toBe(50 + 7 + 9);
   });
 
-  it('decides the game at its deadline: highest Castle, then Wall', () => {
+  it('can decide the game at a deadline (off by default): highest Castle, then Wall', () => {
     const finish = (you: { keep: number; wall: number }): GameState['result'] => {
       const start = onTurn(7, { keepTurn: false, you, opponent: { keep: 50, wall: 15 } });
       return discardCard(start).state.result;

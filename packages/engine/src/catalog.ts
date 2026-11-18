@@ -67,7 +67,7 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   twilightErosion: 3,
   twilightKeepErosion: 2,
   twilightBuildBonus: 3,
-  twilightTurns: 15,
+  twilightTurns: 0,
 });
 
 function assertSameIds(kind: string, designIds: string[], effectIds: string[]): void {

@@ -26,6 +26,8 @@ export interface TwilightStatus {
   level: number;
   /** Turns until it falls (level 0) or until the game is decided (level 1+; 0 means this is the last turn). */
   turns: number;
+  /** Turns until the next level. */
+  next: number;
 }
 
 export function twilightStatus(board: { rules: Rules; turn: number }, warnAhead = 6): TwilightStatus | null {
@@ -33,16 +35,18 @@ export function twilightStatus(board: { rules: Rules; turn: number }, warnAhead 
   const level = twilightLevel(board);
   if (level === 0) {
     const turns = board.rules.twilightTurn - board.turn;
-    return turns <= warnAhead ? { level, turns } : null;
+    return turns <= warnAhead ? { level, turns, next: turns } : null;
   }
   const end = twilightDeadline(board.rules);
-  return { level, turns: end > 0 ? Math.max(0, end - board.turn) : -1 };
+  const every = Math.max(1, board.rules.twilightEvery ?? 1);
+  const next = every - ((board.turn - board.rules.twilightTurn) % every);
+  return { level, turns: end > 0 ? Math.max(0, end - board.turn) : -1, next };
 }
 
 /** Short line for the chip: when it falls, or its level and how long is left. */
 export function twilightLine(status: TwilightStatus): string {
   if (status.level === 0) return t('twilightSoon', { n: status.turns });
   if (status.turns === 0) return t('twilightLast', { level: status.level });
-  if (status.turns < 0) return `${t('twilightName')} ${status.level}`;
+  if (status.turns < 0) return t('twilightLevel', { level: status.level, n: status.next });
   return t('twilightNow', { level: status.level, n: status.turns });
 }
