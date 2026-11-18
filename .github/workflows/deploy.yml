@@ -1,0 +1,77 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time, and never stop one halfway.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SITE_URL: https://games.onirium.agency
+
+jobs:
+  deploy:
+    name: Publish to games.onirium.agency
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://games.onirium.agency
+    steps:
+      - name: Check the Cloudflare secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets. See 'Despliegue' in the README."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # A broken main is never published.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build the client
+        run: pnpm --filter @cardcraft-castles/client build
+
+      - name: Publish the Worker and the client
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @cardcraft-castles/server run deploy
+
+      # The first deploy has to wait for the domain's certificate.
+      - name: Wait for the site
+        run: |
+          curl --fail --silent --show-error --retry 40 --retry-delay 15 --retry-all-errors \
+            "$SITE_URL/api/health"
+
+      - name: Check that the page is the game
+        run: |
+          curl --fail --silent --show-error --output "$RUNNER_TEMP/index.html" "$SITE_URL/"
+          grep --quiet '<title>Cardcraft: Castles</title>' "$RUNNER_TEMP/index.html"
+
+      - name: Play a whole online game against the published server
+        run: pnpm --filter @cardcraft-castles/server smoke "$SITE_URL" --private

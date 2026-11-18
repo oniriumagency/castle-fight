@@ -10,5 +10,31 @@
     ]
   },
   // SQLite-backed Durable Objects are the ones available on the free plan.
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Lobby", "Room"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Lobby", "Room"] }],
+
+  // The top level is what `pnpm dev` and the tests run: the API alone.
+  // `--env production` is the published game: the same Worker, plus the built
+  // client as static assets, on its own domain. See the README.
+  "env": {
+    "production": {
+      // Keep the Worker's name instead of the default `cardcraft-castles-production`.
+      "name": "cardcraft-castles",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "games.onirium.agency", "custom_domain": true }],
+      "assets": {
+        "directory": "../client/dist",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      "observability": { "enabled": true },
+      // Bindings are not inherited by environments: keep this equal to the list above.
+      "durable_objects": {
+        "bindings": [
+          { "name": "LOBBY", "class_name": "Lobby" },
+          { "name": "ROOM", "class_name": "Room" }
+        ]
+      }
+    }
+  }
 }
