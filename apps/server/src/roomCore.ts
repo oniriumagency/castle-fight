@@ -174,7 +174,17 @@ export class RoomCore<S> {
       this.host.close(socket, CLOSE_CODES.roomClosed, 'The room is closed');
       return;
     }
-    if (this.host.sockets().length > ROOM_LIMITS.maxSockets) {
+    // Over the limit, make room by closing the oldest sockets without a seat
+    // (invite pages, tabs that never resumed) rather than turning this one
+    // away: it may be a player coming back for their seat.
+    let others = this.host.sockets().filter((s) => s !== socket);
+    while (others.length >= ROOM_LIMITS.maxSockets) {
+      const spare = others.find((s) => this.host.seatOf(s) === null);
+      if (spare === undefined) break;
+      this.host.close(spare, CLOSE_CODES.tooManyConnections, 'Too many connections to this room');
+      others = others.filter((s) => s !== spare);
+    }
+    if (others.length >= ROOM_LIMITS.maxSockets) {
       this.host.close(socket, CLOSE_CODES.tooManyConnections, 'Too many connections to this room');
       return;
     }

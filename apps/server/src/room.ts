@@ -8,7 +8,21 @@ import { RoomCore, newRoomRecord, type LobbyRoomUpdate, type NewRoom, type RoomH
 /** What each WebSocket remembers across hibernation. */
 interface Attachment {
   seat: PlayerId | null;
+  /** When the socket connected. */
+  at: number;
+  /** We closed it; it no longer counts even if the other side never answers. */
+  closed?: boolean;
 }
+
+/**
+ * A socket the client has not pinged for this long is dead: the browser went
+ * away without a close frame (lost network, a sleeping laptop, a killed mobile
+ * tab). The client pings every 20 s, and a throttled background tab still about
+ * once a minute.
+ */
+export const STALE_SOCKET_MS = 2 * 60_000;
+/** While anyone is connected, the room wakes this often to drop dead sockets. */
+export const SWEEP_EVERY_MS = 60_000;
 
 function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
@@ -48,10 +62,9 @@ export class Room extends DurableObject<Env> {
     super(ctx, env);
     this.host = {
       now: () => Date.now(),
-      sockets: () =>
-        this.ctx.getWebSockets().filter((ws) => ws !== this.closing && ws.readyState === WebSocket.OPEN),
-      seatOf: (ws) => (ws.deserializeAttachment() as Attachment | null)?.seat ?? null,
-      setSeat: (ws, seat) => ws.serializeAttachment({ seat } satisfies Attachment),
+      sockets: () => this.ctx.getWebSockets().filter((ws) => this.live(ws)),
+      seatOf: (ws) => this.attachment(ws).seat,
+      setSeat: (ws, seat) => ws.serializeAttachment({ ...this.attachment(ws), seat } satisfies Attachment),
       send: (ws, message: RoomServerMessage) => {
         try {
           ws.send(JSON.stringify(message));
@@ -60,6 +73,11 @@ export class Room extends DurableObject<Env> {
         }
       },
       close: (ws, code, reason) => {
+        try {
+          ws.serializeAttachment({ ...this.attachment(ws), closed: true } satisfies Attachment);
+        } catch {
+          // Already gone.
+        }
         try {
           ws.close(code, reason);
         } catch {
@@ -101,8 +119,9 @@ export class Room extends DurableObject<Env> {
       return new Response('Expected a WebSocket', { status: 426 });
     }
     const { 0: client, 1: server } = new WebSocketPair();
+    this.sweep();
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ seat: null } satisfies Attachment);
+    server.serializeAttachment({ seat: null, at: Date.now() } satisfies Attachment);
     if (this.core) {
       this.core.connected(server);
       await this.commit();
@@ -118,6 +137,7 @@ export class Room extends DurableObject<Env> {
       this.host.close(ws, CLOSE_CODES.roomClosed, 'The room is closed');
       return;
     }
+    this.sweep();
     this.core.receive(ws, typeof message === 'string' ? message : '');
     await this.commit();
   }
@@ -133,8 +153,50 @@ export class Room extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     this.alarmAt = null;
+    this.sweep();
     this.core?.tick();
     await this.commit();
+  }
+
+  private attachment(ws: WebSocket): Attachment {
+    const value = ws.deserializeAttachment() as Partial<Attachment> | null;
+    // Sockets accepted by an older version only stored the seat.
+    return { seat: value?.seat ?? null, at: value?.at ?? 0, ...(value?.closed ? { closed: true } : {}) };
+  }
+
+  /** Open, not closed by us, and heard from recently. */
+  private live(ws: WebSocket): boolean {
+    if (ws === this.closing || ws.readyState !== WebSocket.OPEN) return false;
+    const { closed } = this.attachment(ws);
+    return !closed && !this.stale(ws);
+  }
+
+  private stale(ws: WebSocket): boolean {
+    const pinged = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
+    const { at } = this.attachment(ws);
+    // A socket from before this version has no `at`: judge it by its pings alone.
+    return Date.now() - Math.max(pinged, at) > STALE_SOCKET_MS;
+  }
+
+  /**
+   * Close sockets whose client vanished without a close frame. Left alone they
+   * kept a seat looking connected (so no reconnection window ever opened) and
+   * filled the room until new connections were refused.
+   */
+  private sweep(): void {
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState !== WebSocket.OPEN || this.attachment(ws).closed || !this.stale(ws)) continue;
+      const { seat } = this.attachment(ws);
+      console.warn(`Room ${this.core?.record.id ?? '?'}: dropping a dead socket (seat ${seat ?? 'none'})`);
+      // A normal close: if the client is in fact alive it reconnects and resumes.
+      this.host.close(ws, 1000, 'No heartbeat');
+      this.closing = ws;
+      try {
+        this.core?.disconnected(ws);
+      } finally {
+        this.closing = null;
+      }
+    }
   }
 
   private async dropped(ws: WebSocket): Promise<void> {
@@ -165,8 +227,14 @@ export class Room extends DurableObject<Env> {
     // Not awaited: the output gate holds outgoing messages until the write is durable.
     if (core.takeDirty()) void this.ctx.storage.put('room', record);
 
-    const wake = core.nextWake();
-    if (wake !== this.alarmAt) {
+    // While anyone is connected, also wake now and then to drop dead sockets.
+    const now = Date.now();
+    const coreWake = core.nextWake();
+    const sweepAt = this.host.sockets().length > 0 ? now + SWEEP_EVERY_MS : null;
+    const wake = coreWake === null ? sweepAt : sweepAt === null ? coreWake : Math.min(coreWake, sweepAt);
+    // An alarm already set that rings sooner is fine: `tick` only runs what is due.
+    const keep = wake !== null && this.alarmAt !== null && this.alarmAt > now && this.alarmAt <= wake;
+    if (wake !== this.alarmAt && !keep) {
       this.alarmAt = wake;
       if (wake === null) await this.ctx.storage.deleteAlarm();
       else await this.ctx.storage.setAlarm(wake);
