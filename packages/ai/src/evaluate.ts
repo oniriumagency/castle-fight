@@ -187,7 +187,7 @@ function opNominal(op: EffectOp, w: Weights): number {
     case 'discardRandom':
       return 5 * op.count;
     case 'discardOwn':
-      // The hand refills at the end of the turn, so a discard only costs card quality.
+      // The hand refills when the next turn starts, so a discard only costs card quality.
       return op.upTo ? 0 : -(op.count === 'hand' ? 4 : op.count);
     case 'draw':
       return op.count;

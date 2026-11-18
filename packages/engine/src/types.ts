@@ -53,7 +53,7 @@ export interface Rules {
   workerStart: number;
   /** Extra Wall for the player who moves second, to make up for the lost tempo. */
   secondPlayerWall: number;
-  /** Cards in hand; the hand refills to this size at the end of your turn. */
+  /** Cards in hand; the hand refills to this size when your turn starts. */
   handSize: number;
   /** Most cards one discard action can throw away. */
   discardMax: number;
@@ -329,6 +329,12 @@ export interface PlayerState {
   drawbridge: boolean;
   /** This player's hand is visible to the opponent until the opponent's next turn. */
   handRevealed: boolean;
+  /**
+   * Cards a rival's effect made this player discard since their last turn: they
+   * draw that many fewer when their next turn starts (the hand only refills on
+   * the turn after). Missing in old saves: 0.
+   */
+  drawShort?: number;
   /** Who revealed it; the hand hides again when that player's next turn starts. */
   revealedBy?: PlayerId;
   /** 3+ players: this castle fell and the player no longer takes turns. */
@@ -489,7 +495,7 @@ export type Action =
   | { type: 'play'; player: PlayerId; uid: number; target?: PlayerId }
   /**
    * Discard the card `uid` from your hand as your action, plus the cards in
-   * `also` (up to `rules.discardMax` cards in all). The hand refills at the end of the turn.
+   * `also` (up to `rules.discardMax` cards in all). The hand refills when the player's next turn starts.
    */
   | { type: 'discard'; player: PlayerId; uid: number; also?: number[] }
   /** Use the hero ultimate. Free action: it does not use up your play. */
