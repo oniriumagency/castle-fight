@@ -35,6 +35,8 @@ describe('cleanTurnSeconds', () => {
   it('accepts only the offered turn lengths', () => {
     expect(cleanTurnSeconds(45)).toBe(45);
     expect(cleanTurnSeconds(90)).toBe(90);
+    expect(cleanTurnSeconds(0)).toBe(0);
+    expect(cleanTurnSeconds(-1)).toBeNull();
     expect(cleanTurnSeconds(31)).toBeNull();
     expect(cleanTurnSeconds('30')).toBeNull();
     expect(cleanTurnSeconds(1e9)).toBeNull();

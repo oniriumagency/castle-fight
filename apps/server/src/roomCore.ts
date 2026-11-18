@@ -540,6 +540,9 @@ export class RoomCore<S> {
       room.ending = { winner: state.result.winner, reason: state.result.reason, forfeit };
       if (state.result.winner !== null) room.score[state.result.winner] += 1;
       for (const seat of room.seats) if (seat) seat.rematch = false;
+    } else if (state.rules.turnSeconds <= 0) {
+      // No time limit: turns never run out.
+      room.clock = null;
     } else if (!room.clock || room.clock.turn !== state.turn) {
       room.clock = { turn: state.turn, deadline: now + state.rules.turnSeconds * 1000 };
     }

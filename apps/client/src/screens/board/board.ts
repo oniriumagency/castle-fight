@@ -13,7 +13,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
-import { comboBonusText } from '../../game/combo';
+import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
@@ -471,11 +471,23 @@ class BoardScreen implements Screen {
     const oppCards = opp.hand;
     if (this.oppHand.childElementCount !== oppCards.length || this.oppHand.dataset.key !== JSON.stringify(oppCards)) {
       this.oppHand.dataset.key = JSON.stringify(oppCards);
+      if (this.pilePreview && !this.discardPile.matches(':hover')) this.hidePilePreview();
       this.oppHand.replaceChildren(
         ...oppCards.map((c) => {
           const el = c.cardId ? cardFace(c.cardId, { calm: true }) : cardBack();
           el.dataset.uid = String(c.uid);
-          if (c.cardId) el.addEventListener('click', () => this.inspectCard(c.cardId!));
+          if (c.cardId) {
+            const id = c.cardId;
+            el.classList.add('revealed');
+            el.addEventListener('click', () => {
+              this.hidePilePreview();
+              this.inspectCard(id);
+            });
+            el.addEventListener('pointerenter', (e) => {
+              if (e.pointerType === 'mouse') this.showCardPreview(id, el.getBoundingClientRect(), 'below');
+            });
+            el.addEventListener('pointerleave', () => this.hidePilePreview());
+          }
           return el;
         }),
       );
@@ -949,8 +961,10 @@ class BoardScreen implements Screen {
   private async showPlayed(cardId: string, from: DOMRect, combo: boolean): Promise<void> {
     this.clearPlayed();
     const card = cardFace(cardId, { className: 'played' });
-    const bonus = combo ? comboBonusText(cardId) : '';
-    if (bonus) card.append(h('span.combo-tag', null, `${t('comboReady')}: ${bonus}`));
+    if (combo && comboBonusText(cardId)) {
+      card.classList.add('combo', 'boosted');
+      card.append(boostTag(cardId, true));
+    }
     this.stage.replaceChildren(card);
     this.playedCard = card;
     const target = card.getBoundingClientRect();
@@ -1022,23 +1036,36 @@ class BoardScreen implements Screen {
 
   /** Large copy of the last card played, next to the discard pile, to read what it did. */
   private showPilePreview(): void {
-    this.hidePilePreview();
     const id = this.discardTopId();
-    if (!id || this.el.classList.contains('touch')) return;
-    const big = cardFace(id, { calm: true });
+    if (id) this.showCardPreview(id, this.discardPile.getBoundingClientRect(), 'above');
+    else this.hidePilePreview();
+  }
+
+  /**
+   * A readable copy of a card next to `anchor` while the mouse is on it (the
+   * discard pile, or a revealed card of the rival). Not on touch screens,
+   * where a tap opens the inspect view instead.
+   */
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below'): void {
+    this.hidePilePreview();
+    if (this.el.classList.contains('touch')) return;
+    const big = cardFace(cardId, { calm: true });
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
-    const pile = this.discardPile.getBoundingClientRect();
-    const room = pile.top - host.top - 64;
+    const minTop = host.top + 56;
+    const handTop = this.hand.el.getBoundingClientRect().top;
+    const roomAbove = anchor.top - minTop - 12;
+    const roomBelow = Math.min(window.innerHeight, handTop + 40) - anchor.bottom - 12;
+    const room = prefer === 'above' ? roomAbove : roomBelow;
     const w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
     const hgt = w * 1.4;
-    let left = pile.left + pile.width / 2 - w / 2;
-    let top = pile.top - hgt - 12;
-    if (top < host.top + 56) {
-      // Not enough room above: stand beside the pile instead.
-      top = Math.max(host.top + 56, Math.min(pile.top + pile.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
-      left = pile.right + 16;
-      if (left + w > window.innerWidth - 8) left = pile.left - w - 16;
+    let left = anchor.left + anchor.width / 2 - w / 2;
+    let top = prefer === 'above' ? anchor.top - hgt - 12 : anchor.bottom + 12;
+    if ((prefer === 'above' && top < minTop) || (prefer === 'below' && top + hgt > window.innerHeight - 8)) {
+      // Not enough room: stand beside the anchor instead.
+      top = Math.max(minTop, Math.min(anchor.top + anchor.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
+      left = anchor.right + 16;
+      if (left + w > window.innerWidth - 8) left = anchor.left - w - 16;
     }
     left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
     big.style.setProperty('--w', `${w}px`);
@@ -1211,7 +1238,10 @@ class BoardScreen implements Screen {
     if (!ctx || !cardId) return;
     const reason = blockReason(ctx, cardId);
     const big = cardFace(cardId, { tilt: true, cost: undefined });
-    big.classList.toggle('combo', !reason && this.hand.elementOf(uid)?.classList.contains('combo') === true);
+    const handCard = this.hand.elementOf(uid);
+    big.classList.toggle('combo', !reason && handCard?.classList.contains('combo') === true);
+    big.classList.toggle('boosted', !reason && handCard?.classList.contains('boosted') === true);
+    if (big.classList.contains('boosted')) big.append(boostTag(cardId, big.classList.contains('combo')));
     const costEl = this.hand.elementOf(uid)?.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     this.openInspect(

@@ -11,7 +11,7 @@ import {
   other,
   ultimateThreshold,
 } from './core';
-import { resolvePending, runOps } from './effects';
+import { isConditionMet, resolvePending, runOps } from './effects';
 import { randomPick } from './rng';
 import { settle } from './turn';
 import type {
@@ -49,6 +49,14 @@ export function isUltimateReady(state: Board, player: PlayerId): boolean {
  */
 export function isComboActive(state: Board, player: PlayerId, cardId: CardId): boolean {
   return hasCombo(cardId) && state.players[player].comboSchool === getCard(cardId).school;
+}
+
+/**
+ * True if playing `cardId` now would get a stronger effect than its base one:
+ * its Combo is on, or one of its conditions holds.
+ */
+export function isBoostActive(state: Board, player: PlayerId, cardId: CardId): boolean {
+  return isComboActive(state, player, cardId) || isConditionMet(state, player, cardId);
 }
 
 /**

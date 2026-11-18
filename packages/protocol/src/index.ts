@@ -83,8 +83,11 @@ export interface RoomTimings {
   afkTimeouts: number;
 }
 
-/** Turn lengths a host can pick when creating a room, in seconds. */
-export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90] as const;
+/** Turn lengths a host can pick when creating a room, in seconds. 0 means no time limit. */
+export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90, 0] as const;
+
+/** `turnSeconds` value for turns with no time limit. */
+export const UNLIMITED_TURN = 0;
 
 export const DEFAULT_TIMINGS: RoomTimings = {
   turnSeconds: 30,
@@ -151,7 +154,7 @@ export interface CreateRoomRequest {
   /** Defaults to "Sala de <nickname>". */
   name?: string;
   private?: boolean;
-  /** Seconds per turn, one of `TURN_SECONDS_OPTIONS`. Defaults to the server's turn length. */
+  /** Seconds per turn, one of `TURN_SECONDS_OPTIONS` (0: no limit). Defaults to the server's turn length. */
   turnSeconds?: number;
   /** Random id the SDK keeps per browser, so quick join never pairs you with yourself. */
   clientId?: string;

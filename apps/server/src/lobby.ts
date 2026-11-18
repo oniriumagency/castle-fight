@@ -203,7 +203,7 @@ export class Lobby extends DurableObject<Env> {
 
   private async spawnRoom(input: CreateRoomInput, now: number): Promise<RoomSummary> {
     const base = timingsFrom(this.env);
-    const timings = input.turnSeconds ? { ...base, turnSeconds: input.turnSeconds } : base;
+    const timings = input.turnSeconds !== null ? { ...base, turnSeconds: input.turnSeconds } : base;
     for (let attempt = 0; ; attempt++) {
       const id = newRoomId();
       try {

@@ -5,7 +5,10 @@ import {
   buildDeckList,
   createGame,
   currentPlayer,
+  getPlayerView,
+  isBoostActive,
   isComboActive,
+  isConditionMet,
   legalActions,
   replay,
 } from '../src/index';
@@ -322,6 +325,27 @@ describe('enchantments', () => {
       state = pass(pass(state));
     }
     expect(protectedTurns).toBe(4);
+  });
+});
+
+describe('boosted cards', () => {
+  it('sees a condition that holds, also from the player view', () => {
+    const state = scenario({ opponent: { schoolsLastTurn: ['construccion'] }, you: { keep: 50 } });
+    expect(isConditionMet(state, ME, 'emboscada')).toBe(true);
+    expect(isBoostActive(getPlayerView(state, ME), ME, 'emboscada')).toBe(true);
+    expect(isConditionMet(state, ME, 'reparaciones-de-urgencia')).toBe(false);
+    state.players[ME].keep = 20;
+    expect(isConditionMet(state, ME, 'reparaciones-de-urgencia')).toBe(true);
+    state.players[OPP].schoolsLastTurn = ['asalto'];
+    expect(isBoostActive(state, ME, 'emboscada')).toBe(false);
+    // A card with no condition and no Combo is never boosted.
+    expect(isBoostActive(state, ME, 'catapulta')).toBe(false);
+  });
+
+  it('counts an active Combo', () => {
+    const state = scenario({ you: { comboSchool: 'construccion' } });
+    expect(isBoostActive(state, ME, 'puntales')).toBe(true);
+    expect(isBoostActive(state, ME, 'almenas')).toBe(false);
   });
 });
 

@@ -37,6 +37,7 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: PlayerId): Pla
     extraTurns: p.extraTurns,
     lastPlayedCard: p.lastPlayedCard,
     comboSchool: p.comboSchool,
+    schoolsLastTurn: p.schoolsLastTurn.slice(),
     hand: p.hand.map((c) => ({ uid: c.uid, cardId: visible ? c.cardId : null })),
     deckCount: p.deck.length,
     discardCount: p.discard.length,

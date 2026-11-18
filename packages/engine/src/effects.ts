@@ -13,6 +13,8 @@ import {
 } from './core';
 import { randomPick } from './rng';
 import type {
+  Board,
+  CardId,
   CardInstance,
   ChoiceKind,
   Condition,
@@ -20,6 +22,7 @@ import type {
   EffectOp,
   GameEvent,
   GameState,
+  PlayerId,
   Resource,
   ResourceMap,
 } from './types';
@@ -38,13 +41,22 @@ interface Choice {
   revealed?: CardInstance[];
 }
 
-function evalCondition(state: GameState, ctx: EffectContext, cond: Condition): boolean {
+function evalCondition(state: Board, ctx: Pick<EffectContext, 'player'>, cond: Condition): boolean {
   switch (cond.kind) {
     case 'selfKeepBelow':
       return state.players[ctx.player].keep < cond.value;
     case 'opponentPlayedSchoolLastTurn':
       return state.players[other(ctx.player)].schoolsLastTurn.includes(cond.school);
   }
+}
+
+/**
+ * True if one of the card's conditions ("if your Keep is below 35...",
+ * "if the opponent played Construction...") holds right now, so playing it
+ * gets the stronger effect.
+ */
+export function isConditionMet(state: Board, player: PlayerId, cardId: CardId): boolean {
+  return getCard(cardId).effects.some((op) => op.op === 'if' && evalCondition(state, { player }, op.cond));
 }
 
 /** The decision an op needs, or null when it needs none. */

@@ -19,9 +19,11 @@ export {
   currentPlayer,
   isUltimateReady,
   isComboActive,
+  isBoostActive,
   playBlocker,
 } from './actions';
 export { getPlayerView, redactEvents } from './view';
+export { isConditionMet } from './effects';
 export { effectiveCost, costResource, attackBonus, wallDamageReduction, isSchoolBanned, other, ultimateThreshold } from './core';
 
 export {

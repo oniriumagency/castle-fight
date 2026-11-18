@@ -1,4 +1,4 @@
-import { DEFAULT_TIMINGS, TURN_SECONDS_OPTIONS, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
+import { DEFAULT_TIMINGS, TURN_SECONDS_OPTIONS, UNLIMITED_TURN, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
 import type { LobbyConnection } from '@cardcraft-castles/protocol/client';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
@@ -27,9 +27,14 @@ export function requireNickname(input: HTMLInputElement): string | null {
 
 const TURN_KEY = 'cardcraft-castles:turn-seconds';
 
+function turnLabel(seconds: number): string {
+  return seconds === UNLIMITED_TURN ? `∞ ${t('noTimeLimit').toLowerCase()}` : t('secondsShort', { n: seconds });
+}
+
 function storedTurnSeconds(): number {
   try {
-    const value = Number(localStorage.getItem(TURN_KEY));
+    const raw = localStorage.getItem(TURN_KEY);
+    const value = raw === null || raw === '' ? NaN : Number(raw);
     if ((TURN_SECONDS_OPTIONS as readonly number[]).includes(value)) return value;
   } catch {
     // Storage blocked.
@@ -61,7 +66,8 @@ export function lobbyScreen(): Screen {
           {
             type: 'button',
             'aria-pressed': String(seconds === turnSeconds),
-            'aria-label': t('secondsLong', { n: seconds }),
+            'aria-label': seconds === UNLIMITED_TURN ? t('noTimeLimit') : t('secondsLong', { n: seconds }),
+            title: seconds === UNLIMITED_TURN ? t('noTimeLimit') : t('secondsLong', { n: seconds }),
             onclick: () => {
               audio.play('uiClick');
               turnSeconds = seconds;
@@ -73,7 +79,7 @@ export function lobbyScreen(): Screen {
               renderTurnPicker();
             },
           },
-          t('secondsShort', { n: seconds }),
+          seconds === UNLIMITED_TURN ? h('span.inf', null, '∞') : t('secondsShort', { n: seconds }),
         ),
       ),
     );
@@ -117,7 +123,7 @@ export function lobbyScreen(): Screen {
             'div.room-info',
             null,
             h('strong', null, room.name),
-            h('small', null, t('hostedBy', { host: room.host }), ' · ', html(iconSvg('clock')), ' ', t('secondsShort', { n: room.turnSeconds ?? DEFAULT_TIMINGS.turnSeconds })),
+            h('small', null, t('hostedBy', { host: room.host }), ' · ', html(iconSvg('clock')), ' ', turnLabel(room.turnSeconds ?? DEFAULT_TIMINGS.turnSeconds)),
           ),
           h('span.room-status', null, statusText(room.status)),
           h('span.room-players', null, html(iconSvg('users')), t('players', { n: room.players })),

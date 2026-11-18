@@ -4,6 +4,7 @@ import {
   effectiveCost,
   getCard,
   isComboActive,
+  isConditionMet,
   playBlocker,
   type PlayerId,
   type PlayerView,
@@ -12,6 +13,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
+import { boostTag } from '../../game/combo';
 import { cardBack, cardFace, glossaryFor } from '../../ui/card';
 
 export interface HandContext {
@@ -155,7 +157,9 @@ export class Hand {
       const myTurn = ctx.canAct;
       slot.el.classList.toggle('playable', myTurn && !reason);
       slot.el.classList.toggle('blocked', myTurn && !!reason);
-      slot.el.classList.toggle('combo', myTurn && !reason && isComboActive(ctx.view, ctx.seat, slot.cardId));
+      const combo = myTurn && !reason && isComboActive(ctx.view, ctx.seat, slot.cardId);
+      slot.el.classList.toggle('combo', combo);
+      slot.el.classList.toggle('boosted', combo || (myTurn && !reason && isConditionMet(ctx.view, ctx.seat, slot.cardId)));
       const cost = effectiveCost(ctx.view, ctx.seat, slot.cardId);
       const costEl = slot.el.querySelector('.cost');
       const span = costEl?.querySelector('span');
@@ -208,6 +212,8 @@ export class Hand {
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     big.classList.add('hover-preview');
     big.classList.toggle('combo', slot.el.classList.contains('combo'));
+    big.classList.toggle('boosted', slot.el.classList.contains('boosted'));
+    if (big.classList.contains('boosted')) big.append(boostTag(slot.cardId, big.classList.contains('combo')));
     big.classList.toggle('blocked', slot.el.classList.contains('blocked'));
     const r = slot.el.getBoundingClientRect();
     const hostRect = host.getBoundingClientRect();
