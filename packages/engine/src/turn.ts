@@ -149,9 +149,8 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
 
   // 0. Draw back up to a full hand. Cards are drawn when your turn starts, not
   // when it ends, so between your turns your hand keeps the gaps you left.
-  // Cards a rival made you discard are not replaced until the turn after.
-  drawCards(state, events, player, state.rules.handSize - self.hand.length - (self.drawShort ?? 0));
-  delete self.drawShort;
+  // Always back to a full hand, whatever was played, discarded or taken since.
+  drawCards(state, events, player, state.rules.handSize - self.hand.length);
 
   // 1. "Until your next turn" effects.
   for (let i = 0; i < state.players.length; i++) {

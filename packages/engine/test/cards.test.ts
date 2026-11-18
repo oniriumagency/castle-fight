@@ -484,14 +484,15 @@ const CARD_TESTS: Record<string, () => void> = {
   'prision-de-hielo': () => {
     const result = play('prision-de-hielo', { keepTurn: false });
     const state = result.state;
-    // No resource produces on the opponent's next turn, and they lose a card.
+    // No resource produces on the opponent's next turn, and they lose a card (replaced as their turn starts).
     expect(eventsOf(result.events, 'produced')[0]).toMatchObject({
       player: OPP,
       gained: { piedra: 0, acero: 0, mana: 0 },
     });
     expect(state.players[OPP].resources).toEqual({ piedra: 50, acero: 50, mana: 50 });
     expect(state.players[OPP].frost).toEqual({ piedra: 0, acero: 0, mana: 0 });
-    expect(state.players[OPP].hand).toHaveLength(5);
+    // The lost card is drawn back when their turn starts.
+    expect(state.players[OPP].hand).toHaveLength(6);
     expect(eventsOf(result.events, 'cardDiscarded')[0]).toMatchObject({ player: OPP, reason: 'effect' });
   },
   'reloj-de-arena': () => {
