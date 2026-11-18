@@ -1,0 +1,234 @@
+import { localize, type Locale, type LocalizedText } from '@cardcraft-castles/engine';
+import { settings } from './settings';
+
+/**
+ * Interface texts in Spanish and English. Card, hero, event, school and
+ * resource names come from the engine catalog, never from here, so balance
+ * changes to `design/cards.json` show up without touching the client.
+ */
+const STRINGS = {
+  // Main menu
+  tagline: { es: 'Levanta tu castillo. Derriba el del rival.', en: 'Raise your castle. Bring down theirs.' },
+  playAi: { es: 'Jugar contra la IA', en: 'Play vs AI' },
+  playAiHint: { es: 'Una partida rápida contra el ordenador', en: 'A quick match against the computer' },
+  playOnline: { es: 'Jugar online', en: 'Play online' },
+  playOnlineHint: { es: 'Crea una sala o únete a una abierta', en: 'Create a room or join an open one' },
+  playLocal: { es: 'Dos jugadores', en: 'Two players' },
+  playLocalHint: { es: 'Por turnos en este dispositivo', en: 'Take turns on this device' },
+  howToPlay: { es: 'Cómo se juega', en: 'How to play' },
+  settings: { es: 'Ajustes', en: 'Settings' },
+  nickname: { es: 'Tu apodo', en: 'Your nickname' },
+  nicknamePlaceholder: { es: 'Escribe un apodo', en: 'Enter a nickname' },
+  back: { es: 'Volver', en: 'Back' },
+  close: { es: 'Cerrar', en: 'Close' },
+  confirm: { es: 'Confirmar', en: 'Confirm' },
+  cancel: { es: 'Cancelar', en: 'Cancel' },
+  version: { es: 'Versión preliminar', en: 'Preview build' },
+
+  // Lobby
+  lobbyTitle: { es: 'Salas abiertas', en: 'Open rooms' },
+  lobbyEmpty: { es: 'No hay salas abiertas. Crea una y comparte el enlace.', en: 'No open rooms. Create one and share the link.' },
+  lobbyConnecting: { es: 'Conectando con el servidor…', en: 'Connecting to the server…' },
+  lobbyOffline: {
+    es: 'No se puede conectar con el servidor de partidas. Mientras tanto puedes jugar contra la IA o a dos jugadores.',
+    en: 'Cannot reach the game server. Meanwhile you can play against the AI or two players on this device.',
+  },
+  retry: { es: 'Reintentar', en: 'Retry' },
+  createRoom: { es: 'Crear partida', en: 'Create game' },
+  roomName: { es: 'Nombre de la sala', en: 'Room name' },
+  roomNameDefault: { es: 'Sala de {name}', en: "{name}'s room" },
+  join: { es: 'Unirse', en: 'Join' },
+  quickJoin: { es: 'Partida rápida', en: 'Quick match' },
+  privateRoom: { es: 'Privada (solo con enlace)', en: 'Private (link only)' },
+  watchFull: { es: 'Llena', en: 'Full' },
+  roomWaiting: { es: 'Esperando rival', en: 'Waiting for opponent' },
+  roomPlaying: { es: 'En juego', en: 'In progress' },
+  roomFinished: { es: 'Terminada', en: 'Finished' },
+  hostedBy: { es: 'Anfitrión: {host}', en: 'Host: {host}' },
+  players: { es: '{n}/2', en: '{n}/2' },
+  waitingTitle: { es: 'Esperando rival', en: 'Waiting for an opponent' },
+  waitingHint: { es: 'Comparte este enlace para que alguien se una a tu sala.', en: 'Share this link so someone can join your room.' },
+  copyLink: { es: 'Copiar enlace', en: 'Copy link' },
+  copied: { es: 'Enlace copiado', en: 'Link copied' },
+  leaveRoom: { es: 'Salir de la sala', en: 'Leave room' },
+  connectionLost: { es: 'Se perdió la conexión con la partida.', en: 'Lost the connection to the game.' },
+  reconnecting: { es: 'Reconectando…', en: 'Reconnecting…' },
+  serverError: { es: 'El servidor respondió: {message}', en: 'The server said: {message}' },
+
+  // Hero select
+  chooseHero: { es: 'Elige tu héroe', en: 'Choose your hero' },
+  chooseHeroFor: { es: '{who}, elige tu héroe', en: '{who}, choose your hero' },
+  opponentHero: { es: 'Héroe rival', en: 'Opponent hero' },
+  randomHero: { es: 'Al azar', en: 'Random' },
+  difficulty: { es: 'Dificultad', en: 'Difficulty' },
+  easy: { es: 'Fácil', en: 'Easy' },
+  normal: { es: 'Normal', en: 'Normal' },
+  hard: { es: 'Difícil', en: 'Hard' },
+  startGame: { es: 'Empezar partida', en: 'Start game' },
+  passive: { es: 'Pasiva', en: 'Passive' },
+  ultimate: { es: 'Definitiva', en: 'Ultimate' },
+  player1: { es: 'Jugador 1', en: 'Player 1' },
+  player2: { es: 'Jugador 2', en: 'Player 2' },
+  aiName: { es: 'IA ({level})', en: 'AI ({level})' },
+
+  // Board
+  yourTurn: { es: 'Tu turno', en: 'Your turn' },
+  theirTurn: { es: 'Turno de {who}', en: "{who}'s turn" },
+  extraTurn: { es: 'Turno extra', en: 'Extra turn' },
+  turnN: { es: 'Turno {n}', en: 'Turn {n}' },
+  play: { es: 'Jugar', en: 'Play' },
+  discard: { es: 'Descartar', en: 'Discard' },
+  useUltimate: { es: 'Usar definitiva', en: 'Use ultimate' },
+  ultimateReady: { es: '¡Definitiva lista!', en: 'Ultimate ready!' },
+  ultimateProgress: { es: 'Definitiva: {charge}/{threshold} de daño recibido', en: 'Ultimate: {charge}/{threshold} damage taken' },
+  deck: { es: 'Mazo', en: 'Deck' },
+  discardPile: { es: 'Descarte', en: 'Discard' },
+  production: { es: '+{n} por turno', en: '+{n} per turn' },
+  workersOf: { es: '{n} {worker}', en: '{n} {worker}' },
+  frozenTurns: { es: 'Congelado {n} turno(s)', en: 'Frozen for {n} turn(s)' },
+  burnTurns: { es: 'Quemadura: {n} turno(s), 2 de daño por turno', en: 'Burn: {n} turn(s), 2 damage per turn' },
+  shieldCharges: { es: 'Escudo: bloquea {n} ataque(s)', en: 'Shield: blocks {n} attack(s)' },
+  drawbridgeUp: { es: 'Puente levadizo: el daño perforante cuenta como normal', en: 'Drawbridge: piercing damage counts as normal' },
+  handVisible: { es: 'Mano revelada', en: 'Hand revealed' },
+  turnsLeft: { es: '{n} turno(s)', en: '{n} turn(s)' },
+  upcomingEvent: { es: 'En {n} turno(s)', en: 'In {n} turn(s)' },
+  upcomingNow: { es: 'Al empezar el próximo turno', en: 'At the start of next turn' },
+  activeEvent: { es: 'Activo: {n} turno(s) más', en: 'Active: {n} more turn(s)' },
+  comboReady: { es: 'Combo', en: 'Combo' },
+  costUp: { es: 'Más cara', en: 'Costs more' },
+  costDown: { es: 'Más barata', en: 'Costs less' },
+  blockedCannotAfford: { es: 'Te falta {resource}: cuesta {cost}.', en: 'Not enough {resource}: it costs {cost}.' },
+  blockedSchoolBanned: { es: 'Un evento prohíbe esta escuela ahora.', en: 'A battle event forbids this school right now.' },
+  blockedNothingToCopy: { es: 'El rival aún no ha jugado ninguna carta.', en: 'Your opponent has not played a card yet.' },
+  blockedNotYourTurn: { es: 'Espera a tu turno.', en: 'Wait for your turn.' },
+  dragHint: { es: 'Arrastra hacia arriba para jugar, o sobre el descarte para descartar', en: 'Drag up to play, or onto the discard pile to discard' },
+  waitingOpponent: { es: 'Esperando a {who}…', en: 'Waiting for {who}…' },
+  thinking: { es: '{who} está pensando…', en: '{who} is thinking…' },
+  menu: { es: 'Menú', en: 'Menu' },
+  concede: { es: 'Rendirse', en: 'Concede' },
+  concedeConfirm: { es: '¿Seguro que quieres rendirte?', en: 'Are you sure you want to concede?' },
+  resume: { es: 'Seguir jugando', en: 'Resume' },
+  log: { es: 'Registro', en: 'Log' },
+  you: { es: 'Tú', en: 'You' },
+  passDevice: { es: 'Pasa el dispositivo a {who}', en: 'Pass the device to {who}' },
+  passDeviceHint: { es: 'Tu mano queda oculta hasta que pulses el botón.', en: 'Your hand stays hidden until you press the button.' },
+  ready: { es: 'Estoy listo', en: "I'm ready" },
+  timeUp: { es: '¡Se acabó el tiempo!', en: "Time's up!" },
+  rotateHint: { es: 'Gira el teléfono para jugar más cómodo', en: 'Turn your phone sideways for a better view' },
+  emotes: { es: 'Emotes', en: 'Emotes' },
+
+  // Choices
+  chooseFrost: { es: 'Elige el recurso del rival que se congela', en: "Choose the opponent's resource to freeze" },
+  chooseDiscard: { es: 'Elige la carta del rival que se descarta', en: "Choose the opponent's card to discard" },
+  chooseEnchantment: { es: 'Elige el encantamiento rival que se destruye', en: 'Choose the enemy enchantment to destroy' },
+  opponentChoosing: { es: '{who} está eligiendo…', en: '{who} is choosing…' },
+
+  // Log lines
+  logTurn: { es: 'Turno {n}: {who}', en: 'Turn {n}: {who}' },
+  logPlayed: { es: '{who} juega {card}', en: '{who} plays {card}' },
+  logPlayedCombo: { es: '{who} juega {card} con Combo', en: '{who} plays {card} with Combo' },
+  logDiscarded: { es: '{who} descarta {card}', en: '{who} discards {card}' },
+  logTimeoutDiscard: { es: '{who} se quedó sin tiempo y descarta {card}', en: '{who} ran out of time and discards {card}' },
+  logEffectDiscard: { es: '{who} pierde {card}', en: '{who} loses {card}' },
+  logCopied: { es: '{who} copia {card}', en: '{who} copies {card}' },
+  logUltimate: { es: '{who} desata su definitiva', en: '{who} unleashes the ultimate' },
+  logDamage: { es: '{who} recibe {n} de daño', en: '{who} takes {n} damage' },
+  logBlocked: { es: 'El Escudo de {who} bloquea el ataque', en: "{who}'s Shield blocks the attack" },
+  logBurn: { es: '{who} sufre la Quemadura', en: '{who} suffers Burn' },
+  logBuilt: { es: '{who}: +{n} {target}', en: '{who}: +{n} {target}' },
+  logLost: { es: '{who}: −{n} {target}', en: '{who}: −{n} {target}' },
+  logEvent: { es: 'Evento: {event}', en: 'Event: {event}' },
+  logEnchant: { es: '{who} conjura {card}', en: '{who} casts {card}' },
+  logEnchantGone: { es: '{card} de {who} desaparece', en: "{who}'s {card} fades" },
+  logSwap: { es: 'Las Murallas se intercambian', en: 'The Walls swap' },
+  logExtraTurn: { es: '{who} gana un turno extra', en: '{who} gains an extra turn' },
+  logTimedOut: { es: '{who} agotó el tiempo', en: '{who} ran out of time' },
+  logGameOver: { es: 'Fin de la partida', en: 'Game over' },
+
+  // Results
+  victory: { es: 'Victoria', en: 'Victory' },
+  defeat: { es: 'Derrota', en: 'Defeat' },
+  draw: { es: 'Empate', en: 'Draw' },
+  winsTitle: { es: '¡{who} gana!', en: '{who} wins!' },
+  reasonKeepBuilt: { es: '{who} completó su Torreón.', en: '{who} completed their Keep.' },
+  reasonKeepDestroyed: { es: 'El Torreón de {who} cayó.', en: "{who}'s Keep fell." },
+  reasonConcede: { es: '{who} se rindió.', en: '{who} conceded.' },
+  reasonTurnLimit: { es: 'Se alcanzó el límite de turnos.', en: 'The turn limit was reached.' },
+  statTurns: { es: 'Turnos', en: 'Turns' },
+  statDamage: { es: 'Daño causado', en: 'Damage dealt' },
+  statBuilt: { es: 'Piedra levantada', en: 'Stone raised' },
+  statCards: { es: 'Cartas jugadas', en: 'Cards played' },
+  statBest: { es: 'Mejor golpe', en: 'Biggest hit' },
+  statUltimates: { es: 'Definitivas', en: 'Ultimates' },
+  rematch: { es: 'Revancha', en: 'Rematch' },
+  mainMenu: { es: 'Menú principal', en: 'Main menu' },
+  viewBoard: { es: 'Ver tablero', en: 'View board' },
+
+  // Settings
+  language: { es: 'Idioma', en: 'Language' },
+  masterVolume: { es: 'Volumen general', en: 'Master volume' },
+  musicVolume: { es: 'Música', en: 'Music' },
+  sfxVolume: { es: 'Efectos', en: 'Effects' },
+  animationSpeed: { es: 'Velocidad de animación', en: 'Animation speed' },
+  speedNormal: { es: 'Normal', en: 'Normal' },
+  speedFast: { es: 'Rápida', en: 'Fast' },
+  reducedMotion: { es: 'Reducir movimiento', en: 'Reduce motion' },
+  screenShake: { es: 'Sacudida de pantalla', en: 'Screen shake' },
+  localTimer: { es: 'Reloj de turno en partidas locales', en: 'Turn clock in local games' },
+  on: { es: 'Sí', en: 'On' },
+  off: { es: 'No', en: 'Off' },
+
+  // How to play
+  rulesGoal: {
+    es: 'Gana quien lleve su <b>Torreón</b> a {win} o deje el del rival en 0.',
+    en: 'Win by raising your <b>Keep</b> to {win} or bringing your opponent’s down to 0.',
+  },
+  rulesTurn: {
+    es: 'En tu turno, tus trabajadores producen recursos. Después juegas una carta pagando su coste, o descartas una. Al acabar repones la mano hasta {hand}.',
+    en: 'On your turn your workers produce resources. Then you play one card by paying its cost, or discard one. Afterwards your hand refills to {hand}.',
+  },
+  rulesSchools: {
+    es: 'Cada escuela se paga con su recurso: <b>Construcción</b> con Piedra, <b>Asalto</b> con Acero y <b>Arcano</b> con Maná. Los Canteros, Herreros y Arcanistas producen 1 por turno cada uno.',
+    en: 'Each school is paid with its resource: <b>Construction</b> with Stone, <b>Assault</b> with Steel and <b>Arcane</b> with Mana. Masons, Smiths and Arcanists each produce 1 per turn.',
+  },
+  rulesDamage: {
+    es: 'El daño golpea primero la <b>Muralla</b> y el resto pasa al Torreón. El daño <b>perforante</b> va directo al Torreón.',
+    en: 'Damage hits the <b>Wall</b> first and the rest goes to the Keep. <b>Piercing</b> damage goes straight to the Keep.',
+  },
+  rulesHeroes: {
+    es: 'Tu <b>héroe</b> tiene una pasiva y una <b>definitiva</b> que se carga con el daño que recibes. Usarla no gasta tu jugada.',
+    en: 'Your <b>hero</b> has a passive and an <b>ultimate</b> that charges as you take damage. Using it does not spend your play.',
+  },
+  rulesExtras: {
+    es: 'Los <b>encantamientos</b> se quedan en mesa varios turnos (máximo {max}). El <b>Combo</b> se activa si tu carta anterior era de la misma escuela. Cada {every} turnos llega un <b>evento de batalla</b> que afecta a los dos.',
+    en: '<b>Enchantments</b> stay on the table for several turns (up to {max}). <b>Combo</b> triggers when your previous card was from the same school. Every {every} turns a <b>battle event</b> hits both players.',
+  },
+  rulesControls: {
+    es: 'Toca una carta para verla grande y jugarla o descartarla. En ordenador también puedes arrastrarla, o usar las teclas 1 a 6, Intro para jugar, Supr para descartar y U para la definitiva.',
+    en: 'Tap a card to see it large and play or discard it. On a computer you can also drag it, or use keys 1 to 6, Enter to play, Delete to discard and U for the ultimate.',
+  },
+} as const satisfies Record<string, LocalizedText>;
+
+export type StringKey = keyof typeof STRINGS;
+
+export function detectLocale(): Locale {
+  return navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en';
+}
+
+export function locale(): Locale {
+  return settings.get().locale;
+}
+
+/** Interface text with `{name}` placeholders filled in. */
+export function t(key: StringKey, values: Record<string, string | number> = {}): string {
+  return fill(STRINGS[key][locale()], values);
+}
+
+/** A catalog text (card, hero, event...) in the current locale. */
+export function L(text: LocalizedText): string {
+  return localize(text, locale());
+}
+
+export function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));
+}

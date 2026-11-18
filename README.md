@@ -11,7 +11,7 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`), con el nombre de archivo indicado en cada prompt. |
 | `packages/engine` | Motor de reglas puro y determinista, sin dependencias. Lo usan el servidor, el cliente, la IA y las simulaciones. [Documentación](packages/engine/README.md). |
 | `packages/protocol` | Mensajes entre cliente y servidor y el SDK de cliente tipado (`@cardcraft-castles/protocol/client`) con lobby, salas, reconexión y reloj. [Documentación](packages/protocol/README.md). |
-| `apps/client` | Cliente web (Vite + PixiJS). Por ahora es un esqueleto que juega una partida local con el motor. |
+| `apps/client` | Cliente web (Vite + PixiJS): menú, lobby online, selección de héroe, tablero animado y resultados, en escritorio y móvil, en español e inglés. Se juega contra la IA, a dos jugadores en el mismo dispositivo o en línea. [Documentación](apps/client/README.md). |
 | `apps/server` | Servidor autoritativo en Cloudflare Workers (plan gratuito): un Durable Object para el lobby en vivo y uno por sala, con reloj de turno, reconexión, revancha, partida rápida, salas privadas por enlace y límites contra abusos. [Documentación](apps/server/README.md). |
 
 ## Puesta en marcha

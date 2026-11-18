@@ -3,20 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0d1220" />
+    <meta name="theme-color" content="#0d1020" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Cardcraft: Castles — levanta tu castillo y derriba el del rival. Duelo de cartas 1 contra 1 en el navegador." />
     <title>Cardcraft: Castles</title>
-    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body>
     <div id="stage"></div>
-    <div id="hud">
-      <p id="log" aria-live="polite"></p>
-      <div id="controls">
-        <button id="next" type="button"></button>
-        <button id="restart" type="button"></button>
-        <button id="locale" type="button"></button>
-      </div>
+    <div id="screen">
+      <div class="boot"><div class="spinner big"></div></div>
     </div>
+    <div id="overlay"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

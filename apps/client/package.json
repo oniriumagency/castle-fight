@@ -5,17 +5,22 @@
   "description": "Cliente HTML5 de Cardcraft: Castles (Vite + PixiJS)",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "art": "node scripts/build-art.mjs",
+    "dev": "node scripts/build-art.mjs && vite",
+    "build": "node scripts/build-art.mjs && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@cardcraft-castles/engine": "workspace:*",
     "@cardcraft-castles/protocol": "workspace:*",
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/eb-garamond": "^5.3.0",
+    "@fontsource/grenze-gotisch": "^5.3.0",
     "pixi.js": "^8.23.0"
   },
   "devDependencies": {
+    "sharp": "0.35.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.8"
   }
