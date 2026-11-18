@@ -154,6 +154,7 @@ function playCard(
   const resource = costResource(cardId);
   // Only cards with a Combo bonus get (and announce) it.
   const combo = isComboActive(state, player, cardId);
+  const boosted = isConditionMet(state, player, cardId);
 
   self.hand.splice(index, 1);
   self.discard.push(cardId);
@@ -162,7 +163,7 @@ function playCard(
   self.lastPlayedCard = cardId;
   self.schoolsThisTurn.push(card.school);
   state.actionsLeft -= 1;
-  events.push({ type: 'cardPlayed', player, uid, cardId, resource, cost, combo });
+  events.push({ type: 'cardPlayed', player, uid, cardId, resource, cost, combo, ...(boosted ? { boosted: true } : {}) });
 
   runOps(
     state,

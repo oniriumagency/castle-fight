@@ -197,14 +197,15 @@ export class SidePanel {
     this.onPreview(null);
     this.history.replaceChildren(
       ...entries.map((entry, i) => {
-        const { cardId, discarded } = parseHistoryEntry(entry);
+        const { cardId, discarded, boost } = parseHistoryEntry(entry);
         const card = getCard(cardId);
-        const name = discarded ? `${L(card.name)} (${t('discardedStamp')})` : L(card.name);
+        const tag = boost === 'combo' ? t('comboReady') : boost === 'boosted' ? t('boosted') : null;
+        const name = discarded ? `${L(card.name)} (${t('discardedStamp')})` : tag ? `${L(card.name)} (${tag})` : L(card.name);
         const el = h(
           'button.hist-card',
           {
             type: 'button',
-            class: `s-${card.school} r-${card.rarity}${i === 0 ? ' newest' : ''}${discarded ? ' discarded' : ''}`,
+            class: `s-${card.school} r-${card.rarity}${i === 0 ? ' newest' : ''}${discarded ? ' discarded' : ''}${boost ? ' boosted' : ''}`,
             title: name,
             'aria-label': `${name}: ${rulesOf(card)}`,
             onclick: () => {
@@ -215,6 +216,7 @@ export class SidePanel {
           h('img', { src: artUrl(card.art), alt: '', draggable: 'false', onerror: hideMissingArt }),
           h('span.hist-cost', null, String(card.cost)),
           discarded ? discardOverlay() : null,
+          tag ? h('span.hist-boost', { 'aria-hidden': 'true' }, tag) : null,
         );
         el.addEventListener('pointerenter', (e) => {
           if (e.pointerType === 'mouse') this.onPreview(entry, el.getBoundingClientRect());

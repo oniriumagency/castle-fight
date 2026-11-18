@@ -27,7 +27,7 @@ import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilig
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
-import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize } from '../../ui/card';
+import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize, type Boost } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
 import { heroCss, skyFor } from '../../ui/theme';
@@ -211,14 +211,14 @@ class BoardScreen implements Screen {
     this.ultMode.pulse = () => fx.ultimateAura(this.fxContext(), this.ultMode.button.classList.contains('usable'));
     for (const panel of this.panels) {
       panel.onInspect = (entry) => {
-        const { cardId, discarded } = parseHistoryEntry(entry);
-        this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded);
+        const { cardId, discarded, boost } = parseHistoryEntry(entry);
+        this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded, boost);
       };
       panel.onInspectHero = (heroId) => this.inspectHero(heroId);
       panel.onPreview = (cardId, anchor) => {
         if (cardId && anchor) {
           const entry = parseHistoryEntry(cardId);
-          this.showCardPreview(entry.cardId, anchor, panel.side === 0 ? 'right' : 'left', this.heroOf(this.seatOfSide(panel.side)), entry.discarded);
+          this.showCardPreview(entry.cardId, anchor, panel.side === 0 ? 'right' : 'left', this.heroOf(this.seatOfSide(panel.side)), entry.discarded, entry.boost);
         }
         else this.hidePilePreview();
       };
@@ -738,7 +738,7 @@ class BoardScreen implements Screen {
     this.stats.add(events);
     for (const e of events) {
       if (e.type === 'cardPlayed' || e.type === 'cardDiscarded') {
-        const entry = historyEntry(e.cardId, e.type === 'cardDiscarded');
+        const entry = e.type === 'cardDiscarded' ? historyEntry(e.cardId, true) : historyEntry(e.cardId, false, boostOf(e));
         this.history[e.player] = [entry, ...this.history[e.player]].slice(0, HISTORY_SIZE);
       }
     }
@@ -956,12 +956,12 @@ class BoardScreen implements Screen {
         p.hand = p.hand.filter((c) => c.uid !== e.uid);
         p.lastPlayedCard = e.cardId;
         p.discardCount++;
-        this.shownHistory[e.player] = [e.cardId, ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
+        this.shownHistory[e.player] = [historyEntry(e.cardId, false, boostOf(e)), ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
         const from = this.takeFromHand(e.player, e.uid);
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
         fx.cardLaunched();
-        await this.showPlayed(e.cardId, from, e.combo, this.heroOf(e.player));
+        await this.showPlayed(e.cardId, from, boostOf(e), this.heroOf(e.player));
         break;
       }
       case 'cardCopied':
@@ -1236,14 +1236,11 @@ class BoardScreen implements Screen {
   }
 
   /** The played card flies to the centre, is shown big, and stays until the next one. */
-  private async showPlayed(cardId: string, from: DOMRect, combo: boolean, hero?: HeroId): Promise<void> {
+  private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId): Promise<void> {
     this.clearPlayed();
-    const card = cardFace(cardId, { className: 'played', hero });
+    const card = markBoost(cardFace(cardId, { className: 'played', hero }), cardId, boost);
+    const combo = boost === 'combo';
     if (hero) card.dataset.hero = hero;
-    if (combo && comboBonusText(cardId)) {
-      card.classList.add('combo', 'boosted');
-      card.append(boostTag(cardId, true));
-    }
     this.stage.replaceChildren(card);
     this.playedCard = card;
     const target = card.getBoundingClientRect();
@@ -1350,10 +1347,10 @@ class BoardScreen implements Screen {
    * discard pile, or a revealed card of the rival). Not on touch screens,
    * where a tap opens the inspect view instead.
    */
-  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId, discarded = false): void {
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId, discarded = false, boost: Boost = null): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
-    const big = cardFace(cardId, { calm: true, hero });
+    const big = markBoost(cardFace(cardId, { calm: true, hero }), cardId, boost);
     if (discarded) markDiscarded(big);
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
@@ -1846,9 +1843,9 @@ class BoardScreen implements Screen {
     return panel;
   }
 
-  private inspectCard(cardId: string, hero?: HeroId, discarded = false): void {
+  private inspectCard(cardId: string, hero?: HeroId, discarded = false, boost: Boost = null): void {
     audio.play('cardSelect');
-    const face = cardFace(cardId, { tilt: true, hero });
+    const face = markBoost(cardFace(cardId, { tilt: true, hero }), cardId, boost);
     if (discarded) markDiscarded(face);
     this.openInspect(face, rulesOf(getCard(cardId)));
   }
@@ -2153,4 +2150,19 @@ class BoardScreen implements Screen {
   private exit(): void {
     void import('../flow').then(({ flow }) => (this.session.kind === 'online' ? flow.lobby() : flow.menu()));
   }
+}
+
+/** How a played card was strengthened: its Combo (only cards with a Combo bonus), or its condition. */
+function boostOf(e: { cardId: string; combo: boolean; boosted?: boolean }): Boost {
+  if (e.combo && comboBonusText(e.cardId)) return 'combo';
+  return e.combo || e.boosted ? 'boosted' : null;
+}
+
+/** The arcane halo and the COMBO / BOOSTED tag on a card that was played strengthened. */
+function markBoost(card: HTMLElement, cardId: string, boost: Boost): HTMLElement {
+  if (!boost) return card;
+  card.classList.add('boosted');
+  if (boost === 'combo') card.classList.add('combo');
+  card.append(boostTag(cardId, boost === 'combo'));
+  return card;
 }

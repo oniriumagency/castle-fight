@@ -245,17 +245,25 @@ export function markDiscarded(el: HTMLElement): HTMLElement {
 }
 
 /**
- * History entries: a card id, with this prefix when the card was discarded.
+ * History entries: a card id, with a prefix when the card was discarded
+ * (`x:`) or played with its Combo (`c:`) or its condition met (`b:`).
  * Kept as plain strings so saved histories stay readable.
  */
-const DISCARDED_PREFIX = 'x:';
+export type Boost = 'combo' | 'boosted' | null;
 
-export function historyEntry(cardId: string, discarded: boolean): string {
-  return discarded ? DISCARDED_PREFIX + cardId : cardId;
+const DISCARDED_PREFIX = 'x:';
+const BOOST_PREFIX: Record<'combo' | 'boosted', string> = { combo: 'c:', boosted: 'b:' };
+
+export function historyEntry(cardId: string, discarded: boolean, boost: Boost = null): string {
+  if (discarded) return DISCARDED_PREFIX + cardId;
+  return boost ? BOOST_PREFIX[boost] + cardId : cardId;
 }
 
-export function parseHistoryEntry(entry: string): { cardId: string; discarded: boolean } {
-  return entry.startsWith(DISCARDED_PREFIX) ? { cardId: entry.slice(DISCARDED_PREFIX.length), discarded: true } : { cardId: entry, discarded: false };
+export function parseHistoryEntry(entry: string): { cardId: string; discarded: boolean; boost: Boost } {
+  if (entry.startsWith(DISCARDED_PREFIX)) return { cardId: entry.slice(DISCARDED_PREFIX.length), discarded: true, boost: null };
+  if (entry.startsWith(BOOST_PREFIX.combo)) return { cardId: entry.slice(2), discarded: false, boost: 'combo' };
+  if (entry.startsWith(BOOST_PREFIX.boosted)) return { cardId: entry.slice(2), discarded: false, boost: 'boosted' };
+  return { cardId: entry, discarded: false, boost: null };
 }
 
 /** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */
