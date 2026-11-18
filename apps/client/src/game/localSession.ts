@@ -1,10 +1,12 @@
 import {
+  HEROES,
   applyAction,
   createGame,
   getPlayerView,
   redactEvents,
   type GameEvent,
   type GameState,
+  type HeroId,
   type PlayerId,
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
@@ -233,7 +235,23 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.clockTimer = this.aiTimer = null;
   }
 
-  rematch(): void {
+  rematch(heroes?: Partial<Record<PlayerId, HeroId>>): void {
+    // A new hero for the seats played on this device; the AI keeps its own.
+    this.seats.forEach((seat, i) => {
+      const hero = heroes?.[i];
+      if (hero && this.isLocal(i)) this.seats[i] = { ...seat, hero };
+    });
+    // Free-for-all: the AIs keep three different heroes on the board.
+    if (this.seats.length > 2) {
+      const taken = new Set<HeroId>();
+      this.seats.forEach((seat, i) => {
+        if (seat.isAi && taken.has(seat.hero)) {
+          const free = HEROES.map((h) => h.id).filter((id) => !taken.has(id) && !this.seats.some((s) => s.hero === id));
+          if (free.length) this.seats[i] = { ...seat, hero: free[Math.floor(Math.random() * free.length)]! };
+        }
+        taken.add(this.seats[i]!.hero);
+      });
+    }
     this.emit({ type: 'rematch', seat: 0 });
     this.start();
   }
