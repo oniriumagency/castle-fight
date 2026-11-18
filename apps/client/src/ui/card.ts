@@ -13,7 +13,7 @@ import {
   type LocalizedText,
 } from '@cardcraft-castles/engine';
 import { escapeHtml, h } from '../app/dom';
-import { L, locale } from '../app/i18n';
+import { L, locale, t } from '../app/i18n';
 import { settings } from '../app/settings';
 import { SCHOOL_EMBLEM, artUrl, emblemSvg } from './assets';
 
@@ -27,7 +27,7 @@ import { SCHOOL_EMBLEM, artUrl, emblemSvg } from './assets';
 /** Words that are bold in rules text, with the explanation shown when a card is inspected. */
 const GLOSSARY: { words: LocalizedText; text: LocalizedText }[] = [
   {
-    words: { es: 'Torreón|Torreones', en: 'Keep|Keeps' },
+    words: { es: 'Castillo|Castillos', en: 'Castle|Castles' },
     text: {
       es: `Tu vida. Llega a ${DEFAULT_RULES.keepWin} para ganar; si cae a 0, pierdes.`,
       en: `Your life. Reach ${DEFAULT_RULES.keepWin} to win; if it drops to 0, you lose.`,
@@ -35,11 +35,11 @@ const GLOSSARY: { words: LocalizedText; text: LocalizedText }[] = [
   },
   {
     words: { es: 'Muralla|Murallas', en: 'Wall|Walls' },
-    text: { es: 'Recibe el daño normal antes que el Torreón.', en: 'Takes normal damage before your Keep.' },
+    text: { es: 'Recibe el daño normal antes que el Castillo.', en: 'Takes normal damage before your Castle.' },
   },
   {
     words: { es: 'perforante', en: 'piercing' },
-    text: { es: 'Ignora la Muralla y golpea directamente el Torreón.', en: 'Ignores the Wall and hits the Keep directly.' },
+    text: { es: 'Ignora la Muralla y golpea directamente el Castillo.', en: 'Ignores the Wall and hits the Castle directly.' },
   },
   {
     words: { es: 'Encantamiento', en: 'Enchantment' },
@@ -120,16 +120,16 @@ const BUFF_OPEN = '\u0001';
 const BUFF_CLOSE = '\u0002';
 
 /**
- * Card text with the numbers the player's hero improves already counted:
- * "13 damage" becomes "15 (+2) damage" for the Marshal, "for 4 turns" becomes
- * "for 5 (+1) turns" for the Sorceress. Hits that are not single attacks
+ * Card text with what the player's hero adds to its numbers: "13 damage"
+ * becomes "13+2 damage" for the Marshal, "for 4 turns" becomes "for 4+1
+ * turns" for the Sorceress. Hits that are not single attacks
  * (per card discarded, Burn ticks) and other modifiers stay as printed.
  */
 function buffText(ops: readonly EffectOp[], text: string, heroId: HeroId): string {
   const buffs = heroBuffs(heroId);
   if (!buffs.attack && !buffs.status) return text;
   const numbers = effectNumbers(ops);
-  const mark = (n: number, bonus: number): string => `${BUFF_OPEN}${n + bonus} (+${bonus})${BUFF_CLOSE}`;
+  const mark = (n: number, bonus: number): string => `${n}${BUFF_OPEN}+${bonus}${BUFF_CLOSE}`;
   const es = locale() === 'es';
   let out = text;
   if (buffs.attack && numbers.damage.size) {
@@ -137,21 +137,18 @@ function buffText(ops: readonly EffectOp[], text: string, heroId: HeroId): strin
     out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? mark(Number(m), buffs.attack) : m));
   }
   if (buffs.status && numbers.status.size) {
-    const turns = es ? /(?<=durante )(\d+) (turnos?)/g : /(?<=for )(\d+) (turns?)/g;
-    out = out.replace(turns, (m, n: string, word: string) => {
+    const turns = es ? /(?<=durante )(\d+) turnos?/g : /(?<=for )(\d+) turns?/g;
+    out = out.replace(turns, (m, n: string) => {
       if (!numbers.status.has(Number(n))) return m;
       const plural = es ? 'turnos' : 'turns';
-      return `${mark(Number(n), buffs.status)} ${Number(n) + buffs.status > 1 ? plural : word}`;
+      return `${mark(Number(n), buffs.status)} ${plural}`;
     });
   }
   return out;
 }
 
 function buffHtml(html: string): string {
-  return html.replace(/\u0001([^\u0002]*)\u0002/g, (_, inner: string) => {
-    const [total, bonus] = inner.split(' ');
-    return `<span class="hero-buff">${total} <small>${bonus}</small></span>`;
-  });
+  return html.replace(/\u0001([^\u0002]*)\u0002/g, '<span class="hero-buff">$1</span>');
 }
 
 /** Explanations for the keywords a text uses, for the inspect view. */
@@ -215,6 +212,27 @@ export function heroParts(heroId: HeroId): { passive: string; ultimate: string }
   const text = L(getHero(heroId).text);
   const match = /^[^:]+:\s*(.*?)\s*(?:Definitiva|Ultimate):\s*(.*)$/s.exec(text);
   return match ? { passive: match[1], ultimate: match[2] } : { passive: text, ultimate: '' };
+}
+
+/** Red tint and a "Discarded" stamp over a card that was thrown away rather than played. */
+export function markDiscarded(el: HTMLElement): HTMLElement {
+  el.classList.add('discarded');
+  el.append(h('span.discard-overlay', { 'aria-hidden': 'true' }, h('b', null, t('discardedStamp'))));
+  return el;
+}
+
+/**
+ * History entries: a card id, with this prefix when the card was discarded.
+ * Kept as plain strings so saved histories stay readable.
+ */
+const DISCARDED_PREFIX = 'x:';
+
+export function historyEntry(cardId: string, discarded: boolean): string {
+  return discarded ? DISCARDED_PREFIX + cardId : cardId;
+}
+
+export function parseHistoryEntry(entry: string): { cardId: string; discarded: boolean } {
+  return entry.startsWith(DISCARDED_PREFIX) ? { cardId: entry.slice(DISCARDED_PREFIX.length), discarded: true } : { cardId: entry, discarded: false };
 }
 
 /** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */

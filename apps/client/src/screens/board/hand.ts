@@ -16,6 +16,7 @@ import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
 import { boostTag } from '../../game/combo';
 import { cardBack, cardFace, glossaryFor } from '../../ui/card';
+import { closeX } from '../../ui/closeX';
 
 export interface HandContext {
   view: PlayerView;
@@ -349,16 +350,35 @@ export function inspectPanel(opts: {
   text: string;
   actions?: { play: () => void; discard: () => void; reason: string | null; canAct: boolean };
   close: () => void;
-}): HTMLElement {
+}): InspectPanel {
   const gloss = glossaryFor(opts.text);
   const a = opts.actions;
-  return h(
+  const reasonEl = h('p.inspect-reason');
+  const playBtn = h('button.btn.primary.big', { type: 'button', onclick: () => a?.play() }, t('play'));
+  const discardBtn = h('button.btn', { type: 'button', onclick: () => a?.discard() }, t('discard'));
+  const hintEl = h('p.inspect-hint', null, html(t('dragHint')));
+  /** Follows the game while open: the turn starting enables Play without reopening the card. */
+  const updateActions = (reason: string | null, canAct: boolean): void => {
+    reasonEl.textContent = reason ?? '';
+    reasonEl.hidden = !reason;
+    playBtn.disabled = !!reason;
+    discardBtn.disabled = !canAct;
+    hintEl.hidden = !canAct;
+  };
+  if (a) updateActions(a.reason, a.canAct);
+  const panel = h(
     'div.inspect',
-    { onclick: (e: Event) => e.target === e.currentTarget && opts.close() },
+    {
+      // Anywhere but the card and what is written beside it closes the view.
+      onclick: (e: Event) => {
+        const target = e.target as HTMLElement;
+        if (target === e.currentTarget || target.matches('.inspect-box, .inspect-card, .inspect-side')) opts.close();
+      },
+    },
     h(
       'div.inspect-box',
       null,
-      h('div.inspect-card', null, opts.card),
+      h('div.inspect-card', null, opts.card, closeX(opts.close, true)),
       h(
         'div.inspect-side',
         null,
@@ -369,18 +389,13 @@ export function inspectPanel(opts: {
               gloss.flatMap((g) => [h('dt', null, g.word), h('dd', null, g.text)]),
             )
           : null,
-        a && a.reason ? h('p.inspect-reason', null, a.reason) : null,
-        a
-          ? h(
-              'div.inspect-actions',
-              null,
-              h('button.btn.primary.big', { type: 'button', disabled: !!a.reason, onclick: a.play }, t('play')),
-              h('button.btn', { type: 'button', disabled: !a.canAct, onclick: a.discard }, t('discard')),
-              h('button.btn.ghost', { type: 'button', onclick: opts.close }, t('cancel')),
-            )
-          : h('div.inspect-actions', null, h('button.btn', { type: 'button', onclick: opts.close }, t('close'))),
-        a && a.canAct ? h('p.inspect-hint', null, html(t('dragHint'))) : null,
+        a ? reasonEl : null,
+        a ? h('div.inspect-actions', null, playBtn, discardBtn) : null,
+        a ? hintEl : null,
       ),
     ),
   );
+  return Object.assign(panel, { updateActions });
 }
+
+export type InspectPanel = HTMLDivElement & { updateActions: (reason: string | null, canAct: boolean) => void };

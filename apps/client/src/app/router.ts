@@ -1,5 +1,6 @@
 import { clear, h } from './dom';
 import { audio } from '../fx/audio';
+import { closeX } from '../ui/closeX';
 
 /** A full-screen view: menu, lobby, hero select, board, results. */
 export interface Screen {
@@ -46,6 +47,8 @@ window.addEventListener('resize', () => current?.resize?.());
 export function modal(build: (close: () => void) => HTMLElement, opts: { dismissable?: boolean } = {}): () => void {
   const overlay = document.getElementById('overlay')!;
   const box = build(() => close());
+  // Every dialog that can be dismissed gets the red X in its corner.
+  if (opts.dismissable !== false) box.append(closeX(() => close()));
   const backdrop = h('div.modal-backdrop', { role: 'dialog', 'aria-modal': 'true' }, box);
   let closed = false;
   const onKey = (e: KeyboardEvent): void => {

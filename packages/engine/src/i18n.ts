@@ -10,7 +10,7 @@ export const GAME_TITLE = 'Cardcraft: Castles';
 export const LOCALES: readonly Locale[] = ['es', 'en'];
 
 export const TERMS = {
-  keep: { es: 'Torreón', en: 'Keep' },
+  keep: { es: 'Castillo', en: 'Castle' },
   wall: { es: 'Muralla', en: 'Wall' },
   hand: { es: 'Mano', en: 'Hand' },
   deck: { es: 'Mazo', en: 'Deck' },
