@@ -1,0 +1,17 @@
+{
+  "name": "cardcraft-castles",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "sim": "pnpm --filter @cardcraft-castles/engine sim",
+    "dev:client": "pnpm --filter @cardcraft-castles/client dev",
+    "dev:server": "pnpm --filter @cardcraft-castles/server dev"
+  }
+}

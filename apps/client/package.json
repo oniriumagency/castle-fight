@@ -1,0 +1,22 @@
+{
+  "name": "@cardcraft-castles/client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cliente HTML5 de Cardcraft: Castles (Vite + PixiJS)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cardcraft-castles/engine": "workspace:*",
+    "@cardcraft-castles/protocol": "workspace:*",
+    "pixi.js": "^8.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

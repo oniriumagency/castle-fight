@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cardcraft-castles",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "LOBBY", "class_name": "Lobby" },
+      { "name": "ROOM", "class_name": "Room" }
+    ]
+  },
+  // SQLite-backed Durable Objects are the ones available on the free plan.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Lobby", "Room"] }]
+}

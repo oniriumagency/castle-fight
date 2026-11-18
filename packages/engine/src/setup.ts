@@ -1,0 +1,88 @@
+import { DEFAULT_RULES, buildDeckList, getHero, isHeroId } from './catalog';
+import { drawCards, emptyResources } from './core';
+import { hashSeed, randomInt, shuffle } from './rng';
+import { rollBattleEvent, startTurn } from './turn';
+import type { GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from './types';
+
+export interface GameOptions {
+  /** Same seed + same actions = same game. Use an unpredictable value online. */
+  seed: number | string;
+  /** Hero of player 0 and player 1. */
+  heroes: [HeroId, HeroId];
+  /** Who takes the first turn. Random (from the seed) when omitted. */
+  firstPlayer?: PlayerId;
+  /** Overrides for the default rules, mainly for balance simulations and tests. */
+  rules?: Partial<Rules>;
+}
+
+function createPlayer(state: GameState, hero: HeroId): PlayerState {
+  const rules = state.rules;
+  return {
+    hero,
+    keep: rules.keepStart,
+    wall: rules.wallStart + (getHero(hero).passive.startingWallBonus ?? 0),
+    resources: emptyResources(rules.resourceStart),
+    workers: emptyResources(rules.workerStart),
+    hand: [],
+    deck: shuffle(state, buildDeckList(rules)),
+    discard: [],
+    enchantments: [],
+    burn: 0,
+    frost: emptyResources(),
+    shield: 0,
+    drawbridge: false,
+    handRevealed: false,
+    ultimateCharge: 0,
+    ultimateUses: 0,
+    extraTurns: 0,
+    lastPlayedCard: null,
+    comboSchool: null,
+    schoolsThisTurn: [],
+    schoolsLastTurn: [],
+  };
+}
+
+/**
+ * Create a new game and start the first turn. Throws on invalid options
+ * (unknown hero), since that is a programming error rather than a player move.
+ */
+export function createGame(options: GameOptions): { state: GameState; events: GameEvent[] } {
+  for (const hero of options.heroes) {
+    if (!isHeroId(hero)) throw new Error(`Unknown hero "${hero}"`);
+  }
+  const rules: Rules = {
+    ...DEFAULT_RULES,
+    ...options.rules,
+    deckCopies: { ...DEFAULT_RULES.deckCopies, ...options.rules?.deckCopies },
+  };
+
+  const state = {
+    version: 1,
+    rules,
+    rng: hashSeed(options.seed),
+    seq: 0,
+    turn: 0,
+    active: 0,
+    phase: 'action',
+    actionsLeft: 0,
+    extraTurn: false,
+    pending: null,
+    activeEvent: null,
+    upcomingEvent: { id: '', turn: rules.eventEveryTurns + 1 },
+    nextUid: 1,
+    result: null,
+  } as unknown as GameState;
+
+  state.players = [createPlayer(state, options.heroes[0]), createPlayer(state, options.heroes[1])];
+  state.upcomingEvent.id = rollBattleEvent(state, null);
+  const firstPlayer = options.firstPlayer ?? (randomInt(state, 2) as PlayerId);
+
+  const events: GameEvent[] = [
+    { type: 'gameStarted', firstPlayer, heroes: [options.heroes[0], options.heroes[1]] },
+    { type: 'battleEventForecast', eventId: state.upcomingEvent.id, turn: state.upcomingEvent.turn },
+  ];
+  drawCards(state, events, 0, rules.handSize);
+  drawCards(state, events, 1, rules.handSize);
+  startTurn(state, events, firstPlayer, false);
+  return { state, events };
+}
