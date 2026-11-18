@@ -5,11 +5,16 @@
  *
  *   pnpm dev            (in another terminal)
  *   pnpm smoke          (or: pnpm smoke http://localhost:8787)
+ *
+ * With `--private` the bots meet in a private room instead: use it against
+ * the published game, where quick join could seat a bot in a real player's room.
  */
 import { HEROES } from '@cardcraft-castles/engine';
 import { OnlineClient, type RoomConnection } from '@cardcraft-castles/protocol/client';
 
-const base = process.argv[2] ?? 'http://localhost:8787';
+const args = process.argv.slice(2);
+const privateRoom = args.includes('--private');
+const base = args.find((arg) => !arg.startsWith('--')) ?? 'http://localhost:8787';
 const pick = <T>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)]!;
 
 const bots = [0, 1].map(() => new OnlineClient({ baseUrl: base, storage: null }));
@@ -19,14 +24,24 @@ console.log(`Server: ${health.game}, protocol ${health.protocol}, ${health.cards
 const lobby = bots[0]!.connectLobby();
 lobby.on('stats', (stats) => console.log(`Lobby: ${stats.online} online, ${stats.waiting} waiting, ${stats.playing} playing`));
 
-const first = await bots[0]!.quickJoin({ nickname: 'bot-0' });
-console.log(`bot-0 ${first.created ? 'created' : 'found'} room ${first.room.id}`);
-const rooms: RoomConnection[] = [bots[0]!.joinRoom(first.room.id, { nickname: 'bot-0', hero: 'random' })];
+let roomId: string;
+if (privateRoom) {
+  roomId = (await bots[0]!.createRoom({ nickname: 'bot-0', private: true })).id;
+  console.log(`bot-0 created private room ${roomId}`);
+} else {
+  const first = await bots[0]!.quickJoin({ nickname: 'bot-0' });
+  console.log(`bot-0 ${first.created ? 'created' : 'found'} room ${first.room.id}`);
+  roomId = first.room.id;
+}
+const rooms: RoomConnection[] = [bots[0]!.joinRoom(roomId, { nickname: 'bot-0', hero: 'random' })];
 await new Promise((resolve) => rooms[0]!.on('welcome', resolve));
 
-const second = await bots[1]!.quickJoin({ nickname: 'bot-1' });
-console.log(`bot-1 ${second.created ? 'created' : 'found'} room ${second.room.id}`);
-rooms.push(bots[1]!.joinRoom(second.room.id, { nickname: 'bot-1', hero: pick(HEROES).id }));
+if (!privateRoom) {
+  const second = await bots[1]!.quickJoin({ nickname: 'bot-1' });
+  console.log(`bot-1 ${second.created ? 'created' : 'found'} room ${second.room.id}`);
+  roomId = second.room.id;
+}
+rooms.push(bots[1]!.joinRoom(roomId, { nickname: 'bot-1', hero: pick(HEROES).id }));
 
 let states = 0;
 const summary = await new Promise<string>((resolve, reject) => {

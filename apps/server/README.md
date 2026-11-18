@@ -76,4 +76,16 @@ Se pueden poner en `.dev.vars` para `pnpm dev`.
 
 ## Despliegue
 
-Este paquete no se despliega solo. `pnpm --filter @cardcraft-castles/server deploy` lo publica con la cuenta de Wrangler. Para servir el cliente desde el mismo dominio basta con añadir `assets` en `wrangler.jsonc` apuntando a `../client/dist` con `run_worker_first: ["/api/*"]`; así el enlace de invitación y la API comparten origen y el SDK no necesita configuración.
+`wrangler.jsonc` tiene dos niveles. El superior es lo que ejecutan `pnpm dev` y los tests: solo la API. `env.production` es el juego publicado: el mismo Worker, con el cliente compilado (`../client/dist`) como archivos estáticos y el dominio propio. `/api/*` va siempre al Worker (`run_worker_first`) y cualquier otra ruta que no sea un archivo devuelve `index.html`. Así el enlace de invitación y la API comparten origen y el SDK no necesita configuración.
+
+```sh
+pnpm --filter @cardcraft-castles/client build
+pnpm --filter @cardcraft-castles/server run deploy   # wrangler deploy --env production
+pnpm --filter @cardcraft-castles/server smoke https://games.onirium.agency --private
+```
+
+Con `--private` los bots de `smoke` se encuentran en una sala privada en vez de usar la partida rápida, para no sentarse en la sala de un jugador real.
+
+Los entornos de Wrangler no heredan los Durable Objects: una clase nueva hay que declararla en los dos niveles (la migración solo en el superior).
+
+Lo normal es no publicar a mano: GitHub Actions lo hace en cada push a `main`. Los secretos que necesita están en el [README principal](../../README.md#despliegue).
