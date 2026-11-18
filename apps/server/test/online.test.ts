@@ -373,6 +373,16 @@ describe('limits', () => {
     expect((error as { retryAfterMs?: number }).retryAfterMs).toBeGreaterThan(0);
   });
 
+  it('accepts error reports from the page', async () => {
+    const res = await fetch(`${base}/api/client-error`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: JSON.stringify({ kind: 'error', message: 'x'.repeat(20_000) }),
+    });
+    expect(res.status).toBe(204);
+    expect((await fetch(`${base}/api/client-error`)).status).toBe(405);
+  });
+
   it('closes lobby sockets that send junk', async () => {
     const ws = new WebSocket(base.replace(/^http/, 'ws') + '/api/lobby');
     await new Promise((resolve) => ws.addEventListener('open', resolve));

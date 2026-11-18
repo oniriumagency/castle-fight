@@ -30,6 +30,7 @@ import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
+import { reportProblem } from '../../app/errorReport';
 import { skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
@@ -59,6 +60,10 @@ const HISTORY_SIZE = 3;
 
 /** One state update's animations may take this long at most; then the board shows the result. */
 const MAX_ANIMATION_MS = 20_000;
+/** A gap this long between watchdog runs while the tab is visible means the page froze. */
+const STALL_MS = 5000;
+/** The player's own turn with the board locked this long is reported. */
+const BLOCKED_REPORT_MS = 30_000;
 /** An action unanswered for this long no longer blocks the board. */
 const AWAIT_ANSWER_MS = 6000;
 
@@ -418,10 +423,19 @@ class BoardScreen implements Screen {
       while (this.queue.length && !this.destroyed) {
         const update = this.queue.shift()!;
         // An animation that never ends (a paused or throttled tab) must not freeze the board.
-        await Promise.race([
-          this.animate(update).catch((error: unknown) => console.error('Board animation failed', error)),
-          new Promise<void>((resolve) => setTimeout(resolve, MAX_ANIMATION_MS)),
+        const kinds = update.events.map((e) => e.type);
+        const timedOut = await Promise.race([
+          this.animate(update).then(
+            () => false,
+            (error: unknown) => {
+              console.error('Board animation failed', error);
+              reportProblem('animationError', error, { events: kinds.slice(0, 40), ...this.snapshot() });
+              return false;
+            },
+          ),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(true), MAX_ANIMATION_MS)),
         ]);
+        if (timedOut) reportProblem('animationTimeout', 'An update took too long to animate', { events: kinds.slice(0, 40), ...this.snapshot() });
         this.view = update.view;
         this.shown = [clonePlayer(update.view.players[0]), clonePlayer(update.view.players[1])];
         this.shownActive = update.view.active;
@@ -1408,9 +1422,12 @@ class BoardScreen implements Screen {
    * again. Either one used to leave both players looking at "Wait for your turn".
    */
   private watchdog(): void {
-    if (this.destroyed || this.busy) return;
+    if (this.destroyed) return;
+    this.watchHealth();
+    if (this.busy) return;
     if (this.awaiting) {
       if (Date.now() - this.awaitingSince < AWAIT_ANSWER_MS) return;
+      reportProblem('noAnswer', 'The server did not answer an action', this.snapshot());
       this.awaiting = false;
       this.session.resync?.();
       this.render();
@@ -1419,6 +1436,57 @@ class BoardScreen implements Screen {
     const view = this.view;
     if (!view || this.closeChoice || this.curtain.hidden !== true) return;
     if (view.phase === 'choice' && view.pending?.player === view.viewer && this.session.isLocal(view.viewer)) this.maybeChoose();
+  }
+
+  /** Last watchdog run, to notice the page itself stalling. */
+  private lastWatch = 0;
+  private wasVisible = false;
+  /** Since when it has been this player's turn without the board letting them act. */
+  private blockedSince = 0;
+
+  /**
+   * Report (once per page load) a board that stays locked on the player's own
+   * turn, or a page that stopped running for seconds, with what the board was
+   * doing, so the next freeze can be told apart from the others.
+   */
+  private watchHealth(): void {
+    const now = Date.now();
+    const visible = document.visibilityState === 'visible';
+    // Only while the tab stays in front: background tabs are allowed to sleep.
+    if (this.lastWatch && visible && this.wasVisible && now - this.lastWatch > STALL_MS) {
+      reportProblem('stall', `The page stopped for ${now - this.lastWatch} ms`, this.snapshot());
+    }
+    this.lastWatch = now;
+    this.wasVisible = visible;
+    const v = this.view;
+    const myTurn = !!v && v.phase !== 'finished' && v.active === v.viewer && this.session.isLocal(v.viewer);
+    if (!myTurn || this.canAct() || !visible) {
+      this.blockedSince = 0;
+      return;
+    }
+    if (!this.blockedSince) this.blockedSince = now;
+    else if (now - this.blockedSince > BLOCKED_REPORT_MS) {
+      reportProblem('boardLocked', 'Own turn, but the board does not let the player act', this.snapshot());
+    }
+  }
+
+  /** What the board is doing, for problem reports. */
+  private snapshot(): Record<string, unknown> {
+    const v = this.view;
+    return {
+      session: this.session.kind,
+      turn: v?.turn,
+      phase: v?.phase,
+      active: v?.active,
+      viewer: v?.viewer,
+      pending: v?.pending ? { player: v.pending.player, kind: (v.pending as { kind?: string }).kind, options: v.pending.options.length } : null,
+      busy: this.busy,
+      awaiting: this.awaiting,
+      queued: this.queue.length,
+      curtain: this.curtain.hidden !== true,
+      choiceOpen: !!this.closeChoice,
+      dialogs: Array.from(this.layer.children, (el) => el.className).slice(0, 10),
+    };
   }
 
   private tryPlay(uid: number): void {
