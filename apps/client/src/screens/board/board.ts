@@ -13,6 +13,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
+import { comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
@@ -125,6 +126,17 @@ class BoardScreen implements Screen {
     this.deckPile.append(cardBack(), h('span.pile-count'));
     this.discardPile.append(h('div.pile-empty'), h('span.pile-count'));
     this.hand.discardTarget = this.discardPile;
+    // The last card played sits on the discard pile: hover it to read it, click or tap to inspect it.
+    this.discardPile.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'mouse') this.showPilePreview();
+    });
+    this.discardPile.addEventListener('pointerleave', () => this.hidePilePreview());
+    this.discardPile.addEventListener('click', () => {
+      const id = this.discardTopId();
+      if (!id) return;
+      this.hidePilePreview();
+      this.inspectCard(id);
+    });
     this.eventChip.addEventListener('click', () => this.inspectEvent());
 
     this.el = h(
@@ -436,6 +448,7 @@ class BoardScreen implements Screen {
         isAi: this.session.seats[seat]?.isAi,
         active: this.shownActive === seat && view.phase !== 'finished',
         canUltimate: canAct && seat === view.viewer && p.ultimateReady,
+        mine: this.session.isLocal(seat),
       });
       this.plaques[side].update(p.keep, p.wall);
     }
@@ -848,7 +861,11 @@ class BoardScreen implements Screen {
         this.render();
         if (e.ready && !wasReady) {
           this.panels[this.sideOf(e.player)].pulse('.portrait');
-          if (this.session.isLocal(e.player)) audio.play('ultimateReady');
+          this.panels[this.sideOf(e.player)].pulse('.ult-btn');
+          if (this.session.isLocal(e.player)) {
+            audio.play('ultimateReady');
+            toast(t('ultimateReadyToast'), 'info', 4200);
+          }
         }
         break;
       }
@@ -916,7 +933,8 @@ class BoardScreen implements Screen {
   private async showPlayed(cardId: string, from: DOMRect, combo: boolean): Promise<void> {
     this.clearPlayed();
     const card = cardFace(cardId, { className: 'played' });
-    if (combo) card.append(h('span.combo-tag', null, t('comboReady')));
+    const bonus = combo ? comboBonusText(cardId) : '';
+    if (bonus) card.append(h('span.combo-tag', null, `${t('comboReady')}: ${bonus}`));
     this.stage.replaceChildren(card);
     this.playedCard = card;
     const target = card.getBoundingClientRect();
@@ -964,9 +982,51 @@ class BoardScreen implements Screen {
   }
 
   private setDiscardTop(cardId: string | null): void {
+    this.hidePilePreview();
     const top = cardId ? cardFace(cardId, { calm: true }) : cardBack();
     const count = this.discardPile.querySelector('.pile-count');
     this.discardPile.replaceChildren(top, count ?? h('span.pile-count'));
+    this.discardPile.classList.toggle('has-card', !!cardId);
+    if (this.discardPile.matches(':hover')) this.showPilePreview();
+  }
+
+  private discardTopId(): string | null {
+    return this.discardPile.querySelector<HTMLElement>('.card[data-card-id]')?.dataset.cardId ?? null;
+  }
+
+  private pilePreview: HTMLElement | null = null;
+
+  /** Large copy of the last card played, next to the discard pile, to read what it did. */
+  private showPilePreview(): void {
+    this.hidePilePreview();
+    const id = this.discardTopId();
+    if (!id || this.el.classList.contains('touch')) return;
+    const big = cardFace(id, { calm: true });
+    big.classList.add('hover-preview', 'pile-preview');
+    const host = this.layer.getBoundingClientRect();
+    const pile = this.discardPile.getBoundingClientRect();
+    const room = pile.top - host.top - 64;
+    const w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
+    const hgt = w * 1.4;
+    let left = pile.left + pile.width / 2 - w / 2;
+    let top = pile.top - hgt - 12;
+    if (top < host.top + 56) {
+      // Not enough room above: stand beside the pile instead.
+      top = Math.max(host.top + 56, Math.min(pile.top + pile.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
+      left = pile.right + 16;
+      if (left + w > window.innerWidth - 8) left = pile.left - w - 16;
+    }
+    left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
+    big.style.setProperty('--w', `${w}px`);
+    big.style.left = `${left - host.left}px`;
+    big.style.top = `${top - host.top}px`;
+    this.layer.appendChild(big);
+    this.pilePreview = big;
+  }
+
+  private hidePilePreview(): void {
+    this.pilePreview?.remove();
+    this.pilePreview = null;
   }
 
   private async flyToDiscard(cardId: string | null, from: DOMRect, existing?: HTMLElement): Promise<void> {

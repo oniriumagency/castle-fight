@@ -1,5 +1,6 @@
 import { TERMS, getBattleEvent, getCard, type GameEvent, type PlayerId } from '@cardcraft-castles/engine';
 import { L, t } from '../app/i18n';
+import { comboBonusText } from './combo';
 
 /** One line of the game log for an event, or null for events not worth a line. */
 export function describeEvent(event: GameEvent, name: (seat: PlayerId) => string): string | null {
@@ -8,7 +9,9 @@ export function describeEvent(event: GameEvent, name: (seat: PlayerId) => string
     case 'turnStarted':
       return t('logTurn', { n: event.turn, who: name(event.player) });
     case 'cardPlayed':
-      return t(event.combo ? 'logPlayedCombo' : 'logPlayed', { who: name(event.player), card: card(event.cardId) });
+      return event.combo && comboBonusText(event.cardId)
+        ? t('logPlayedCombo', { who: name(event.player), card: card(event.cardId), bonus: comboBonusText(event.cardId) })
+        : t('logPlayed', { who: name(event.player), card: card(event.cardId) });
     case 'cardCopied':
       return t('logCopied', { who: name(event.player), card: card(event.cardId) });
     case 'cardDiscarded':

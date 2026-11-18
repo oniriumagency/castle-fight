@@ -1669,3 +1669,198 @@
   right: -4px;
   transform: none;
 }
+
+/* ---------- Ultimate button ---------- */
+
+.ult-btn {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px 9px;
+  border-radius: 9px;
+  border: 1px solid rgb(227 182 86 / 28%);
+  background: rgb(10 8 16 / 70%);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: help;
+  overflow: hidden;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s;
+}
+
+.side-1 .ult-btn {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.ult-btn-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 8%);
+  color: var(--gold);
+}
+
+.ult-btn-icon svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.ult-btn-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.ult-btn-title {
+  font-family: var(--display);
+  font-size: 0.8rem;
+  color: var(--text, #f3ead8);
+  letter-spacing: 0.02em;
+}
+
+.ult-btn-hint {
+  font-size: 0.7rem;
+}
+
+.ult-btn-effect {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: rgb(243 234 216 / 72%);
+}
+
+.ult-btn-effect b {
+  color: #f3ead8;
+}
+
+.ult-btn-meter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.ult-btn-meter i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #b9832b, #ffd36a);
+  transition: width 0.6s ease;
+}
+
+.side-1 .ult-btn-meter i {
+  margin-left: auto;
+}
+
+.ult-btn.ready {
+  border-color: rgb(255 211 106 / 70%);
+  color: #f3e3b8;
+}
+
+.ult-btn.ready .ult-btn-icon {
+  background: #ffd36a;
+  color: #2a1606;
+}
+
+.ult-btn.usable {
+  cursor: pointer;
+  color: #2a1606;
+  border-color: #fff0b0;
+  background: linear-gradient(180deg, #ffe17a, #e09a2a);
+  animation: ultBtnReady 1.6s ease-in-out infinite;
+}
+
+.ult-btn.usable .ult-btn-title,
+.ult-btn.usable .ult-btn-effect,
+.ult-btn.usable .ult-btn-effect b {
+  color: #2a1606;
+}
+
+.ult-btn.usable .ult-btn-icon {
+  background: #2a1606;
+  color: #ffd36a;
+}
+
+.ult-btn.usable .ult-btn-meter {
+  display: none;
+}
+
+.ult-btn.usable:hover {
+  filter: brightness(1.08);
+}
+
+.ult-btn.usable:active {
+  transform: translateY(1px);
+}
+
+@keyframes ultBtnReady {
+  50% { box-shadow: 0 0 16px rgb(255 190 70 / 85%); }
+}
+
+.board.short .ult-btn {
+  gap: 5px;
+  padding: 4px 6px 7px;
+}
+
+.board.short .ult-btn-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.board.short .ult-btn-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.board.short .ult-btn-title {
+  font-size: 0.68rem;
+}
+
+.board.short .ult-btn-hint {
+  font-size: 0.6rem;
+}
+
+.board.short .ult-btn-effect {
+  display: none;
+}
+
+/* Phones: the ring on the portrait already shows the charge of the rival's ultimate. */
+.board.phone-portrait .ult-btn:not(.mine),
+.board.short .ult-btn:not(.mine):not(.ready) {
+  display: none;
+}
+
+.board.phone-portrait .ult-btn-effect {
+  display: none;
+}
+
+.board.short .ult-btn:not(.ready) .ult-btn-hint {
+  display: none;
+}
+
+.board.short .ult-btn-title {
+  white-space: nowrap;
+}
+
+.discard-pile.has-card {
+  cursor: zoom-in;
+}
+
+.discard-pile.has-card:hover .card {
+  filter: brightness(1.12);
+  box-shadow: 0 0 0 2px rgb(255 211 106 / 70%), 0 8px 14px rgb(0 0 0 / 60%);
+}
