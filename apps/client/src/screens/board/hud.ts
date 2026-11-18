@@ -312,14 +312,17 @@ export class CastlePlaque {
   private readonly keep: HTMLElement;
   private readonly wall: HTMLElement;
   private readonly bar: HTMLElement;
+  private readonly name: HTMLElement;
 
   constructor(side: number, private keepWin: number) {
+    this.name = h('span.plaque-name');
     this.keep = h('span.plaque-num');
     this.wall = h('span.plaque-num');
     this.bar = h('span.plaque-bar-fill');
     this.el = h(
       'div.plaque',
       { class: `plaque-${side}` },
+      this.name,
       h('span.plaque-item.keep', { title: L(TERMS.keep) }, html(iconSvg('keep')), this.keep),
       h('span.plaque-item.wall', { title: L(TERMS.wall) }, html(iconSvg('wall')), this.wall),
       h('span.plaque-bar', null, this.bar),
@@ -328,6 +331,15 @@ export class CastlePlaque {
 
   setKeepWin(keepWin: number): void {
     this.keepWin = keepWin;
+  }
+
+  /** The player's gametag, above the numbers; it lights up on their turn. */
+  setName(name: string, active: boolean): void {
+    if (this.name.textContent !== name) {
+      this.name.textContent = name;
+      this.name.title = name;
+    }
+    this.el.classList.toggle('active', active);
   }
 
   update(keep: number, wall: number): void {

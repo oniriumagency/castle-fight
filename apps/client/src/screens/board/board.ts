@@ -578,6 +578,7 @@ class BoardScreen implements Screen {
         mine: this.session.isLocal(seat),
       });
       this.plaques[side].update(p.keep, p.wall);
+      this.plaques[side].setName(this.name(seat), this.shownActive === seat && view.phase !== 'finished');
       this.panels[side].setHistory(this.shownHistory[seat]);
     }
     fx.auras(
