@@ -430,3 +430,11 @@
   text-shadow: 0 0 calc(6 * var(--u)) rgb(79 216 255 / 70%);
   letter-spacing: 0.02em;
 }
+
+/* Placeholder while a card's illustration does not exist yet. */
+.card.no-art .art {
+  background: radial-gradient(circle at 50% 40%, var(--f1, #3a3450) 0%, #0b0a12 75%);
+}
+.card.no-art .art img {
+  visibility: hidden;
+}

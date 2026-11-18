@@ -118,7 +118,7 @@ describe('online play', () => {
 
   it('answers the health check', async () => {
     const health = await client(base).online.health();
-    expect(health).toMatchObject({ ok: true, protocol: 2, cards: 60 });
+    expect(health).toMatchObject({ ok: true, protocol: 2, cards: 69 });
   });
 
   it('lists a room live in the lobby, lets a second player in and hides each hand', async () => {

@@ -328,6 +328,51 @@
       "art": "cards/ciudadela-eterna.jpg"
     },
     {
+      "id": "escombros-utiles",
+      "school": "construccion",
+      "rarity": "comun",
+      "cost": 2,
+      "name": {
+        "es": "Escombros Útiles",
+        "en": "Useful Rubble"
+      },
+      "text": {
+        "es": "Descarta hasta 3 cartas. +4 Muralla por cada una.",
+        "en": "Discard up to 3 cards. +4 Wall for each."
+      },
+      "art": "cards/escombros-utiles.jpg"
+    },
+    {
+      "id": "planos-revisados",
+      "school": "construccion",
+      "rarity": "rara",
+      "cost": 3,
+      "name": {
+        "es": "Planos Revisados",
+        "en": "Revised Plans"
+      },
+      "text": {
+        "es": "Descarta 1 carta, roba 2 y juega otra carta este turno.",
+        "en": "Discard 1 card, draw 2 and play another card this turn."
+      },
+      "art": "cards/planos-revisados.jpg"
+    },
+    {
+      "id": "sillares-reciclados",
+      "school": "construccion",
+      "rarity": "rara",
+      "cost": 5,
+      "name": {
+        "es": "Sillares Reciclados",
+        "en": "Reclaimed Ashlars"
+      },
+      "text": {
+        "es": "Descarta hasta 3 cartas. +4 Torreón por cada una.",
+        "en": "Discard up to 3 cards. +4 Keep for each."
+      },
+      "art": "cards/sillares-reciclados.jpg"
+    },
+    {
       "id": "escaramuza",
       "school": "asalto",
       "rarity": "comun",
@@ -628,6 +673,51 @@
       "art": "cards/hueste-imparable.jpg"
     },
     {
+      "id": "tierra-quemada",
+      "school": "asalto",
+      "rarity": "comun",
+      "cost": 3,
+      "name": {
+        "es": "Tierra Quemada",
+        "en": "Scorched Earth"
+      },
+      "text": {
+        "es": "Descarta hasta 3 cartas. 4 de daño por cada una.",
+        "en": "Discard up to 3 cards. 4 damage for each."
+      },
+      "art": "cards/tierra-quemada.jpg"
+    },
+    {
+      "id": "relevo-de-tropas",
+      "school": "asalto",
+      "rarity": "rara",
+      "cost": 3,
+      "name": {
+        "es": "Relevo de Tropas",
+        "en": "Troop Rotation"
+      },
+      "text": {
+        "es": "5 de daño. Descarta 1 carta, roba 1 y juega otra carta este turno.",
+        "en": "5 damage. Discard 1 card, draw 1 and play another card this turn."
+      },
+      "art": "cards/relevo-de-tropas.jpg"
+    },
+    {
+      "id": "todo-o-nada",
+      "school": "asalto",
+      "rarity": "epica",
+      "cost": 9,
+      "name": {
+        "es": "Todo o Nada",
+        "en": "All or Nothing"
+      },
+      "text": {
+        "es": "Descarta toda tu mano. 6 de daño por cada carta descartada.",
+        "en": "Discard your whole hand. 6 damage for each card discarded."
+      },
+      "art": "cards/todo-o-nada.jpg"
+    },
+    {
       "id": "chispa-arcana",
       "school": "arcano",
       "rarity": "comun",
@@ -926,6 +1016,51 @@
         "en": "17 damage to the Wall and 17 piercing damage."
       },
       "art": "cards/cometa-del-ocaso.jpg"
+    },
+    {
+      "id": "ofrenda-arcana",
+      "school": "arcano",
+      "rarity": "comun",
+      "cost": 1,
+      "name": {
+        "es": "Ofrenda Arcana",
+        "en": "Arcane Offering"
+      },
+      "text": {
+        "es": "Descarta 2 cartas, roba 1 y juega otra carta este turno.",
+        "en": "Discard 2 cards, draw 1 and play another card this turn."
+      },
+      "art": "cards/ofrenda-arcana.jpg"
+    },
+    {
+      "id": "grimorio-en-llamas",
+      "school": "arcano",
+      "rarity": "rara",
+      "cost": 5,
+      "name": {
+        "es": "Grimorio en Llamas",
+        "en": "Burning Grimoire"
+      },
+      "text": {
+        "es": "Descarta hasta 3 cartas. 4 de daño perforante por cada una.",
+        "en": "Discard up to 3 cards. 4 piercing damage for each."
+      },
+      "art": "cards/grimorio-en-llamas.jpg"
+    },
+    {
+      "id": "quema-de-pergaminos",
+      "school": "arcano",
+      "rarity": "rara",
+      "cost": 7,
+      "name": {
+        "es": "Quema de Pergaminos",
+        "en": "Scroll Burning"
+      },
+      "text": {
+        "es": "El rival descarta 2 cartas al azar y recibe 6 de daño perforante.",
+        "en": "The opponent discards 2 random cards and takes 6 piercing damage."
+      },
+      "art": "cards/quema-de-pergaminos.jpg"
     }
   ],
   "heroes": [

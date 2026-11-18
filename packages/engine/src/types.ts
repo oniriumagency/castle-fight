@@ -108,10 +108,13 @@ export interface EnchantmentModifiers {
  * player resolving the effect, "opponent" is the other player.
  */
 export type EffectOp =
-  /** +amount to your Wall. `comboBonus` is added when Combo is active. */
-  | { op: 'wall'; amount: number; comboBonus?: number }
+  /**
+   * +amount to your Wall. `comboBonus` is added when Combo is active and
+   * `perDiscard` once for each card the same effect made you discard.
+   */
+  | { op: 'wall'; amount: number; comboBonus?: number; perDiscard?: number }
   /** +amount to your Keep. */
-  | { op: 'keep'; amount: number; comboBonus?: number }
+  | { op: 'keep'; amount: number; comboBonus?: number; perDiscard?: number }
   /**
    * An attack against the opponent. Each repetition (`times`) is a separate
    * hit: attack bonuses, Buttress reduction and Shield apply per hit.
@@ -124,6 +127,8 @@ export type EffectOp =
       times?: number;
       wallMultiplier?: number;
       comboBonus?: number;
+      /** Added to `amount` once for each card the same effect made you discard. */
+      perDiscard?: number;
     }
   | { op: 'gainResource'; resource: Resource | 'all'; amount: number }
   | { op: 'gainWorker'; worker: Resource; amount: number }
@@ -155,6 +160,13 @@ export type EffectOp =
   | { op: 'peekAndDiscard' }
   /** The opponent discards `count` random cards. */
   | { op: 'discardRandom'; count: number }
+  /**
+   * Discard `count` cards of your own hand, chosen one at a time, or the whole
+   * hand. With `upTo` you may stop early. Each card counts for `perDiscard`.
+   */
+  | { op: 'discardOwn'; count: number | 'hand'; upTo?: boolean }
+  /** Draw `count` cards. */
+  | { op: 'draw'; count: number }
   | { op: 'swapWalls' }
   /** Resolve the effects of the last card the opponent played. */
   | { op: 'copyLast' }
@@ -289,6 +301,8 @@ export interface EffectContext {
   player: PlayerId;
   source: EffectSource;
   combo: boolean;
+  /** Cards this effect has made its player discard so far (drives `perDiscard`). */
+  discarded?: number;
 }
 
 export type ChoiceKind =
@@ -297,7 +311,12 @@ export type ChoiceKind =
   /** Pick the opponent card to discard. Options are card uids as strings. */
   | 'discardFromHand'
   /** Pick the enemy enchantment to destroy. Options are card ids. */
-  | 'destroyEnchantment';
+  | 'destroyEnchantment'
+  /**
+   * Pick one of your own cards to discard. Options are card uids as strings,
+   * plus `'done'` (first, the default) when you may stop early.
+   */
+  | 'discardOwn';
 
 /** A decision the active player must make before the effect continues. */
 export interface PendingChoice {
@@ -307,6 +326,8 @@ export interface PendingChoice {
   options: string[];
   /** For `discardFromHand`: the opponent hand being looked at. */
   revealed?: CardInstance[];
+  /** For `discardOwn`: cards discarded so far and how many more at most. */
+  progress?: { done: number; left: number };
   /** @internal */
   ctx: EffectContext;
   /** @internal */
@@ -573,6 +594,8 @@ export interface PendingChoiceView {
   /** Empty for the player who is not choosing. */
   options: string[];
   revealed?: CardInstance[];
+  /** For `discardOwn`: cards discarded so far and how many more at most. */
+  progress?: { done: number; left: number };
 }
 
 /** What one player is allowed to know. Safe to send to that player's client. */

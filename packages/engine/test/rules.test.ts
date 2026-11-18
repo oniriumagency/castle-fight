@@ -55,7 +55,7 @@ describe('setup', () => {
     expect(count('catapulta')).toBe(3);
     expect(count('motin')).toBe(2);
     expect(count('cometa-del-ocaso')).toBe(1);
-    expect(deck).toHaveLength(30 * 4 + 18 * 3 + 9 * 2 + 3);
+    expect(deck).toHaveLength(33 * 4 + 23 * 3 + 10 * 2 + 3);
   });
 
   it('rejects unknown heroes', () => {
