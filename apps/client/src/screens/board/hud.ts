@@ -12,7 +12,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { artUrl, emblemSvg, iconSvg, type EmblemName } from '../../ui/assets';
-import { parseHistoryEntry, ultimateHtml } from '../../ui/card';
+import { discardOverlay, parseHistoryEntry, ultimateHtml } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
 const RESOURCE_EMBLEM: Record<Resource, EmblemName> = { piedra: 'piedra', acero: 'acero', mana: 'mana' };
@@ -214,7 +214,7 @@ export class SidePanel {
           },
           h('img', { src: artUrl(card.art), alt: '', draggable: 'false', onerror: hideMissingArt }),
           h('span.hist-cost', null, String(card.cost)),
-          discarded ? h('span.discard-overlay', { 'aria-hidden': 'true' }, h('b', null, t('discardedStamp'))) : null,
+          discarded ? discardOverlay() : null,
         );
         el.addEventListener('pointerenter', (e) => {
           if (e.pointerType === 'mouse') this.onPreview(entry, el.getBoundingClientRect());
