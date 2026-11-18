@@ -273,8 +273,7 @@ class BoardScreen implements Screen {
   /** Seat shown on the left: the local player, or player 1 on a shared device. */
   private get leftSeat(): PlayerId {
     if (this.session.kind === 'local') return 0;
-    if (this.session.isLocal(1) && !this.session.isLocal(0)) return 1;
-    return 0;
+    return this.seats().find((seat) => this.session.isLocal(seat)) ?? 0;
   }
 
   /** Rivals follow in turn order: the next to play on the right, the one after in the middle. */
