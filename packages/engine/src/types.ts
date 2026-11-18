@@ -578,6 +578,8 @@ export type GameEvent =
       resource: Resource;
       cost: number;
       combo: boolean;
+      /** The card's condition held when it was played (its stronger effect applies). */
+      boosted?: boolean;
     }
   | { type: 'cardCopied'; player: PlayerId; cardId: CardId }
   | {

@@ -2343,6 +2343,40 @@
   right: -6px;
 }
 
+/* Played with its Combo or its condition met: the arcane halo and a small tag. */
+.hist-card.boosted {
+  border-color: #7ff0ff;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 55%), 0 0 10px 2px rgb(79 216 255 / 70%);
+}
+
+.hist-boost {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #062a33;
+  background: linear-gradient(180deg, #b8f6ff, #3fc6e8);
+  box-shadow: 0 0 8px #4fd8ff;
+  pointer-events: none;
+}
+
+.hist-card.newest .hist-boost {
+  font-size: 0.62rem;
+}
+
+.board.phone-portrait .hist-boost {
+  font-size: 0.45rem;
+  padding: 0 4px;
+}
+
 .hist-card:hover {
   transform: scale(1.08);
   filter: brightness(1.12);
@@ -3378,4 +3412,9 @@
 
 .reduced-motion .ult-used-call {
   animation: none;
+}
+
+/* In the card view the red X sits on the card's corner: the COMBO / BOOSTED tag moves left of it. */
+.inspect-card .card > .combo-tag {
+  right: 28px;
 }
