@@ -27,7 +27,7 @@ import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilig
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
-import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry } from '../../ui/card';
+import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
 import { skyFor } from '../../ui/theme';
@@ -234,6 +234,7 @@ class BoardScreen implements Screen {
     audio.music('battle');
     void preloadArt([...this.session.seats.map((s) => getHero(s.hero).art)]);
     this.field.setCount(this.count);
+    setTableSize(this.count);
     this.field.setHeroes(this.sides().map((side) => this.session.seats[this.seatOfSide(side)].hero));
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
@@ -276,6 +277,7 @@ class BoardScreen implements Screen {
     }
     // The menu shows a duel.
     this.field.setCount(2);
+    setTableSize(2);
     audio.setTension(0);
   }
 
@@ -1760,7 +1762,7 @@ class BoardScreen implements Screen {
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     const panel = this.openInspect(
       big,
-      L(getCard(cardId).text),
+      rulesOf(getCard(cardId)),
       {
         play: () => this.tryPlay(uid),
         discard: () => this.tryDiscard(uid),
@@ -1818,12 +1820,12 @@ class BoardScreen implements Screen {
     audio.play('cardSelect');
     const face = cardFace(cardId, { tilt: true, hero });
     if (discarded) markDiscarded(face);
-    this.openInspect(face, L(getCard(cardId).text));
+    this.openInspect(face, rulesOf(getCard(cardId)));
   }
 
   private inspectHero(heroId: string): void {
     audio.play('cardSelect');
-    this.openInspect(heroCard(heroId, { tilt: true }), L(getHero(heroId).text));
+    this.openInspect(heroCard(heroId, { tilt: true }), rulesOf(getHero(heroId)));
   }
 
   private inspectEvent(): void {
