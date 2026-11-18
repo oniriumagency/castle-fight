@@ -2531,3 +2531,44 @@
   animation: none;
   opacity: 1;
 }
+
+/* The opponent asked for a rematch: a clear gold call above the buttons. */
+.rematch-note.request {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  padding: 8px 16px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 214 120 / 22%), rgb(255 190 70 / 10%));
+  color: var(--gold-l);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  animation: rematchCall 1.4s ease-in-out infinite;
+}
+
+.rematch-note.request svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn.accept {
+  animation: ultBtnReady 1.6s ease-in-out infinite;
+}
+
+@keyframes rematchCall {
+  50% { box-shadow: 0 0 18px rgb(255 200 90 / 55%); }
+}
+
+.reduced-motion .rematch-note.request,
+.reduced-motion .btn.accept {
+  animation: none;
+}
+
+/* Viewing the board after the game: the call stays visible next to the buttons. */
+.results.peek .results-box > .rematch-note.request {
+  display: inline-flex;
+  background: rgb(20 16 30 / 92%);
+}

@@ -1,4 +1,5 @@
 import { getHero, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
+import { callAttention } from '../../app/attention';
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
@@ -145,17 +146,34 @@ export function showResults(o: ResultsOptions): void {
   o.host.appendChild(wrap);
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('in')));
 
-  // Online: show when the opponent wants a rematch.
+  // Online: when the opponent asks for a rematch, say so loud and clear (even with the board in view or the tab in the background).
   if (o.session.kind === 'online') {
+    let announced = false;
     const timer = setInterval(() => {
       if (!wrap.isConnected) return clearInterval(timer);
       const presence = o.getPresence();
       const opp = presence?.seats[seats[1]];
       if (opp?.left) {
         rematchBtn.disabled = true;
+        rematchBtn.classList.remove('accept');
+        rematchNote.classList.remove('request');
         rematchNote.textContent = t('connectionLost');
-      } else if (opp?.wantsRematch && !rematchBtn.disabled) {
-        rematchNote.textContent = `${o.name(seats[1])}: ${t('rematch')}?`;
+      } else if (opp?.wantsRematch && !rematchBtn.disabled && !announced) {
+        announced = true;
+        const message = t('rematchRequested', { who: o.name(seats[1]) });
+        rematchNote.replaceChildren(html(iconSvg('sword')), h('span', null, message));
+        rematchNote.classList.add('request');
+        rematchBtn.textContent = t('acceptRematch');
+        rematchBtn.classList.add('accept');
+        audio.play('emote');
+        callAttention(`⚔ ${message}`, t('acceptRematchHint'));
+      } else if (!opp?.wantsRematch && announced && !rematchBtn.disabled) {
+        // The opponent took it back (left the results): back to the plain button.
+        announced = false;
+        rematchNote.replaceChildren();
+        rematchNote.classList.remove('request');
+        rematchBtn.textContent = t('rematch');
+        rematchBtn.classList.remove('accept');
       }
     }, 500);
   }
