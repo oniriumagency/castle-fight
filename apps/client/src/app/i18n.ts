@@ -248,6 +248,7 @@ const STRINGS = {
   mute: { es: 'Silenciar', en: 'Mute' },
   unmute: { es: 'Activar sonido', en: 'Unmute' },
   muteAll: { es: 'Silenciar todo', en: 'Mute everything' },
+  soundSettings: { es: 'Sonido', en: 'Sound' },
   effectsQuality: { es: 'Calidad de efectos', en: 'Effects quality' },
   qualityAuto: { es: 'Auto', en: 'Auto' },
   qualityHigh: { es: 'Alta', en: 'High' },
