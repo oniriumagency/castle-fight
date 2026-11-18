@@ -66,7 +66,7 @@ const VARIANTS: Variant[] = [
     id: 'all60Leader',
     name: () => tx('Golpea a todos + castigo al líder', 'Hit everyone + leader penalty'),
     hint: () =>
-      tx('Como el anterior, y el Torreón más alto recibe +2 por ataque.', 'As above, and the tallest Keep takes +2 per attack.'),
+      tx('Como el anterior, y el Castillo más alto recibe +2 por ataque.', 'As above, and the tallest Castle takes +2 per attack.'),
     rules: { multiTargeting: 'all', multiAllScale: 0.6, leaderExtraDamage: 2 },
   },
   {
@@ -143,8 +143,8 @@ export function ffaScreen(): Screen {
           'p.ffa-note',
           null,
           tx(
-            'Prototipo: tú contra dos IA (nivel Normal). Gana el último castillo en pie o el primero que complete su Torreón.',
-            'Prototype: you against two AIs (Normal level). The last castle standing, or the first to complete its Keep, wins.',
+            'Prototipo: tú contra dos IA (nivel Normal). Gana el último que quede en pie o el primero que complete su Castillo.',
+            'Prototype: you against two AIs (Normal level). The last one standing, or the first to complete their Castle, wins.',
           ),
         ),
         h('div.field', null, tx('Regla de objetivo', 'Targeting rule'), variantList),

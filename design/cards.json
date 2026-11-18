@@ -82,8 +82,8 @@
         "en": "Foundations"
       },
       "text": {
-        "es": "+7 Torreón.",
-        "en": "+7 Keep."
+        "es": "+7 Castillo.",
+        "en": "+7 Castle."
       },
       "art": "cards/cimientos.jpg"
     },
@@ -97,8 +97,8 @@
         "en": "Royal Scaffold"
       },
       "text": {
-        "es": "+17 Torreón.",
-        "en": "+17 Keep."
+        "es": "+17 Castillo.",
+        "en": "+17 Castle."
       },
       "art": "cards/andamio-real.jpg"
     },
@@ -142,8 +142,8 @@
         "en": "Battlements"
       },
       "text": {
-        "es": "+7 Muralla y +5 Torreón.",
-        "en": "+7 Wall and +5 Keep."
+        "es": "+7 Muralla y +5 Castillo.",
+        "en": "+7 Wall and +5 Castle."
       },
       "art": "cards/almenas.jpg"
     },
@@ -172,8 +172,8 @@
         "en": "Emergency Repairs"
       },
       "text": {
-        "es": "+7 Torreón. Si tu Torreón está por debajo de 35, +15 en su lugar.",
-        "en": "+7 Keep. If your Keep is below 35, +15 instead."
+        "es": "+7 Castillo. Si tu Castillo está por debajo de 35, +15 en su lugar.",
+        "en": "+7 Castle. If your Castle is below 35, +15 instead."
       },
       "art": "cards/reparaciones-de-urgencia.jpg"
     },
@@ -217,8 +217,8 @@
         "en": "Watchtower"
       },
       "text": {
-        "es": "+12 Torreón. El rival revela su mano hasta tu próximo turno.",
-        "en": "+12 Keep. Your opponent reveals their hand until your next turn."
+        "es": "+12 Castillo. El rival revela su mano hasta tu próximo turno.",
+        "en": "+12 Castle. Your opponent reveals their hand until your next turn."
       },
       "art": "cards/torre-vigia.jpg"
     },
@@ -247,8 +247,8 @@
         "en": "Living Fortress"
       },
       "text": {
-        "es": "Encantamiento (5 turnos): +5 Torreón al inicio de tu turno.",
-        "en": "Enchantment (5 turns): +5 Keep at the start of your turn."
+        "es": "Encantamiento (5 turnos): +5 Castillo al inicio de tu turno.",
+        "en": "Enchantment (5 turns): +5 Castle at the start of your turn."
       },
       "art": "cards/fortaleza-viva.jpg"
     },
@@ -307,8 +307,8 @@
         "en": "Skyward Spire"
       },
       "text": {
-        "es": "+33 Torreón.",
-        "en": "+33 Keep."
+        "es": "+33 Castillo.",
+        "en": "+33 Castle."
       },
       "art": "cards/aguja-celeste.jpg"
     },
@@ -322,8 +322,8 @@
         "en": "Eternal Citadel"
       },
       "text": {
-        "es": "+33 Torreón y +25 Muralla. Elimina tus estados negativos.",
-        "en": "+33 Keep and +25 Wall. Remove your negative statuses."
+        "es": "+33 Castillo y +25 Muralla. Elimina tus estados negativos.",
+        "en": "+33 Castle and +25 Wall. Remove your negative statuses."
       },
       "art": "cards/ciudadela-eterna.jpg"
     },
@@ -367,8 +367,8 @@
         "en": "Reclaimed Ashlars"
       },
       "text": {
-        "es": "Descarta hasta 3 cartas. +4 Torreón por cada una.",
-        "en": "Discard up to 3 cards. +4 Keep for each."
+        "es": "Descarta hasta 3 cartas. +4 Castillo por cada una.",
+        "en": "Discard up to 3 cards. +4 Castle for each."
       },
       "art": "cards/sillares-reciclados.jpg"
     },
@@ -832,8 +832,8 @@
         "en": "Crystal Bloom"
       },
       "text": {
-        "es": "+10 Torreón.",
-        "en": "+10 Keep."
+        "es": "+10 Castillo.",
+        "en": "+10 Castle."
       },
       "art": "cards/brote-de-cristal.jpg"
     },
@@ -862,8 +862,8 @@
         "en": "Purification"
       },
       "text": {
-        "es": "Elimina tus estados negativos y +5 Torreón.",
-        "en": "Remove your negative statuses and +5 Keep."
+        "es": "Elimina tus estados negativos y +5 Castillo.",
+        "en": "Remove your negative statuses and +5 Castle."
       },
       "art": "cards/purificacion.jpg"
     },
@@ -1071,8 +1071,8 @@
         "en": "The Architect"
       },
       "text": {
-        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Torreón y +10 Muralla.",
-        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Keep and +10 Wall."
+        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Castillo y +10 Muralla.",
+        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Castle and +10 Wall."
       },
       "art": "heroes/arquitecta.jpg"
     },
@@ -1107,8 +1107,8 @@
         "en": "The Alchemist"
       },
       "text": {
-        "es": "Pasiva: +3 de un recurso al azar cada turno. Definitiva: +10 de cada recurso y +6 Torreón.",
-        "en": "Passive: +3 of a random resource each turn. Ultimate: +10 of each resource and +6 Keep."
+        "es": "Pasiva: +3 de un recurso al azar cada turno. Definitiva: +10 de cada recurso y +6 Castillo.",
+        "en": "Passive: +3 of a random resource each turn. Ultimate: +10 of each resource and +6 Castle."
       },
       "art": "heroes/alquimista.jpg"
     },
@@ -1181,8 +1181,8 @@
         "en": "Earthquake"
       },
       "text": {
-        "es": "Ambos Torreones pierden 7.",
-        "en": "Both Keeps lose 7."
+        "es": "Ambos Castillos pierden 7.",
+        "en": "Both Castles lose 7."
       },
       "art": "events/terremoto.jpg"
     },

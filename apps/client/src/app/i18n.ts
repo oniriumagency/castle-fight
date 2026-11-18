@@ -185,8 +185,8 @@ const STRINGS = {
   defeat: { es: 'Derrota', en: 'Defeat' },
   draw: { es: 'Empate', en: 'Draw' },
   winsTitle: { es: '¡{who} gana!', en: '{who} wins!' },
-  reasonKeepBuilt: { es: '{who} completó su Torreón.', en: '{who} completed their Keep.' },
-  reasonKeepDestroyed: { es: 'El Torreón de {who} cayó.', en: "{who}'s Keep fell." },
+  reasonKeepBuilt: { es: '{who} completó su Castillo.', en: '{who} completed their Castle.' },
+  reasonKeepDestroyed: { es: 'El Castillo de {who} cayó.', en: "{who}'s Castle fell." },
   reasonConcede: { es: '{who} se rindió.', en: '{who} conceded.' },
   reasonTurnLimit: { es: 'Se alcanzó el límite de turnos.', en: 'The turn limit was reached.' },
   statTurns: { es: 'Turnos', en: 'Turns' },
@@ -257,8 +257,8 @@ const STRINGS = {
 
   // How to play
   rulesGoal: {
-    es: 'Gana quien lleve su <b>Torreón</b> a {win} o deje el del rival en 0.',
-    en: 'Win by raising your <b>Keep</b> to {win} or bringing your opponent’s down to 0.',
+    es: 'Gana quien lleve su <b>Castillo</b> a {win} o deje el del rival en 0.',
+    en: 'Win by raising your <b>Castle</b> to {win} or bringing your opponent’s down to 0.',
   },
   rulesTurn: {
     es: 'En tu turno, tus trabajadores producen recursos. Después juegas una carta pagando su coste, o descartas de 1 a 3 cartas. Al acabar repones la mano hasta {hand}.',
@@ -269,8 +269,8 @@ const STRINGS = {
     en: 'Each school is paid with its resource: <b>Construction</b> with Stone, <b>Assault</b> with Steel and <b>Arcane</b> with Mana. Masons, Smiths and Arcanists each produce 1 per turn.',
   },
   rulesDamage: {
-    es: 'El daño golpea primero la <b>Muralla</b> y el resto pasa al Torreón. El daño <b>perforante</b> va directo al Torreón.',
-    en: 'Damage hits the <b>Wall</b> first and the rest goes to the Keep. <b>Piercing</b> damage goes straight to the Keep.',
+    es: 'El daño golpea primero la <b>Muralla</b> y el resto pasa al Castillo. El daño <b>perforante</b> va directo al Castillo.',
+    en: 'Damage hits the <b>Wall</b> first and the rest goes to the Castle. <b>Piercing</b> damage goes straight to the Castle.',
   },
   rulesHeroes: {
     es: 'Tu <b>héroe</b> tiene una pasiva y una <b>definitiva</b> que se carga con el daño que recibes. Usarla no gasta tu jugada.',
