@@ -49,9 +49,11 @@ describe('free-for-all rooms', () => {
   it('a player who leaves is knocked out and the other two play on', () => {
     const { room, sockets } = startThree();
     const quitter = sockets.find((s) => s.seat !== room.record.game!.active)!;
+    const seat = quitter.seat!;
     room.send(quitter, { type: 'leave' });
     expect(room.record.status).toBe('playing');
-    expect(room.record.game!.players[quitter.seat ?? 0]!.eliminated).toBe(true);
+    expect(room.record.game!.players[seat]!.eliminated).toBe(true);
+    expect(room.record.seats[seat]!.left).toBe(true);
   });
 
   it('plays a whole game through the room, then needs all three for a rematch', () => {
