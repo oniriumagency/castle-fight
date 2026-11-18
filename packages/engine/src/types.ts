@@ -105,10 +105,11 @@ export interface Rules {
   twilightEvery: number;
   /** Twilight Fury: extra damage of every attack, per level. */
   twilightAttackBonus: number;
-  /** Twilight Fury: Wall the active player loses at the start of their turn, per level. */
-  twilightErosion: number;
-  /** Twilight Fury: Keep the active player loses at the start of their turn, per level (never below 1). */
-  twilightKeepErosion: number;
+  /**
+   * Twilight Fury: normal damage the active player takes at the start of
+   * their turn, per level: the Wall first, the rest to the Keep (never below 1).
+   */
+  twilightDamage: number;
   /** Twilight Fury: extra Castle every card that builds it raises, per level. */
   twilightBuildBonus: number;
 }

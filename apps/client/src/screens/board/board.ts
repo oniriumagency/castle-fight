@@ -894,12 +894,12 @@ class BoardScreen implements Screen {
         void fx.battleEventEnded(ctx, this.view ? twilightLevel(this.view) : 0);
         break;
       case 'twilightRose': {
-        const values = this.view ? twilightValues(this.view.rules) : { atk: 0, wall: 0 };
+        const values = this.view ? twilightValues(this.view.rules) : { atk: 0, dmg: 0 };
         if (this.incoming) this.renderTwilightChip(this.incoming);
         const rising = fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
         // When it falls, its card is shown like a battle event; later levels get a banner.
         if (e.level === 1 && this.view) await this.revealCard(twilightCardFor(this.view.rules, { className: 'event-reveal' }), `${t('twilightName')} · ${t('twilightTableLevel')} 1`);
-        else this.showBanner(t('twilightName'), t('twilightRose', { level: e.level, atk: values.atk * e.level, wall: values.wall * e.level }));
+        else this.showBanner(t('twilightName'), t('twilightRose', { level: e.level, atk: values.atk * e.level, dmg: values.dmg * e.level }));
         await rising;
         if (this.view?.activeEvent) void ctx.field.setMood(skyFor(this.view.activeEvent.id), 400);
         break;

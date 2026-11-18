@@ -58,8 +58,8 @@ const STRINGS = {
   },
   twilightKind: { es: 'Regla de partida', en: 'Match rule' },
   twilightCardText: {
-    es: 'Desde la ronda {start}, sube un nivel cada {step} rondas. Por nivel: ataques +{atk} y cartas de Castillo +{build}. Al empezar tu turno: −{wall} Muralla y −{keep} Castillo.',
-    en: 'From round {start}, it rises a level every {step} rounds. Per level: attacks +{atk} and Castle cards +{build}. At the start of your turn: −{wall} Wall and −{keep} Castle.',
+    es: 'Desde la ronda {start}, sube un nivel cada {step} rondas. Por nivel: ataques +{atk} y cartas de Castillo +{build}. Al empezar tu turno recibes {dmg} de daño.',
+    en: 'From round {start}, it rises a level every {step} rounds. Per level: attacks +{atk} and Castle cards +{build}. At the start of your turn you take {dmg} damage.',
   },
   twilightHelp: { es: '¿Qué es la Furia del Ocaso?', en: 'What is the Twilight Fury?' },
   twilightInfoIntro: {
@@ -86,10 +86,10 @@ const STRINGS = {
     es: 'Las cartas que levantan tu Castillo dan +{build} por nivel. La Muralla no cambia. Así ganar construyendo hasta {win} sigue siendo posible.',
     en: 'Cards that raise your Castle give +{build} per level. The Wall does not change. So winning by building up to {win} is still possible.',
   },
-  twilightInfoWearTitle: { es: 'Desgaste', en: 'Wear' },
+  twilightInfoWearTitle: { es: 'Daño del Ocaso', en: 'Twilight damage' },
   twilightInfoWear: {
-    es: 'Al empezar tu turno pierdes {wall} de Muralla y {keep} de Castillo por nivel. Como los eventos de batalla, no es un ataque: ignora el Escudo, no carga tu definitiva y nunca deja tu Castillo por debajo de 1, así que el desgaste solo no te elimina.',
-    en: 'At the start of your turn you lose {wall} Wall and {keep} Castle per level. Like battle events, it is not an attack: it ignores Shield, does not charge your ultimate and never takes your Castle below 1, so wear alone never knocks you out.',
+    es: 'Al empezar tu turno recibes {dmg} de daño por nivel (5 en nivel 1, 10 en nivel 2...). Es daño normal, no perforante: primero baja la Muralla y lo que sobra pasa al Castillo. Como los eventos de batalla, no es un ataque: ignora el Escudo, no carga tu definitiva y nunca deja tu Castillo por debajo de 1, así que por sí solo no te elimina.',
+    en: 'At the start of your turn you take {dmg} damage per level (5 at level 1, 10 at level 2...). It is normal damage, not piercing: the Wall goes down first and the rest reaches the Castle. Like battle events, it is not an attack: it ignores Shield, does not charge your ultimate and never takes your Castle below 1, so on its own it never knocks you out.',
   },
   twilightInfoWinTitle: { es: 'Cómo se gana', en: 'How to win' },
   twilightInfoWin: {
@@ -104,13 +104,13 @@ const STRINGS = {
   twilightTableTurns: { es: 'Rondas', en: 'Rounds' },
   twilightTableAttack: { es: 'Ataques', en: 'Attacks' },
   twilightTableBuild: { es: 'Castillo (cartas)', en: 'Castle (cards)' },
-  twilightTableWear: { es: 'Desgaste por turno', en: 'Wear per turn' },
+  twilightTableWear: { es: 'Daño al empezar tu turno', en: 'Damage as your turn starts' },
   twilightTag: { es: 'Ocaso', en: 'Twilight' },
   twilightSoon: { es: 'Ronda {round} · llega en {n}', en: 'Round {round} · falls in {n}' },
   twilightSoonNext: { es: 'Ronda {round} · llega en la próxima', en: 'Round {round} · falls next round' },
   twilightLevel: { es: 'Nivel {level} · ronda {round} · sube en {n}', en: 'Level {level} · round {round} · rises in {n}' },
   twilightLevelNext: { es: 'Nivel {level} · ronda {round} · sube en la próxima', en: 'Level {level} · round {round} · rises next round' },
-  twilightRose: { es: 'Nivel {level}: ataques +{atk}, Muralla −{wall} por turno', en: 'Level {level}: attacks +{atk}, Wall −{wall} per turn' },
+  twilightRose: { es: 'Nivel {level}: ataques +{atk}, {dmg} de daño por turno', en: 'Level {level}: attacks +{atk}, {dmg} damage per turn' },
   logTwilight: { es: 'La Furia del Ocaso sube a nivel {level}', en: 'The Twilight Fury rises to level {level}' },
   privateRoom: { es: 'Privada (solo con enlace)', en: 'Private (link only)' },
   watchFull: { es: 'Llena', en: 'Full' },
@@ -372,8 +372,8 @@ const STRINGS = {
     en: '<b>Enchantments</b> stay on the table for several turns (up to {max}). Cards with <b>Combo</b> get a bonus when your previous card was from the same school (a discard in between breaks it); only those cards have Combo. Every {every} turns a <b>battle event</b> hits both players.',
   },
   rulesTwilight: {
-    es: 'Si la partida se alarga, en la ronda {start} (cuando cada jugador ha jugado {before} turnos) cae la <b>Furia del Ocaso</b> (se puede quitar al crear una sala online). Cada {step} rondas sube de nivel, y por cada nivel los ataques hacen +{atk}, las cartas que levantan el Castillo dan +{build}, y al empezar tu turno pierdes {wall} de Muralla y {keep} de Castillo. Sigue subiendo hasta que alguien gane con las reglas de siempre.',
-    en: 'If the game drags on, in round {start} (once every player has taken {before} turns) the <b>Twilight Fury</b> falls (it can be turned off when creating an online room). It rises a level every {step} rounds, and for each level attacks deal +{atk}, cards that raise your Castle give +{build}, and at the start of your turn you lose {wall} Wall and {keep} Castle. It keeps rising until someone wins by the usual rules.',
+    es: 'Si la partida se alarga, en la ronda {start} (cuando cada jugador ha jugado {before} turnos) cae la <b>Furia del Ocaso</b> (se puede quitar al crear una sala online). Cada {step} rondas sube de nivel, y por cada nivel los ataques hacen +{atk}, las cartas que levantan el Castillo dan +{build}, y al empezar tu turno recibes {dmg} de daño normal (primero en la Muralla). Sigue subiendo hasta que alguien gane con las reglas de siempre.',
+    en: 'If the game drags on, in round {start} (once every player has taken {before} turns) the <b>Twilight Fury</b> falls (it can be turned off when creating an online room). It rises a level every {step} rounds, and for each level attacks deal +{atk}, cards that raise your Castle give +{build}, and at the start of your turn you take {dmg} normal damage (Wall first). It keeps rising until someone wins by the usual rules.',
   },
   rulesControls: {
     es: 'Toca una carta para verla grande y jugarla o descartarla. En ordenador también puedes arrastrarla, o usar las teclas 1 a 6, Intro para jugar, Supr para descartar y U para la definitiva.',
