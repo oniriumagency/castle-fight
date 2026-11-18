@@ -789,13 +789,13 @@ class BoardScreen implements Screen {
       case 'damage': {
         const p = shown[e.target];
         if (e.blocked) {
+          // The dome stays up until the hit lands on it (the director lowers it).
           p.shield = Math.max(0, p.shield - 1);
-          this.field.setShield(this.sideOf(e.target), p.shield);
         } else {
           p.wall = Math.max(0, p.wall - e.wallLoss);
           p.keep = Math.max(0, p.keep - e.keepLoss);
         }
-        await fx.damage(e, ctx, this.heights(e.target));
+        await fx.damage(e, ctx, this.heights(e.target), p.shield);
         this.render();
         break;
       }
