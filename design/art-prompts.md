@@ -1,4 +1,4 @@
-# Castle Fight: prompts de arte
+# Cardcraft: Castles: prompts de arte
 
 Un prompt por imagen. Guarda cada resultado como PNG con el nombre indicado dentro de `art/`.
 

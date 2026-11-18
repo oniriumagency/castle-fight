@@ -1,4 +1,4 @@
-# Castle Fight
+# Cardcraft: Castles
 
 Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online.
 
