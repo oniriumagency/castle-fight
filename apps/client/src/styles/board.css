@@ -2296,3 +2296,13 @@
     font-size: 1.2rem;
   }
 }
+
+/* The hero's own bonus in the ultimate button (dark background). */
+.ult-btn-effect .hero-buff {
+  color: #f59ae0;
+  font-weight: 700;
+}
+
+.ult-btn.usable .ult-btn-effect .hero-buff {
+  color: #8a1676;
+}
