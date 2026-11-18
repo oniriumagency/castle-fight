@@ -5,34 +5,38 @@ export const HERO_EFFECTS: Record<HeroId, { passive: HeroPassive; ultimate: Effe
   arquitecta: {
     passive: { costReduction: { school: 'construccion', amount: 1 } },
     ultimate: [
-      { op: 'keep', amount: 10 },
+      { op: 'keep', amount: 8 },
       { op: 'wall', amount: 10 },
     ],
   },
   mariscal: {
-    passive: { attackBonus: 1 },
-    ultimate: [{ op: 'damage', amount: 15 }],
+    passive: { attackBonus: 2 },
+    ultimate: [{ op: 'damage', amount: 10 }],
   },
   hechicera: {
     passive: { statusDurationBonus: 1 },
     ultimate: [
-      { op: 'burn', turns: 3 },
+      { op: 'burn', turns: 5 },
       { op: 'frost', scope: 'all', turns: 1 },
+      { op: 'damage', amount: 3, kind: 'piercing' },
     ],
   },
   alquimista: {
-    passive: { randomResourcePerTurn: 1 },
-    ultimate: [{ op: 'gainResource', resource: 'all', amount: 8 }],
+    passive: { randomResourcePerTurn: 3 },
+    ultimate: [
+      { op: 'gainResource', resource: 'all', amount: 10 },
+      { op: 'keep', amount: 6 },
+    ],
   },
   saboteadora: {
-    passive: { stealOnDiscard: 1 },
-    ultimate: [{ op: 'stealWorker' }],
+    passive: { stealOnDiscard: 4 },
+    ultimate: [{ op: 'stealWorker' }, { op: 'damage', amount: 10, kind: 'piercing' }],
   },
   guardian: {
-    passive: { startingWallBonus: 8 },
+    passive: { startingWallBonus: 7 },
     ultimate: [
-      { op: 'shield', charges: 2 },
-      { op: 'wall', amount: 8 },
+      { op: 'shield', charges: 1 },
+      { op: 'wall', amount: 10 },
     ],
   },
 };

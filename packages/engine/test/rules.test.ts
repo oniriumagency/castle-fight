@@ -30,9 +30,10 @@ describe('setup', () => {
     expect(state.active).toBe(1);
     expect(state.turn).toBe(1);
     expect(state.phase).toBe('action');
+    // Player 1 moves first, so player 0 gets the second player's taller Wall.
+    expect(state.players.map((p) => p.wall)).toEqual([20, 15]);
     for (const p of state.players) {
-      expect(p.keep).toBe(30);
-      expect(p.wall).toBe(10);
+      expect(p.keep).toBe(50);
       expect(p.workers).toEqual({ piedra: 2, acero: 2, mana: 2 });
       expect(p.hand).toHaveLength(6);
       expect(p.hand.length + p.deck.length).toBe(buildDeckList(DEFAULT_RULES).length);
@@ -62,7 +63,7 @@ describe('setup', () => {
     const { state } = createGame({ seed: 1, heroes: ['mariscal', 'mariscal'], rules: { keepStart: 50, handSize: 4 } });
     expect(state.players[0].keep).toBe(50);
     expect(state.players[0].hand).toHaveLength(4);
-    expect(state.rules.wallStart).toBe(10);
+    expect(state.rules.wallStart).toBe(15);
   });
 
   it('picks the first player from the seed when not given', () => {
@@ -192,13 +193,13 @@ describe('turn flow', () => {
 describe('damage', () => {
   it('normal damage hits the Wall first and the rest reaches the Keep', () => {
     const { state, events } = playCard(scenario({ hand: ['catapulta'], opponent: { wall: 5 } }), 'catapulta');
-    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([0, 23]);
-    expect(eventsOf(events, 'damage')[0]).toMatchObject({ amount: 12, wallLoss: 5, keepLoss: 7, blocked: false });
+    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([0, 30]);
+    expect(eventsOf(events, 'damage')[0]).toMatchObject({ amount: 25, wallLoss: 5, keepLoss: 20, blocked: false });
   });
 
   it('piercing damage ignores the Wall', () => {
     const { state } = playCard(scenario({ hand: ['balista-de-asedio'] }), 'balista-de-asedio');
-    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([10, 23]);
+    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([15, 35]);
   });
 
   it('a Keep at 0 loses the game', () => {
@@ -220,9 +221,11 @@ describe('damage', () => {
     expect(eventsOf(events, 'damage')).toHaveLength(1);
   });
 
-  it('a Keep at 100 wins the game', () => {
-    const { state } = playCard(scenario({ hand: ['aguja-celeste'], you: { keep: 90 } }), 'aguja-celeste');
-    expect(state.players[ME].keep).toBe(100);
+  it('a Keep at the winning height wins the game', () => {
+    const { keepWin } = DEFAULT_RULES;
+    const { state } = playCard(scenario({ hand: ['aguja-celeste'], you: { keep: keepWin - 10 } }), 'aguja-celeste');
+    // The Keep never grows past the winning height.
+    expect(state.players[ME].keep).toBe(keepWin);
     expect(state.result).toEqual({ winner: ME, reason: 'keepBuilt' });
   });
 
@@ -243,8 +246,8 @@ describe('statuses', () => {
     state = playCard(state, 'balista-de-asedio').state;
     // The piercing hit was blocked; Burn then ticked through at the start of their turn.
     expect(state.players[OPP].shield).toBe(0);
-    expect(state.players[OPP].keep).toBe(30);
-    expect(state.players[OPP].wall).toBe(8);
+    expect(state.players[OPP].keep).toBe(50);
+    expect(state.players[OPP].wall).toBe(12);
   });
 
   it('Shield charges stack up to the cap', () => {
@@ -265,10 +268,10 @@ describe('statuses', () => {
     const result = playCard(state, 'tormenta-de-ceniza');
     state = result.state;
     expect(state.players[OPP].burn).toBe(5);
-    // 6 + 1 (Marshal) from the card, then 2 from Burn at the start of the turn.
+    // 15 + 2 (Marshal) from the card, then 3 from Burn at the start of the turn.
     expect(eventsOf(result.events, 'damage').map((e) => [e.cause, e.amount])).toEqual([
-      ['card', 7],
-      ['burn', 2],
+      ['card', 17],
+      ['burn', 3],
     ]);
     const capped = scenario({ hand: ['tormenta-de-ceniza', 'cimientos'], opponent: { burn: 5 } });
     expect(playCard(capped, 'tormenta-de-ceniza').state.players[OPP].burn).toBe(6);
@@ -332,7 +335,7 @@ describe('combo', () => {
     expect(isComboActive(state, ME, 'hostigamiento')).toBe(false);
     const wall = state.players[ME].wall;
     state = playCard(state, 'puntales').state;
-    expect(state.players[ME].wall).toBe(wall + 7);
+    expect(state.players[ME].wall).toBe(wall + 3 + 8);
   });
 
   it('discarding breaks the chain', () => {
@@ -393,10 +396,10 @@ describe('ending the game', () => {
       const start = scenario({ rules: { turnLimit: 1 }, keepTurn: false, you });
       return pass(start).result;
     };
-    expect(finish({ keep: 31, wall: 0 })).toEqual({ winner: ME, reason: 'turnLimit' });
-    expect(finish({ keep: 29, wall: 50 })).toEqual({ winner: OPP, reason: 'turnLimit' });
-    expect(finish({ keep: 30, wall: 11 })).toEqual({ winner: ME, reason: 'turnLimit' });
-    expect(finish({ keep: 30, wall: 10 })).toEqual({ winner: null, reason: 'turnLimit' });
+    expect(finish({ keep: 51, wall: 0 })).toEqual({ winner: ME, reason: 'turnLimit' });
+    expect(finish({ keep: 49, wall: 50 })).toEqual({ winner: OPP, reason: 'turnLimit' });
+    expect(finish({ keep: 50, wall: 16 })).toEqual({ winner: ME, reason: 'turnLimit' });
+    expect(finish({ keep: 50, wall: 15 })).toEqual({ winner: null, reason: 'turnLimit' });
   });
 });
 

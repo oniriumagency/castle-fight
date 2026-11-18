@@ -82,16 +82,16 @@ Cada acción devuelve la lista ordenada de lo que ha pasado (`GameEvent[]`): `ca
 
 Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. Todos se pueden cambiar por partida con `createGame({ rules })`, pensado para las simulaciones de equilibrio.
 
-**Preparación.** Torreón 30, Muralla 10, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (195 cartas). Cuando el mazo se agota se baraja el descarte.
+**Preparación.** Torreón 50, Muralla 15, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Quien juega segundo empieza con 5 más de Muralla (`rules.secondPlayerWall`), que compensa la ventaja de mover primero. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (195 cartas). Cuando el mazo se agota se baraja el descarte.
 
 **Turno.** Al empezar el turno, en este orden: terminan los efectos «hasta tu próximo turno», salta el evento de batalla si toca, la Quemadura hace su daño, se activan los encantamientos de inicio de turno y los trabajadores producen. Después el jugador juega una carta pagando su coste o descarta una. Al terminar repone la mano hasta 6.
 
 **Daño.** El daño normal golpea la Muralla y el sobrante pasa al Torreón. El perforante va directo al Torreón. El daño «solo a la Muralla» no pasa al Torreón. Cada golpe se resuelve por separado: Doble Salva son dos golpes y Hueste Imparable también.
 
-**Ataques.** Son los golpes de cartas y definitivas. Las bonificaciones (Estandarte de Guerra, pasiva del Mariscal) suman a cada golpe; Contrafuertes resta 2 a cada golpe que alcanza la Muralla; un Escudo bloquea un golpe entero. La Quemadura y los eventos no son ataques.
+**Ataques.** Son los golpes de cartas y definitivas. Las bonificaciones (Estandarte de Guerra, pasiva del Mariscal) suman a cada golpe; Contrafuertes resta 3 a cada golpe que alcanza la Muralla; un Escudo bloquea un golpe entero. La Quemadura y los eventos no son ataques.
 
 **Estados.**
-- *Quemadura*: 2 de daño normal al inicio del turno del jugador quemado. Los turnos se acumulan hasta 6.
+- *Quemadura*: 3 de daño normal al inicio del turno del jugador quemado. Los turnos se acumulan hasta 6.
 - *Escarcha*: el recurso congelado no produce. Los turnos se acumulan hasta 3 por recurso.
 - *Escudo*: cada carga bloquea un golpe. Se acumulan hasta 3 y no caducan.
 - Purificación y Ciudadela Eterna quitan Quemadura y Escarcha.
@@ -100,7 +100,7 @@ Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. To
 
 **Combo.** Una carta con Combo recibe su bonificación si la última carta que jugaste es de la misma escuela. Descartar rompe la cadena.
 
-**Héroes.** La definitiva se carga con el daño que recibes en Muralla y Torreón (ataques y Quemadura). La primera vez hacen falta 20 puntos y cada uso encarece la siguiente en 10. Usarla es una acción gratuita: después sigues jugando tu carta.
+**Héroes.** La definitiva se carga con el daño que recibes en Muralla y Torreón (ataques y Quemadura). La primera vez hacen falta 35 puntos y cada uso encarece la siguiente en 15. Usarla es una acción gratuita: después sigues jugando tu carta.
 
 **Eventos de batalla.** Salta uno al inicio de los turnos 9, 17, 25... (cada 8 turnos, contando los de ambos jugadores). El siguiente evento se conoce de antemano (`state.upcomingEvent`), para que la interfaz lo anuncie y los jugadores planeen. Nunca se repite el mismo dos veces seguidas. Eclipse y Tregua duran 2 turnos, uno de cada jugador. Las pérdidas por eventos no cargan la definitiva, ignoran el Escudo y nunca matan: el Terremoto deja el Torreón en 1 como mínimo.
 
@@ -133,7 +133,7 @@ pnpm sim --games 5000 --seed 7 --policy random
 
 `eager` usa la definitiva en cuanto puede, juega una carta al azar de las que puede pagar y solo descarta si no puede jugar ninguna. `random` elige al azar entre todas las acciones legales.
 
-Con jugadores así de torpes las partidas son largas (unos 95 turnos de media) y el resultado depende sobre todo del héroe: la Arquitecta gana cerca del 75 % y el Mariscal el 64 %, mientras que el Alquimista y la Saboteadora rondan el 30 %, porque sus ventajas son recursos que un jugador aleatorio desperdicia. Sin definitivas todos quedan entre el 46 % y el 49 % salvo el Mariscal (62 %). Son cifras orientativas: el equilibrio real se ajusta con la IA, que juega con criterio.
+Con jugadores así de torpes las partidas son más largas que entre personas (unos 55 turnos de media con `eager` y 85 con `random`), pero sirven de comprobación rápida: los seis héroes quedan entre el 48 % y el 52 %. El equilibrio de verdad se mide con la IA, que juega con criterio: `pnpm balance` enfrenta a todos los héroes entre sí y `pnpm ladder` compara los niveles de dificultad. Están en [`packages/ai`](../ai/README.md).
 
 ## Añadir o cambiar una carta
 

@@ -1,11 +1,12 @@
 {
   "version": 1,
   "rules": {
-    "keepStart": 30,
-    "wallStart": 10,
+    "keepStart": 50,
+    "wallStart": 15,
     "keepWin": 100,
     "resourceStart": 8,
     "workerStart": 2,
+    "secondPlayerWall": 5,
     "handSize": 6,
     "turnSeconds": 30,
     "maxEnchantments": 2,
@@ -36,8 +37,8 @@
         "en": "Stone Course"
       },
       "text": {
-        "es": "+3 Muralla.",
-        "en": "+3 Wall."
+        "es": "+5 Muralla.",
+        "en": "+5 Wall."
       },
       "art": "cards/hilada-de-piedra.jpg"
     },
@@ -51,8 +52,8 @@
         "en": "Parapet"
       },
       "text": {
-        "es": "+6 Muralla.",
-        "en": "+6 Wall."
+        "es": "+10 Muralla.",
+        "en": "+10 Wall."
       },
       "art": "cards/parapeto.jpg"
     },
@@ -66,8 +67,8 @@
         "en": "Granite Bulwark"
       },
       "text": {
-        "es": "+12 Muralla.",
-        "en": "+12 Wall."
+        "es": "+20 Muralla.",
+        "en": "+20 Wall."
       },
       "art": "cards/bastida-de-granito.jpg"
     },
@@ -81,8 +82,8 @@
         "en": "Foundations"
       },
       "text": {
-        "es": "+3 Torreón.",
-        "en": "+3 Keep."
+        "es": "+7 Torreón.",
+        "en": "+7 Keep."
       },
       "art": "cards/cimientos.jpg"
     },
@@ -96,8 +97,8 @@
         "en": "Royal Scaffold"
       },
       "text": {
-        "es": "+8 Torreón.",
-        "en": "+8 Keep."
+        "es": "+17 Torreón.",
+        "en": "+17 Keep."
       },
       "art": "cards/andamio-real.jpg"
     },
@@ -141,8 +142,8 @@
         "en": "Battlements"
       },
       "text": {
-        "es": "+4 Muralla y +2 Torreón.",
-        "en": "+4 Wall and +2 Keep."
+        "es": "+7 Muralla y +5 Torreón.",
+        "en": "+7 Wall and +5 Keep."
       },
       "art": "cards/almenas.jpg"
     },
@@ -156,8 +157,8 @@
         "en": "Shoring Beams"
       },
       "text": {
-        "es": "+2 Muralla. Combo: +5 Muralla más.",
-        "en": "+2 Wall. Combo: +5 more Wall."
+        "es": "+3 Muralla. Combo: +8 Muralla más.",
+        "en": "+3 Wall. Combo: +8 more Wall."
       },
       "art": "cards/puntales.jpg"
     },
@@ -171,8 +172,8 @@
         "en": "Emergency Repairs"
       },
       "text": {
-        "es": "+3 Torreón. Si tu Torreón está por debajo de 20, +7 en su lugar.",
-        "en": "+3 Keep. If your Keep is below 20, +7 instead."
+        "es": "+7 Torreón. Si tu Torreón está por debajo de 35, +15 en su lugar.",
+        "en": "+7 Keep. If your Keep is below 35, +15 instead."
       },
       "art": "cards/reparaciones-de-urgencia.jpg"
     },
@@ -216,8 +217,8 @@
         "en": "Watchtower"
       },
       "text": {
-        "es": "+5 Torreón. El rival revela su mano hasta tu próximo turno.",
-        "en": "+5 Keep. Your opponent reveals their hand until your next turn."
+        "es": "+12 Torreón. El rival revela su mano hasta tu próximo turno.",
+        "en": "+12 Keep. Your opponent reveals their hand until your next turn."
       },
       "art": "cards/torre-vigia.jpg"
     },
@@ -231,8 +232,8 @@
         "en": "Buttresses"
       },
       "text": {
-        "es": "Encantamiento (4 turnos): tu Muralla recibe 2 de daño menos por ataque.",
-        "en": "Enchantment (4 turns): your Wall takes 2 less damage per attack."
+        "es": "Encantamiento (4 turnos): tu Muralla recibe 3 de daño menos por ataque.",
+        "en": "Enchantment (4 turns): your Wall takes 3 less damage per attack."
       },
       "art": "cards/contrafuertes.jpg"
     },
@@ -246,8 +247,8 @@
         "en": "Living Fortress"
       },
       "text": {
-        "es": "Encantamiento (5 turnos): +2 Torreón al inicio de tu turno.",
-        "en": "Enchantment (5 turns): +2 Keep at the start of your turn."
+        "es": "Encantamiento (5 turnos): +5 Torreón al inicio de tu turno.",
+        "en": "Enchantment (5 turns): +5 Keep at the start of your turn."
       },
       "art": "cards/fortaleza-viva.jpg"
     },
@@ -261,8 +262,8 @@
         "en": "Drawbridge"
       },
       "text": {
-        "es": "+4 Muralla. Hasta tu próximo turno, el daño perforante se trata como daño normal.",
-        "en": "+4 Wall. Until your next turn, piercing damage is treated as normal damage."
+        "es": "+8 Muralla. Hasta tu próximo turno, el daño perforante se trata como daño normal.",
+        "en": "+8 Wall. Until your next turn, piercing damage is treated as normal damage."
       },
       "art": "cards/puente-levadizo.jpg"
     },
@@ -270,14 +271,14 @@
       "id": "maestro-de-obras",
       "school": "construccion",
       "rarity": "epica",
-      "cost": 12,
+      "cost": 10,
       "name": {
         "es": "Maestro de Obras",
         "en": "Master Builder"
       },
       "text": {
-        "es": "+1 Cantero y +6 Muralla.",
-        "en": "+1 Mason and +6 Wall."
+        "es": "+1 Cantero y +10 Muralla.",
+        "en": "+1 Mason and +10 Wall."
       },
       "art": "cards/maestro-de-obras.jpg"
     },
@@ -291,8 +292,8 @@
         "en": "Cyclopean Bastion"
       },
       "text": {
-        "es": "+22 Muralla.",
-        "en": "+22 Wall."
+        "es": "+37 Muralla.",
+        "en": "+37 Wall."
       },
       "art": "cards/bastion-ciclopeo.jpg"
     },
@@ -306,8 +307,8 @@
         "en": "Skyward Spire"
       },
       "text": {
-        "es": "+16 Torreón.",
-        "en": "+16 Keep."
+        "es": "+33 Torreón.",
+        "en": "+33 Keep."
       },
       "art": "cards/aguja-celeste.jpg"
     },
@@ -321,8 +322,8 @@
         "en": "Eternal Citadel"
       },
       "text": {
-        "es": "+15 Torreón y +15 Muralla. Elimina tus estados negativos.",
-        "en": "+15 Keep and +15 Wall. Remove your negative statuses."
+        "es": "+33 Torreón y +25 Muralla. Elimina tus estados negativos.",
+        "en": "+33 Keep and +25 Wall. Remove your negative statuses."
       },
       "art": "cards/ciudadela-eterna.jpg"
     },
@@ -336,8 +337,8 @@
         "en": "Skirmish"
       },
       "text": {
-        "es": "2 de daño.",
-        "en": "2 damage."
+        "es": "5 de daño.",
+        "en": "5 damage."
       },
       "art": "cards/escaramuza.jpg"
     },
@@ -351,8 +352,8 @@
         "en": "Spearmen's Charge"
       },
       "text": {
-        "es": "6 de daño.",
-        "en": "6 damage."
+        "es": "13 de daño.",
+        "en": "13 damage."
       },
       "art": "cards/carga-de-lanceros.jpg"
     },
@@ -366,8 +367,8 @@
         "en": "Double Volley"
       },
       "text": {
-        "es": "2 de daño, dos veces.",
-        "en": "2 damage, twice."
+        "es": "5 de daño, dos veces.",
+        "en": "5 damage, twice."
       },
       "art": "cards/doble-salva.jpg"
     },
@@ -381,8 +382,8 @@
         "en": "Black Bolts"
       },
       "text": {
-        "es": "4 de daño perforante.",
-        "en": "4 piercing damage."
+        "es": "10 de daño perforante.",
+        "en": "10 piercing damage."
       },
       "art": "cards/saetas-negras.jpg"
     },
@@ -396,8 +397,8 @@
         "en": "Iron Ram"
       },
       "text": {
-        "es": "5 de daño. Doble contra la Muralla.",
-        "en": "5 damage. Double against the Wall."
+        "es": "10 de daño. Doble contra la Muralla.",
+        "en": "10 damage. Double against the Wall."
       },
       "art": "cards/ariete-de-hierro.jpg"
     },
@@ -426,8 +427,8 @@
         "en": "Night Raid"
       },
       "text": {
-        "es": "Roba 4 del recurso que más tenga el rival.",
-        "en": "Steal 4 of the resource your opponent has most of."
+        "es": "Roba 5 del recurso que más tenga el rival.",
+        "en": "Steal 5 of the resource your opponent has most of."
       },
       "art": "cards/saqueo-nocturno.jpg"
     },
@@ -441,8 +442,8 @@
         "en": "Cavalry Charge"
       },
       "text": {
-        "es": "10 de daño.",
-        "en": "10 damage."
+        "es": "22 de daño.",
+        "en": "22 damage."
       },
       "art": "cards/carga-de-caballeria.jpg"
     },
@@ -456,8 +457,8 @@
         "en": "Harassment"
       },
       "text": {
-        "es": "3 de daño. Combo: +4 de daño.",
-        "en": "3 damage. Combo: +4 damage."
+        "es": "7 de daño. Combo: +8 de daño.",
+        "en": "7 damage. Combo: +8 damage."
       },
       "art": "cards/hostigamiento.jpg"
     },
@@ -471,8 +472,8 @@
         "en": "Sappers"
       },
       "text": {
-        "es": "6 de daño solo a la Muralla.",
-        "en": "6 damage to the Wall only."
+        "es": "13 de daño solo a la Muralla.",
+        "en": "13 damage to the Wall only."
       },
       "art": "cards/zapadores.jpg"
     },
@@ -486,8 +487,8 @@
         "en": "Catapult"
       },
       "text": {
-        "es": "12 de daño.",
-        "en": "12 damage."
+        "es": "25 de daño.",
+        "en": "25 damage."
       },
       "art": "cards/catapulta.jpg"
     },
@@ -501,8 +502,8 @@
         "en": "Siege Ballista"
       },
       "text": {
-        "es": "7 de daño perforante.",
-        "en": "7 piercing damage."
+        "es": "15 de daño perforante.",
+        "en": "15 piercing damage."
       },
       "art": "cards/balista-de-asedio.jpg"
     },
@@ -531,8 +532,8 @@
         "en": "Sabotage"
       },
       "text": {
-        "es": "Destruye un encantamiento rival y hace 3 de daño.",
-        "en": "Destroy an enemy enchantment and deal 3 damage."
+        "es": "Destruye un encantamiento rival y hace 8 de daño.",
+        "en": "Destroy an enemy enchantment and deal 8 damage."
       },
       "art": "cards/sabotaje.jpg"
     },
@@ -546,8 +547,8 @@
         "en": "War Banner"
       },
       "text": {
-        "es": "Encantamiento (4 turnos): tus ataques hacen +2 de daño.",
-        "en": "Enchantment (4 turns): your attacks deal +2 damage."
+        "es": "Encantamiento (4 turnos): tus ataques hacen +3 de daño.",
+        "en": "Enchantment (4 turns): your attacks deal +3 damage."
       },
       "art": "cards/estandarte-de-guerra.jpg"
     },
@@ -561,8 +562,8 @@
         "en": "Ambush"
       },
       "text": {
-        "es": "5 de daño. Si el rival jugó Construcción en su último turno, 10 de daño.",
-        "en": "5 damage. If your opponent played Construction last turn, 10 damage."
+        "es": "10 de daño. Si el rival jugó Construcción en su último turno, 20 de daño.",
+        "en": "10 damage. If your opponent played Construction last turn, 20 damage."
       },
       "art": "cards/emboscada.jpg"
     },
@@ -576,8 +577,8 @@
         "en": "Colossal Trebuchet"
       },
       "text": {
-        "es": "20 de daño.",
-        "en": "20 damage."
+        "es": "37 de daño.",
+        "en": "37 damage."
       },
       "art": "cards/trabuquete-colosal.jpg"
     },
@@ -585,7 +586,7 @@
       "id": "motin",
       "school": "asalto",
       "rarity": "epica",
-      "cost": 10,
+      "cost": 8,
       "name": {
         "es": "Motín",
         "en": "Mutiny"
@@ -606,8 +607,8 @@
         "en": "Siege Tower"
       },
       "text": {
-        "es": "8 de daño perforante y 4 de daño a la Muralla.",
-        "en": "8 piercing damage and 4 damage to the Wall."
+        "es": "17 de daño perforante y 10 de daño a la Muralla.",
+        "en": "17 piercing damage and 10 damage to the Wall."
       },
       "art": "cards/torre-de-asedio.jpg"
     },
@@ -621,8 +622,8 @@
         "en": "Unstoppable Host"
       },
       "text": {
-        "es": "16 de daño y después 8 de daño perforante.",
-        "en": "16 damage, then 8 piercing damage."
+        "es": "27 de daño y después 13 de daño perforante.",
+        "en": "27 damage, then 13 piercing damage."
       },
       "art": "cards/hueste-imparable.jpg"
     },
@@ -636,8 +637,8 @@
         "en": "Arcane Spark"
       },
       "text": {
-        "es": "2 de daño perforante.",
-        "en": "2 piercing damage."
+        "es": "5 de daño perforante.",
+        "en": "5 piercing damage."
       },
       "art": "cards/chispa-arcana.jpg"
     },
@@ -651,8 +652,8 @@
         "en": "Ember Rain"
       },
       "text": {
-        "es": "Quemadura al rival durante 3 turnos (2 de daño por turno).",
-        "en": "Burn on your opponent for 3 turns (2 damage per turn)."
+        "es": "Quemadura al rival durante 4 turnos (3 de daño por turno).",
+        "en": "Burn on your opponent for 4 turns (3 damage per turn)."
       },
       "art": "cards/lluvia-de-ascuas.jpg"
     },
@@ -720,7 +721,7 @@
       "id": "ojo-del-augur",
       "school": "arcano",
       "rarity": "comun",
-      "cost": 1,
+      "cost": 2,
       "name": {
         "es": "Ojo del Augur",
         "en": "Augur's Eye"
@@ -741,8 +742,8 @@
         "en": "Crystal Bloom"
       },
       "text": {
-        "es": "+5 Torreón.",
-        "en": "+5 Keep."
+        "es": "+10 Torreón.",
+        "en": "+10 Keep."
       },
       "art": "cards/brote-de-cristal.jpg"
     },
@@ -771,8 +772,8 @@
         "en": "Purification"
       },
       "text": {
-        "es": "Elimina tus estados negativos y +2 Torreón.",
-        "en": "Remove your negative statuses and +2 Keep."
+        "es": "Elimina tus estados negativos y +5 Torreón.",
+        "en": "Remove your negative statuses and +5 Keep."
       },
       "art": "cards/purificacion.jpg"
     },
@@ -810,7 +811,7 @@
       "id": "maldicion-de-oxido",
       "school": "arcano",
       "rarity": "rara",
-      "cost": 6,
+      "cost": 5,
       "name": {
         "es": "Maldición de Óxido",
         "en": "Rust Curse"
@@ -846,8 +847,8 @@
         "en": "Forked Lightning"
       },
       "text": {
-        "es": "5 de daño perforante y 5 de daño a la Muralla.",
-        "en": "5 piercing damage and 5 damage to the Wall."
+        "es": "10 de daño perforante y 10 de daño a la Muralla.",
+        "en": "10 piercing damage and 10 damage to the Wall."
       },
       "art": "cards/rayo-bifurcado.jpg"
     },
@@ -876,8 +877,8 @@
         "en": "Ash Storm"
       },
       "text": {
-        "es": "6 de daño y Quemadura durante 4 turnos.",
-        "en": "6 damage and Burn for 4 turns."
+        "es": "15 de daño y Quemadura durante 4 turnos.",
+        "en": "15 damage and Burn for 4 turns."
       },
       "art": "cards/tormenta-de-ceniza.jpg"
     },
@@ -885,7 +886,7 @@
       "id": "prision-de-hielo",
       "school": "arcano",
       "rarity": "epica",
-      "cost": 11,
+      "cost": 9,
       "name": {
         "es": "Prisión de Hielo",
         "en": "Ice Prison"
@@ -921,8 +922,8 @@
         "en": "Dusk Comet"
       },
       "text": {
-        "es": "10 de daño a la Muralla y 10 de daño perforante.",
-        "en": "10 damage to the Wall and 10 piercing damage."
+        "es": "17 de daño a la Muralla y 17 de daño perforante.",
+        "en": "17 damage to the Wall and 17 piercing damage."
       },
       "art": "cards/cometa-del-ocaso.jpg"
     }
@@ -935,8 +936,8 @@
         "en": "The Architect"
       },
       "text": {
-        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +10 Torreón y +10 Muralla.",
-        "en": "Passive: your Construction cards cost 1 less. Ultimate: +10 Keep and +10 Wall."
+        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Torreón y +10 Muralla.",
+        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Keep and +10 Wall."
       },
       "art": "heroes/arquitecta.jpg"
     },
@@ -947,8 +948,8 @@
         "en": "The Marshal"
       },
       "text": {
-        "es": "Pasiva: tus ataques hacen +1 de daño. Definitiva: 15 de daño.",
-        "en": "Passive: your attacks deal +1 damage. Ultimate: 15 damage."
+        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 10 de daño.",
+        "en": "Passive: your attacks deal +2 damage. Ultimate: 10 damage."
       },
       "art": "heroes/mariscal.jpg"
     },
@@ -959,8 +960,8 @@
         "en": "The Sorceress"
       },
       "text": {
-        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura y Escarcha total al rival.",
-        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn and full Frost on your opponent."
+        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura, Escarcha total y 3 de daño perforante al rival.",
+        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn, full Frost and 3 piercing damage on your opponent."
       },
       "art": "heroes/hechicera.jpg"
     },
@@ -971,8 +972,8 @@
         "en": "The Alchemist"
       },
       "text": {
-        "es": "Pasiva: +1 de un recurso al azar cada turno. Definitiva: +8 de cada recurso.",
-        "en": "Passive: +1 of a random resource each turn. Ultimate: +8 of each resource."
+        "es": "Pasiva: +3 de un recurso al azar cada turno. Definitiva: +10 de cada recurso y +6 Torreón.",
+        "en": "Passive: +3 of a random resource each turn. Ultimate: +10 of each resource and +6 Keep."
       },
       "art": "heroes/alquimista.jpg"
     },
@@ -983,8 +984,8 @@
         "en": "The Saboteur"
       },
       "text": {
-        "es": "Pasiva: al descartar, roba 1 recurso del rival. Definitiva: roba 1 trabajador del rival.",
-        "en": "Passive: when you discard, steal 1 resource from your opponent. Ultimate: steal 1 of your opponent's workers."
+        "es": "Pasiva: al descartar, roba 4 recursos del rival. Definitiva: roba 1 trabajador del rival y hace 10 de daño perforante.",
+        "en": "Passive: when you discard, steal 4 resources from your opponent. Ultimate: steal 1 of your opponent's workers and deal 10 piercing damage."
       },
       "art": "heroes/saboteadora.jpg"
     },
@@ -995,8 +996,8 @@
         "en": "The Warden"
       },
       "text": {
-        "es": "Pasiva: tu Muralla empieza con +8. Definitiva: Escudo durante 2 ataques y +8 Muralla.",
-        "en": "Passive: your Wall starts with +8. Ultimate: Shield for 2 attacks and +8 Wall."
+        "es": "Pasiva: tu Muralla empieza con +7. Definitiva: Escudo durante 1 ataque y +10 Muralla.",
+        "en": "Passive: your Wall starts with +7. Ultimate: Shield for 1 attack and +10 Wall."
       },
       "art": "heroes/guardian.jpg"
     }
@@ -1009,8 +1010,8 @@
         "en": "Thunderstorm"
       },
       "text": {
-        "es": "Ambas Murallas pierden 5.",
-        "en": "Both Walls lose 5."
+        "es": "Ambas Murallas pierden 8.",
+        "en": "Both Walls lose 8."
       },
       "art": "events/tormenta.jpg"
     },
@@ -1045,8 +1046,8 @@
         "en": "Earthquake"
       },
       "text": {
-        "es": "Ambos Torreones pierden 4.",
-        "en": "Both Keeps lose 4."
+        "es": "Ambos Torreones pierden 7.",
+        "en": "Both Keeps lose 7."
       },
       "art": "events/terremoto.jpg"
     },

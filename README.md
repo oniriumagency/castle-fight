@@ -10,6 +10,7 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | `design/art-prompts.md` | Prompts de las 72 ilustraciones. |
 | `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`), con el nombre de archivo indicado en cada prompt. |
 | `packages/engine` | Motor de reglas puro y determinista, sin dependencias. Lo usan el servidor, el cliente, la IA y las simulaciones. [Documentación](packages/engine/README.md). |
+| `packages/ai` | IA rival con tres dificultades, que corre en el navegador sin servidor, y simulaciones de equilibrio IA contra IA. [Documentación](packages/ai/README.md). |
 | `packages/protocol` | Tipos de los mensajes entre cliente y servidor. |
 | `apps/client` | Cliente web (Vite + PixiJS). Por ahora es un esqueleto que juega una partida local con el motor. |
 | `apps/server` | Servidor autoritativo en Cloudflare Workers: un Durable Object para el lobby y uno por sala. Por ahora es un esqueleto que ya juega partidas completas por WebSocket. |
@@ -20,10 +21,12 @@ Hace falta Node 22 o posterior y pnpm 10.
 
 ```sh
 pnpm install
-pnpm test          # tests del motor (uno por carta, héroe y evento)
+pnpm test          # tests del motor (uno por carta, héroe y evento) y de la IA
 pnpm typecheck
 pnpm build         # compila el cliente y empaqueta el servidor
 pnpm sim           # 1000 partidas aleatorias con un resumen de equilibrio
+pnpm balance       # todos los héroes entre sí, jugados por la IA: héroes, cartas y duración
+pnpm ladder        # cuánto gana cada nivel de la IA al anterior
 ```
 
 Para desarrollar:
