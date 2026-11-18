@@ -81,23 +81,24 @@ describe('setup', () => {
 });
 
 describe('turn flow', () => {
-  it('play a card: the hand refills and the turn passes', () => {
+  it('play a card: the turn passes, and the hand refills when your next turn starts', () => {
     const start = scenario({ hand: ['parapeto', 'cimientos'], keepTurn: false });
     const { state, events } = playCard(start, 'parapeto');
     expect(state.active).toBe(OPP);
     expect(state.turn).toBe(2);
-    expect(state.players[ME].hand).toHaveLength(6);
+    // No draw at the end of the turn: the hand keeps its gap through the rival's turn.
+    expect(state.players[ME].hand).toHaveLength(1);
     expect(state.players[ME].discard).toEqual(['parapeto']);
-    expect(events.map((e) => e.type)).toEqual([
-      'cardPlayed',
-      'built',
-      'cardsDrawn',
-      'turnEnded',
-      'turnStarted',
-      'produced',
-    ]);
+    expect(events.map((e) => e.type)).toEqual(['cardPlayed', 'built', 'turnEnded', 'turnStarted', 'produced']);
     // Production: one unit per worker.
     expect(state.players[OPP].resources).toEqual({ piedra: 52, acero: 52, mana: 52 });
+
+    // My next turn starts by drawing back up to a full hand, before anything else.
+    const next = pass(state);
+    expect(next.active).toBe(ME);
+    expect(next.players[ME].hand).toHaveLength(6);
+    const types = mustApply(state, { type: 'discard', player: OPP, uid: state.players[OPP].hand[0]!.uid }).events.map((e) => e.type);
+    expect(types.slice(types.indexOf('turnStarted'), types.indexOf('turnStarted') + 2)).toEqual(['turnStarted', 'cardsDrawn']);
   });
 
   it('discard a card instead of playing', () => {
@@ -106,7 +107,8 @@ describe('turn flow', () => {
     const { state, events } = mustApply(start, { type: 'discard', player: ME, uid });
     expect(state.active).toBe(OPP);
     expect(state.players[ME].discard).toEqual(['cimientos']);
-    expect(state.players[ME].hand).toHaveLength(6);
+    expect(state.players[ME].hand).toHaveLength(1);
+    expect(pass(state).players[ME].hand).toHaveLength(6);
     expect(eventsOf(events, 'cardDiscarded')[0]).toMatchObject({ cardId: 'cimientos', reason: 'action' });
   });
 
@@ -117,8 +119,9 @@ describe('turn flow', () => {
     expect(state.active).toBe(OPP);
     expect(state.players[ME].discard).toEqual(['parapeto', 'cimientos', 'catapulta']);
     expect(eventsOf(events, 'cardDiscarded')).toHaveLength(3);
-    // The hand refills to full at the end of the turn.
-    expect(state.players[ME].hand).toHaveLength(6);
+    // The hand refills to full when the next turn starts.
+    expect(state.players[ME].hand).toHaveLength(1);
+    expect(pass(state).players[ME].hand).toHaveLength(6);
 
     const tooMany = applyAction(start, { type: 'discard', player: ME, uid: a!, also: [b!, c!, d!] });
     expect(tooMany.ok).toBe(false);
@@ -178,7 +181,9 @@ describe('turn flow', () => {
     const start = scenario({ hand: ['parapeto'], keepTurn: false });
     start.players[ME].deck = ['cimientos'];
     start.players[ME].discard = ['escaramuza', 'catapulta', 'zapadores', 'motin', 'drenaje'];
-    const { state, events } = playCard(start, 'parapeto');
+    const played = playCard(start, 'parapeto').state;
+    const { state: next, events } = mustApply(played, { type: 'discard', player: OPP, uid: played.players[OPP].hand[0]!.uid });
+    const state = next;
     expect(eventsOf(events, 'deckReshuffled')).toHaveLength(1);
     expect(state.players[ME].hand).toHaveLength(6);
     expect(state.players[ME].discard).toEqual([]);
@@ -190,10 +195,16 @@ describe('turn flow', () => {
     );
   });
 
-  it('a discarded opponent card is not replaced until the end of their own turn', () => {
+  it('a card a rival makes you discard is not replaced until the turn after your next', () => {
     let state = playCard(scenario({ hand: ['prision-de-hielo'], keepTurn: false }), 'prision-de-hielo').state;
+    // Their turn starts with the gap still there...
+    expect(state.active).toBe(OPP);
     expect(state.players[OPP].hand).toHaveLength(5);
     state = pass(state);
+    expect(state.players[OPP].hand).toHaveLength(4);
+    // ...and their following turn starts with a full hand again.
+    state = pass(state);
+    expect(state.active).toBe(OPP);
     expect(state.players[OPP].hand).toHaveLength(6);
   });
 
@@ -419,7 +430,7 @@ describe('timeout (turn clock hook)', () => {
     expect(state.active).toBe(OPP);
     expect(events[0]).toEqual({ type: 'timedOut', player: ME });
     expect(eventsOf(events, 'cardDiscarded')[0]).toMatchObject({ player: ME, reason: 'timeout' });
-    expect(state.players[ME].hand).toHaveLength(6);
+    expect(state.players[ME].hand).toHaveLength(5);
   });
 
   it('takes the default answer of a pending choice and does not discard after a play', () => {

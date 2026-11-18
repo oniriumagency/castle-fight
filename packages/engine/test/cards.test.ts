@@ -561,7 +561,8 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(hits).toHaveLength(1);
     expect(hits[0]!.wallLoss + hits[0]!.keepLoss).toBe(24);
     expect(state.active).toBe(OPP);
-    expect(state.players[ME].hand).toHaveLength(6);
+    // The hand stays empty until my next turn starts.
+    expect(state.players[ME].hand).toHaveLength(0);
   },
   'ofrenda-arcana': () => {
     let { state } = playCard(scenario({ hand: ['ofrenda-arcana', 'escaramuza', 'parapeto', 'catapulta'] }), 'ofrenda-arcana');

@@ -9,7 +9,7 @@ import {
   playBlocker,
   redactEvents,
 } from '../src/index';
-import { eventsOf, playCard, scenario } from '../src/testing';
+import { eventsOf, mustApply, playCard, scenario } from '../src/testing';
 
 const ME = 0;
 const OPP = 1;
@@ -62,7 +62,9 @@ describe('player view', () => {
   });
 
   it('hides the cards the opponent draws', () => {
-    const { events } = playCard(scenario({ hand: ['parapeto'], keepTurn: false }), 'parapeto');
+    // I play my last card; my next turn starts by drawing a fresh hand.
+    const { state } = playCard(scenario({ hand: ['parapeto'], keepTurn: false }), 'parapeto');
+    const { events } = mustApply(state, { type: 'discard', player: OPP, uid: state.players[OPP].hand[0]!.uid });
     const drawnForMe = eventsOf(redactEvents(events, ME), 'cardsDrawn')[0]!;
     const drawnForThem = eventsOf(redactEvents(events, OPP), 'cardsDrawn')[0]!;
     expect(drawnForMe.cards.every((c) => c.cardId !== null)).toBe(true);
