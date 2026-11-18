@@ -83,7 +83,7 @@ Las cartas que afectan a «el rival» siguen `rules.multiTargeting`:
 
 ### Reloj de turno
 
-El motor no tiene reloj. El servidor programa una alarma de `rules.turnSeconds` (30 s) al empezar cada turno (`state.turn` cambia) y, si salta, aplica `{ type: 'timeout' }`: las elecciones pendientes toman su opción por defecto, se descarta una carta al azar si el jugador aún no había jugado y el turno termina. El servidor nunca debe aceptar `timeout` de un cliente.
+El motor no tiene reloj. El servidor programa una alarma de `rules.turnSeconds` (30 s) al empezar cada turno (`state.turn` cambia) y, si salta, aplica `{ type: 'timeout' }`: las elecciones pendientes toman su opción por defecto, si el jugador aún no había jugado, juega la carta más barata que pueda pagar (al azar entre las de igual coste; sus elecciones también toman la opción por defecto), o descarta una al azar si no puede pagar ninguna, y el turno termina. El servidor nunca debe aceptar `timeout` de un cliente.
 
 ### Registro de eventos
 
@@ -93,7 +93,7 @@ Cada acción devuelve la lista ordenada de lo que ha pasado (`GameEvent[]`): `ca
 
 Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. Todos se pueden cambiar por partida con `createGame({ rules })`, pensado para las simulaciones de equilibrio.
 
-**Preparación.** Torreón 50, Muralla 15, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Quien juega segundo empieza con 5 más de Muralla (`rules.secondPlayerWall`), que compensa la ventaja de mover primero. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (224 cartas). Cuando el mazo se agota se baraja el descarte.
+**Preparación.** Torreón 50, Muralla 15, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Quien juega segundo empieza con 5 más de Muralla (`rules.secondPlayerWall`), que compensa la ventaja de mover primero. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (226 cartas). Cuando el mazo se agota se baraja el descarte.
 
 **Turno.** Al empezar el turno, en este orden: terminan los efectos «hasta tu próximo turno», salta el evento de batalla si toca, la Quemadura hace su daño, se activan los encantamientos de inicio de turno y los trabajadores producen. Después el jugador juega una carta pagando su coste o descarta una. Al terminar repone la mano hasta 6.
 

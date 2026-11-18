@@ -313,6 +313,21 @@
       "art": "cards/aguja-celeste.jpg"
     },
     {
+      "id": "gremios-unidos",
+      "school": "construccion",
+      "rarity": "epica",
+      "cost": 12,
+      "name": {
+        "es": "Gremios Unidos",
+        "en": "United Guilds"
+      },
+      "text": {
+        "es": "+1 Cantero, +1 Herrero y +1 Arcanista.",
+        "en": "+1 Mason, +1 Smith and +1 Arcanist."
+      },
+      "art": "cards/gremios-unidos.jpg"
+    },
+    {
       "id": "ciudadela-eterna",
       "school": "construccion",
       "rarity": "legendaria",

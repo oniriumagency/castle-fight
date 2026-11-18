@@ -502,3 +502,86 @@ input[type='range'] {
 .modal > h2:first-child {
   padding-right: 40px;
 }
+
+/* ---------- Sound panel (speaker button) ---------- */
+
+.mute-btn.is-muted {
+  color: var(--muted);
+}
+
+.sound-panel {
+  position: fixed;
+  z-index: 9000;
+  width: min(300px, calc(100vw - 16px));
+  padding: 10px 12px 8px;
+  background: var(--panel-solid);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.sound-panel.above {
+  transform: translateY(6px);
+}
+
+.sound-panel.in {
+  opacity: 1;
+  transform: none;
+}
+
+.sound-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--gold-l);
+  letter-spacing: 0.04em;
+}
+
+.sound-mute.btn {
+  min-height: 34px;
+  padding: 0.3em 0.7em;
+  font-size: 0.78rem;
+  gap: 0.4em;
+}
+
+.sound-mute[aria-pressed='true'] {
+  border-color: var(--danger);
+  color: #ffd2c8;
+}
+
+.sound-mute svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sound-rows {
+  display: grid;
+  grid-template-columns: max-content 1fr 2.6em;
+  align-items: center;
+  column-gap: 10px;
+  font-size: 0.92rem;
+}
+
+.sound-row {
+  display: contents;
+}
+
+.sound-label {
+  color: var(--ink);
+}
+
+.sound-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.sound-panel.muted .sound-rows {
+  opacity: 0.5;
+}

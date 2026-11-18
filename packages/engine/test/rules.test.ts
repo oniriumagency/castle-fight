@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RULES,
+  costResource,
+  effectiveCost,
   applyAction,
   buildDeckList,
   createGame,
@@ -55,7 +57,7 @@ describe('setup', () => {
     expect(count('catapulta')).toBe(3);
     expect(count('motin')).toBe(2);
     expect(count('cometa-del-ocaso')).toBe(1);
-    expect(deck).toHaveLength(33 * 4 + 23 * 3 + 10 * 2 + 3);
+    expect(deck).toHaveLength(33 * 4 + 23 * 3 + 11 * 2 + 3);
   });
 
   it('rejects unknown heroes', () => {
@@ -387,8 +389,32 @@ describe('combo', () => {
 });
 
 describe('timeout (turn clock hook)', () => {
-  it('discards a random card and ends the turn', () => {
-    const start = scenario({ keepTurn: false });
+  it('plays the cheapest card the player can pay and ends the turn', () => {
+    const hand = ['trabuquete-colosal', 'cimientos', 'parapeto', 'catapulta'] as const;
+    const start = scenario({ hand: [...hand], keepTurn: false });
+    const costs = hand.map((id) => effectiveCost(start, ME, id));
+    const cheapest = Math.min(...costs);
+    const { state, events } = mustApply(start, { type: 'timeout' });
+    expect(events[0]).toEqual({ type: 'timedOut', player: ME });
+    const played = eventsOf(events, 'cardPlayed');
+    expect(played).toHaveLength(1);
+    expect(played[0]!.player).toBe(ME);
+    expect(effectiveCost(start, ME, played[0]!.cardId)).toBe(cheapest);
+    expect(eventsOf(events, 'cardDiscarded').filter((e) => e.reason === 'timeout')).toEqual([]);
+    expect(state.active).toBe(OPP);
+  });
+
+  it('leaves out cards the player cannot pay', () => {
+    const start = scenario({ hand: ['trabuquete-colosal', 'cimientos'], keepTurn: false, resources: 0 });
+    const affordable = start.players[ME].hand.find((c) => c.cardId === 'cimientos')!;
+    const cost = effectiveCost(start, ME, 'cimientos');
+    start.players[ME].resources[costResource('cimientos')] = cost;
+    const { events } = mustApply(start, { type: 'timeout' });
+    expect(eventsOf(events, 'cardPlayed').map((e) => e.uid)).toEqual([affordable.uid]);
+  });
+
+  it('discards a random card when no card can be paid, and ends the turn', () => {
+    const start = scenario({ keepTurn: false, resources: 0 });
     const { state, events } = mustApply(start, { type: 'timeout' });
     expect(state.active).toBe(OPP);
     expect(events[0]).toEqual({ type: 'timedOut', player: ME });

@@ -55,7 +55,7 @@ Los efectos de sonido y visuales son originales y se generan en el navegador: no
 - Calidad de efectos (`src/app/quality.ts`): en `Auto` empieza en alta salvo en dispositivos modestos y baja sola si los fotogramas van lentos. En baja hay la mitad de partículas, sin rayos ni humo, y el lienzo usa menos resolución.
 - Las cartas brillan según su rareza y al caer en la mesa dejan un destello del color de su escuela (`styles/card.css`, `.play-burst` en `styles/board.css`).
 
-Ajustes: volumen general, música y efectos, silenciar todo (también con la tecla M o el botón del altavoz), calidad de efectos, sacudida de pantalla y movimiento reducido.
+Ajustes: volumen general, música y efectos, silenciar todo (también con la tecla M), calidad de efectos, sacudida de pantalla y movimiento reducido. El botón del altavoz (menú y partida) abre ahí mismo un panel con los tres volúmenes y Silenciar todo (`ui/muteButton.ts`).
 
 ## Controles
 
