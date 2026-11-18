@@ -23,7 +23,7 @@ pnpm --filter @cardcraft-castles/client build
 | --- | --- |
 | `app/` | Arranque, textos es/en (`i18n.ts`), ajustes guardados en el navegador, utilidades DOM y enrutador. |
 | `ui/` | Cartas dibujadas en CSS según el marco aprobado (`card.ts`, `styles/card.css`), iconos y emblemas, colores por héroe y cielos por evento. |
-| `scene/` | Campo de batalla en Pixi: castillos que crecen y se rompen, texturas procedurales, interpolaciones. |
+| `scene/` | Campo de batalla en Pixi: castillos que crecen y se rompen, texturas procedurales, interpolaciones. Cada héroe tiene su propio castillo (`castleStyles.ts`: piedra, tejados, almenas, torres de fondo y un detalle animado); `castle.ts` lo dibuja. La torre del frente mide exactamente el Torreón y la muralla del lado del rival la Muralla; las torres de atrás siguen al Torreón sin superarlo. |
 | `game/` | Sesiones de partida: `LocalSession` (IA o dos jugadores en el mismo dispositivo), estadísticas y textos del registro. `ai.ts` es un sustituto hasta que llegue el paquete de IA. |
 | `net/` | `OnlineSession`, que adapta el SDK de `@cardcraft-castles/protocol/client` a la misma interfaz que las partidas locales. |
 | `screens/` | Menú, lobby, sala de espera, selección de héroe, ajustes, cómo se juega, y el tablero (`board/`). |

@@ -24,7 +24,7 @@ import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import { cardBack, cardFace, eventCard, heroCard } from '../../ui/card';
-import { heroColor, skyFor } from '../../ui/theme';
+import { skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
 import { Hand, blockReason, inspectPanel } from './hand';
@@ -163,7 +163,7 @@ class BoardScreen implements Screen {
   mount(): void {
     audio.music('battle');
     void preloadArt([...this.session.seats.map((s) => getHero(s.hero).art)]);
-    this.field.setBanners([heroColor(this.session.seats[this.seatOfSide(0)].hero), heroColor(this.session.seats[this.seatOfSide(1)].hero)]);
+    this.field.setHeroes([this.session.seats[this.seatOfSide(0)].hero, this.session.seats[this.seatOfSide(1)].hero]);
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
     window.addEventListener('keydown', this.onKey);
@@ -522,7 +522,7 @@ class BoardScreen implements Screen {
       // Castle scale and progress bars follow this match's rules.
       this.field.setMaxPoints(view.rules.keepWin);
       for (const plaque of this.plaques) plaque.setKeepWin(view.rules.keepWin);
-      this.field.setBanners([heroColor(view.players[this.seatOfSide(0)].hero), heroColor(view.players[this.seatOfSide(1)].hero)]);
+      this.field.setHeroes([view.players[this.seatOfSide(0)].hero, view.players[this.seatOfSide(1)].hero]);
       void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
     }
     this.view = view;

@@ -184,7 +184,8 @@ export class Battlefield {
       this.clouds.push(cloud);
     }
     const textures = { keepStone: stoneTexture(KEEP_STONE), wallStone: stoneTexture(WALL_STONE), shade: towerShadeTexture() };
-    this.castles = [new Castle(1, textures, 0xc8963e), new Castle(-1, textures, 0xa8322d)];
+    // Each castle is drawn in its hero's style; the menu shows two contrasting ones.
+    this.castles = [new Castle(1, textures, 0xc8963e, 'arquitecta'), new Castle(-1, textures, 0xa8322d, 'mariscal')];
 
     this.world.addChild(this.skyA, this.skyB, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
@@ -307,6 +308,17 @@ export class Battlefield {
   setBanners(colors: [number, number]): void {
     this.castles[0].setBanner(colors[0]);
     this.castles[1].setBanner(colors[1]);
+  }
+
+  /** Draws each castle in its hero's style (towers, roofs, stone) with the hero's banner colour. */
+  setHeroes(heroes: [string, string]): void {
+    this.castles[0].setHero(heroes[0]);
+    this.castles[1].setHero(heroes[1]);
+  }
+
+  /** Scene tops of every standing tower of a castle, Keep first (screen CSS px). */
+  towerTops(player: PlayerId): { x: number; y: number; width: number }[] {
+    return this.castles[player].towerTops().map((t) => ({ ...t, x: t.x + this.world.x, y: t.y + this.world.y }));
   }
 
   /** Jump straight to these heights (new game, resume, layout). */
@@ -648,7 +660,8 @@ export class Battlefield {
   private update(dt: number): void {
     const step = dt / 16.67;
     this.monitorFrames(dt);
-    for (const castle of this.castles) castle.tick(dt);
+    const calm = settings.get().reducedMotion;
+    for (const castle of this.castles) castle.tick(dt, calm);
     // Clouds drift.
     for (const [i, cloud] of this.clouds.entries()) {
       cloud.x += (0.06 + i * 0.02) * step;
@@ -738,9 +751,13 @@ export class Battlefield {
       const wall = this.anchor(player, 'wall');
       const w = castle.keepWidth;
       if (aura.burn) {
-        const onWall = Math.random() < 0.35 && castle.wall > 2;
-        const at = onWall ? wall : { x: keep.x, y: keep.y + w * 0.6 };
-        this.burst(at.x, at.y, { count: 1, texture: 'flame', color: 0xffe080, colorTo: 0xff3010, speed: 1.2, angle: -Math.PI / 2, spread: 0.4, gravity: -0.05, size: 22 + Math.min(aura.burn, 4) * 4, life: 520, area: { w: w * 0.8, h: 6 } });
+        // Flames on every standing tower (the Keep most), sometimes on the Wall.
+        const tops = this.towerTops(player);
+        const onWall = Math.random() < 0.3 && castle.wall > 2;
+        const tower = tops.length && Math.random() < 0.4 ? tops[Math.floor(Math.random() * tops.length)] : null;
+        const at = onWall ? wall : tower ? { x: tower.x, y: tower.y + tower.width * 0.4 } : { x: keep.x, y: keep.y + w * 0.6 };
+        const spanW = tower && !onWall ? tower.width * 0.8 : w * 0.8;
+        this.burst(at.x, at.y, { count: 1, texture: 'flame', color: 0xffe080, colorTo: 0xff3010, speed: 1.2, angle: -Math.PI / 2, spread: 0.4, gravity: -0.05, size: 22 + Math.min(aura.burn, 4) * 4, life: 520, area: { w: spanW, h: 6 } });
         if (Math.random() < 0.5) this.burst(at.x, at.y - 10, { count: 1, color: 0xffa040, speed: 1.6, angle: -Math.PI / 2, spread: 1, gravity: -0.03, size: 6, life: 1200, area: { w: w, h: 10 } });
         if (Math.random() < 0.4 && !effectsLow()) this.burst(at.x, at.y - 24, { count: 1, texture: 'smoke', color: 0x2a2624, speed: 0.8, angle: -Math.PI / 2, spread: 0.5, gravity: -0.02, size: 34, life: 1800, alpha: 0.45 });
       }
