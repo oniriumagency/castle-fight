@@ -284,7 +284,6 @@ const STRINGS = {
   statBest: { es: 'Mejor golpe', en: 'Biggest hit' },
   statUltimates: { es: 'Definitivas', en: 'Ultimates' },
   rematch: { es: 'Revancha', en: 'Rematch' },
-  rematchHero: { es: 'Tu héroe para la revancha', en: 'Your hero for the rematch' },
   headToHead: { es: 'Tú contra {who}', en: 'You vs {who}' },
   headToHeadGames: { es: '{n} partidas en total', en: '{n} games in total' },
   headToHeadFirst: { es: 'Vuestra primera partida', en: 'Your first game together' },

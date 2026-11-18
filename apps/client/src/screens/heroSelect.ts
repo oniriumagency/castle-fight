@@ -39,9 +39,21 @@ function remember(key: string, value: string): void {
  * the opponent; on a shared device both players pick in turn; online it
  * picks the hero you join the room with.
  */
-export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen {
+export interface RematchPick {
+  /** The heroes of the last game, for the seats played on this device. */
+  initial: HeroId[];
+  /** The chosen heroes, in the same order. */
+  onPick: (heroes: HeroId[]) => void;
+  onBack: () => void;
+}
+
+/**
+ * With `rematch`, the same screen is shown over the board after a game: the
+ * players on this device choose again before the rematch, without the AI options.
+ */
+export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?: RematchPick): Screen {
   const ids = HEROES.map((hero) => hero.id);
-  let picked: HeroId = stored(LAST_HERO, ids, ids[0]);
+  let picked: HeroId = rematch?.initial[0] ?? stored(LAST_HERO, ids, ids[0]);
   let opponent: HeroId | 'random' = 'random';
   let difficulty: Difficulty = stored(LAST_LEVEL, DIFFICULTIES, 'normal');
   /** On a shared device: player 1 picks first, then player 2. */
@@ -51,14 +63,31 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
   const el = h('div.hero-screen');
 
   const title = (): string => {
-    if (mode === 'local') return t('chooseHeroFor', { who: step === 0 ? t('player1') : t('player2') });
-    if (mode === 'ffa') return `${t('playFfa')} · ${t('chooseHero')}`;
-    return t('chooseHero');
+    const base = mode === 'local' ? t('chooseHeroFor', { who: step === 0 ? t('player1') : t('player2') }) : t('chooseHero');
+    if (rematch) return `${t('rematch')} · ${base}`;
+    if (mode === 'ffa') return `${t('playFfa')} · ${base}`;
+    return base;
+  };
+
+  /** The board's castles stay as they are while choosing for a rematch. */
+  const previewHero = (id: HeroId): void => {
+    if (!rematch) battlefield().castles[0].setHero(id);
   };
 
   const confirm = (): void => {
     audio.play('uiClick');
     remember(LAST_HERO, picked);
+    if (rematch) {
+      if (mode === 'local' && step === 0) {
+        firstPick = picked;
+        step = 1;
+        picked = rematch.initial[1] ?? picked;
+        build();
+        return;
+      }
+      rematch.onPick(mode === 'local' ? [firstPick!, picked] : [picked]);
+      return;
+    }
     if (mode === 'ai') {
       remember(LAST_LEVEL, difficulty);
       flow.startAi(picked, opponent, difficulty);
@@ -88,12 +117,16 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
       h('h2', null, L(hero.name)),
       h('div.hero-ability', null, h('h3', null, t('passive')), h('p', null, html(rulesHtml(parts.passive)))),
       h('div.hero-ability', null, h('h3', null, t('ultimate')), h('p', null, html(rulesHtml(parts.ultimate)))),
-      mode === 'ai' || mode === 'ffa' ? aiOptions() : null,
+      (mode === 'ai' || mode === 'ffa') && !rematch ? aiOptions() : null,
       h(
         'div.hero-actions',
         null,
         h('button.btn', { type: 'button', onclick: back }, html(iconSvg('arrow')), t('back')),
-        h('button.btn.primary.big', { type: 'button', onclick: confirm }, mode === 'local' && step === 0 ? t('confirm') : t('startGame')),
+        h(
+          'button.btn.primary.big',
+          { type: 'button', onclick: confirm },
+          mode === 'local' && step === 0 ? t('confirm') : rematch ? t(mode === 'online' ? 'rematch' : 'startGame') : t('startGame'),
+        ),
       ),
     );
   };
@@ -179,6 +212,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
       build();
       return;
     }
+    if (rematch) return rematch.onBack();
     if (mode === 'online') flow.lobby();
     else flow.menu();
   };
@@ -200,7 +234,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
           if (picked === id) return;
           picked = id;
           audio.play('cardSelect');
-          battlefield().castles[0].setHero(id);
+          previewHero(id);
           build();
         };
         card.addEventListener('click', choose);
@@ -222,20 +256,20 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
   return {
     el,
     mount() {
-      // The free-for-all choice shows the heroes' 3-player texts.
-      setTableSize(mode === 'ffa' ? 3 : 2);
+      // The free-for-all choice shows the heroes' 3-player texts (a rematch keeps the board's table).
+      if (!rematch) setTableSize(mode === 'ffa' ? 3 : 2);
       build();
-      battlefield().castles[0].setHero(picked);
+      previewHero(picked);
       unsubscribe = settings.subscribe((next, prev) => {
         if (next.locale !== prev.locale) build();
       });
     },
     unmount() {
-      setTableSize(2);
+      if (!rematch) setTableSize(2);
       unsubscribe();
     },
     resize() {
-      requestAnimationFrame(() => battlefield().layout());
+      if (!rematch) requestAnimationFrame(() => battlefield().layout());
     },
   };
 }
