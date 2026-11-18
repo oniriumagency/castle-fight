@@ -228,7 +228,7 @@ variants.forEach((v, i) => {
       `  Gana el líder a mitad de partida: ${pct(t.midLeaderWon, t.midLeaderKnown)}; gana el último: ${pct(t.midLastWon, t.midLeaderKnown)}`,
     );
   }
-  json.push({ id: v.id, label: v.label, rounds, p10, p90, ...t, turns: undefined });
+  json.push({ id: v.id, label: v.label, ...t, rounds, roundsWithDoubleTeam: t.rounds, p10, p90, turns: undefined });
 });
 const out = arg('json', '');
 if (out) (await import('node:fs')).writeFileSync(out, JSON.stringify(json, null, 2));
