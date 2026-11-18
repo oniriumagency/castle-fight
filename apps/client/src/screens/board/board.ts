@@ -477,13 +477,17 @@ class BoardScreen implements Screen {
 
   private async animate(update: StateUpdate): Promise<void> {
     const events = update.events;
+    const starting = events.some((e) => e.type === 'gameStarted');
+    if (starting) this.stats.reset();
+    // After a reload the server only sends the current state: pick up the figures saved before it.
+    else if (update.resumed) this.loadStats();
     this.stats.add(events);
+    if (events.length) this.saveStats();
     for (const e of events) {
       const line = describeEvent(e, (seat) => this.name(seat));
       if (line) this.log(line, e.type);
     }
 
-    const starting = events.some((e) => e.type === 'gameStarted');
     if (!this.shown || update.resumed || starting || events.length === 0) {
       await this.snapTo(update.view, starting);
       return;
@@ -502,11 +506,30 @@ class BoardScreen implements Screen {
     this.clearPlayed();
   }
 
+  private saveStats(): void {
+    const key = this.session.statsKey?.();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(this.stats));
+    } catch {
+      // Storage full or blocked: the results just show what this page saw.
+    }
+  }
+
+  private loadStats(): void {
+    const key = this.session.statsKey?.();
+    if (!key) return;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) this.stats.restore(JSON.parse(raw));
+    } catch {
+      // Nothing usable saved.
+    }
+  }
+
   /** Jump to a view without replaying its events (game start, resume). */
   private async snapTo(view: PlayerView, starting: boolean): Promise<void> {
     if (starting) {
-      this.stats.reset();
-      this.stats.add(this.queue.length ? [] : []);
       this.resultsShown = false;
       this.layer.replaceChildren();
       this.curtainFor = null;
@@ -516,6 +539,12 @@ class BoardScreen implements Screen {
       for (const plaque of this.plaques) plaque.setKeepWin(view.rules.keepWin);
       this.field.setBanners([heroColor(view.players[this.seatOfSide(0)].hero), heroColor(view.players[this.seatOfSide(1)].hero)]);
       void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
+    }
+    if (!starting && this.discardPile.querySelector('.pile-empty')) {
+      // Resumed mid-game: show the last card played, by whoever played most recently.
+      const last = view.players[other(view.active)].lastPlayedCard ?? view.players[view.active].lastPlayedCard;
+      if (last) this.setDiscardTop(last);
+      else if (view.players[view.viewer].discardCount > 0) this.setDiscardTop(null);
     }
     this.view = view;
     this.shown = [clonePlayer(view.players[0]), clonePlayer(view.players[1])];

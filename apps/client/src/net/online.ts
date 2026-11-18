@@ -110,9 +110,29 @@ export class OnlineSession extends BaseSession implements MatchSession {
     this.connection.emote(emote as Emote);
   }
 
+  /** One key per room; the game number keeps a rematch from reusing the last game's figures. */
+  statsKey(): string | null {
+    const room = this.connection.room;
+    return room ? `cardcraft-castles:stats:${this.connection.roomId}:${room.games}` : null;
+  }
+
   leave(): void {
+    clearStoredStats(this.connection.roomId);
     for (const off of this.unsubscribers) off();
     this.listeners.clear();
     this.connection.leave();
+  }
+}
+
+/** Forgets the saved statistics of a room's games (after leaving it). */
+function clearStoredStats(roomId: string): void {
+  try {
+    const prefix = `cardcraft-castles:stats:${roomId}:`;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(prefix)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage blocked: nothing was saved either.
   }
 }

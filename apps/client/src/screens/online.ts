@@ -7,7 +7,7 @@ import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
 import { OnlineSession, online } from '../net/online';
 import { iconSvg } from '../ui/assets';
-import { flow, nickname } from './flow';
+import { flow, nickname, setRoomInUrl } from './flow';
 
 /**
  * Takes a seat in an online room and waits for the opponent. The board
@@ -15,6 +15,7 @@ import { flow, nickname } from './flow';
  * (reload, dropped connection) the SDK resumes it and the board opens at once.
  */
 export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
+  setRoomInUrl(roomId);
   const connection = online.joinRoom(roomId, { nickname: nickname(), hero });
   const session = new OnlineSession(connection);
   let opened = false;
