@@ -95,7 +95,7 @@ Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. To
 
 **Preparación.** Torreón 50, Muralla 15, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Quien juega segundo empieza con 5 más de Muralla (`rules.secondPlayerWall`), que compensa la ventaja de mover primero. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (226 cartas). Cuando el mazo se agota se baraja el descarte.
 
-**Turno.** Al empezar el turno, en este orden: terminan los efectos «hasta tu próximo turno», salta el evento de batalla si toca, la Quemadura hace su daño, se activan los encantamientos de inicio de turno y los trabajadores producen. Después el jugador juega una carta pagando su coste o descarta una. Al terminar repone la mano hasta 6.
+**Turno.** Al empezar el turno, en este orden: el jugador repone la mano hasta 6, terminan los efectos «hasta tu próximo turno», salta el evento de batalla si toca, la Quemadura hace su daño, se activan los encantamientos de inicio de turno y los trabajadores producen. Después el jugador juega una carta pagando su coste o descarta una. Al terminar el turno no se roba: el hueco de la carta jugada sigue ahí durante el turno del rival. Las cartas que un rival te obliga a descartar (Prisión de Hielo, Espía en la Corte...) no se reponen al empezar tu siguiente turno, sino en el de después (`drawShort`).
 
 **Daño.** El daño normal golpea la Muralla y el sobrante pasa al Torreón. El perforante va directo al Torreón. El daño «solo a la Muralla» no pasa al Torreón. Cada golpe se resuelve por separado: Doble Salva son dos golpes y Hueste Imparable también.
 

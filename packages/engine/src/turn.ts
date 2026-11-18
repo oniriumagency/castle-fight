@@ -106,6 +106,7 @@ function decideOnPoints(state: GameState, events: GameEvent[], reason: 'turnLimi
 
 /**
  * Begin the turn of `player`:
+ *  0. draw back up to a full hand;
  *  1. effects that last "until your next turn" end;
  *  2. the battle event fires if it is due, and the Twilight Fury erodes the Wall;
  *  3. Burn deals its damage;
@@ -123,6 +124,12 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
   state.phase = 'action';
   self.schoolsThisTurn = [];
   events.push({ type: 'turnStarted', player, turn: state.turn, extraTurn });
+
+  // 0. Draw back up to a full hand. Cards are drawn when your turn starts, not
+  // when it ends, so between your turns your hand keeps the gaps you left.
+  // Cards a rival made you discard are not replaced until the turn after.
+  drawCards(state, events, player, state.rules.handSize - self.hand.length - (self.drawShort ?? 0));
+  delete self.drawShort;
 
   // 1. "Until your next turn" effects.
   if (self.drawbridge) {
@@ -199,15 +206,13 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
 }
 
 /**
- * Finish the active player's turn: refill the hand, tick down enchantments
+ * Finish the active player's turn: tick down enchantments
  * and lasting battle events, then start the next turn.
  */
 export function endTurn(state: GameState, events: GameEvent[]): void {
   const player = state.active;
   const self = state.players[player]!;
   state.actionsLeft = 0;
-
-  if (!self.eliminated) drawCards(state, events, player, state.rules.handSize - self.hand.length);
 
   // Enchantments last for the owner's next N turns: the turn they are played
   // on does not count.
