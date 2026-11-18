@@ -49,6 +49,9 @@ function clonePlayer(p: PlayerPublicState): PlayerPublicState {
   return structuredClone(p);
 }
 
+/** Cards shown in each player's played history. */
+const HISTORY_SIZE = 3;
+
 const wait = (base: number): Promise<void> => new Promise((r) => setTimeout(r, base * animScale()));
 
 export function boardScreen(session: MatchSession): Screen {
@@ -162,6 +165,10 @@ class BoardScreen implements Screen {
       panel.onUltimate = () => this.act({ type: 'ultimate', player: this.view?.viewer ?? 0 });
       panel.onInspect = (cardId) => this.inspectCard(cardId);
       panel.onInspectHero = (heroId) => this.inspectHero(heroId);
+      panel.onPreview = (cardId, anchor) => {
+        if (cardId && anchor) this.showCardPreview(cardId, anchor, panel.side === 0 ? 'right' : 'left');
+        else this.hidePilePreview();
+      };
     }
     this.hand.onSelect = (uid) => this.onSelect(uid);
     this.hand.onPlay = (uid) => this.tryPlay(uid);
@@ -455,6 +462,7 @@ class BoardScreen implements Screen {
         mine: this.session.isLocal(seat),
       });
       this.plaques[side].update(p.keep, p.wall);
+      this.panels[side].setHistory(this.shownHistory[seat]);
     }
     fx.auras(
       this.fxContext(),
@@ -534,10 +542,14 @@ class BoardScreen implements Screen {
   private async animate(update: StateUpdate): Promise<void> {
     const events = update.events;
     const starting = events.some((e) => e.type === 'gameStarted');
-    if (starting) this.stats.reset();
+    if (starting) {
+      this.stats.reset();
+      this.history = [[], []];
+    }
     // After a reload the server only sends the current state: pick up the figures saved before it.
     else if (update.resumed) this.loadStats();
     this.stats.add(events);
+    for (const e of events) if (e.type === 'cardPlayed') this.history[e.player] = [e.cardId, ...this.history[e.player]].slice(0, HISTORY_SIZE);
     if (events.length) this.saveStats();
     for (const e of events) {
       const line = describeEvent(e, (seat) => this.name(seat));
@@ -567,6 +579,7 @@ class BoardScreen implements Screen {
     if (!key) return;
     try {
       localStorage.setItem(key, JSON.stringify(this.stats));
+      localStorage.setItem(`${key}:history`, JSON.stringify(this.history));
     } catch {
       // Storage full or blocked: the results just show what this page saw.
     }
@@ -578,6 +591,10 @@ class BoardScreen implements Screen {
     try {
       const raw = localStorage.getItem(key);
       if (raw) this.stats.restore(JSON.parse(raw));
+      const history = JSON.parse(localStorage.getItem(`${key}:history`) ?? 'null') as unknown;
+      if (Array.isArray(history) && history.length === 2 && history.every((h) => Array.isArray(h) && h.every((id) => typeof id === 'string'))) {
+        this.history = [history[0].slice(0, HISTORY_SIZE), history[1].slice(0, HISTORY_SIZE)];
+      }
     } catch {
       // Nothing usable saved.
     }
@@ -603,6 +620,12 @@ class BoardScreen implements Screen {
       else if (view.players[view.viewer].discardCount > 0) this.setDiscardTop(null);
     }
     this.view = view;
+    // Resumed with nothing saved: at least the last card each player played.
+    for (const seat of [0, 1] as const) {
+      const last = view.players[seat].lastPlayedCard;
+      if (!starting && this.history[seat].length === 0 && last) this.history[seat] = [last];
+    }
+    this.shownHistory = [this.history[0].slice(), this.history[1].slice()];
     this.shown = [clonePlayer(view.players[0]), clonePlayer(view.players[1])];
     this.shownActive = view.active;
     this.handSeat = view.viewer;
@@ -717,6 +740,7 @@ class BoardScreen implements Screen {
         p.hand = p.hand.filter((c) => c.uid !== e.uid);
         p.lastPlayedCard = e.cardId;
         p.discardCount++;
+        this.shownHistory[e.player] = [e.cardId, ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
         const from = this.takeFromHand(e.player, e.uid);
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
@@ -1033,6 +1057,9 @@ class BoardScreen implements Screen {
   }
 
   private pilePreview: HTMLElement | null = null;
+  /** Last cards each seat played, newest first; `shownHistory` follows the animation. */
+  private history: [string[], string[]] = [[], []];
+  private shownHistory: [string[], string[]] = [[], []];
 
   /** Large copy of the last card played, next to the discard pile, to read what it did. */
   private showPilePreview(): void {
@@ -1046,7 +1073,7 @@ class BoardScreen implements Screen {
    * discard pile, or a revealed card of the rival). Not on touch screens,
    * where a tap opens the inspect view instead.
    */
-  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below'): void {
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right'): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
     const big = cardFace(cardId, { calm: true });
@@ -1054,18 +1081,28 @@ class BoardScreen implements Screen {
     const host = this.layer.getBoundingClientRect();
     const minTop = host.top + 56;
     const handTop = this.hand.el.getBoundingClientRect().top;
-    const roomAbove = anchor.top - minTop - 12;
-    const roomBelow = Math.min(window.innerHeight, handTop + 40) - anchor.bottom - 12;
-    const room = prefer === 'above' ? roomAbove : roomBelow;
-    const w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
-    const hgt = w * 1.4;
-    let left = anchor.left + anchor.width / 2 - w / 2;
-    let top = prefer === 'above' ? anchor.top - hgt - 12 : anchor.bottom + 12;
-    if ((prefer === 'above' && top < minTop) || (prefer === 'below' && top + hgt > window.innerHeight - 8)) {
-      // Not enough room: stand beside the anchor instead.
+    const bottom = Math.min(window.innerHeight, handTop + 40);
+    let w: number;
+    let left: number;
+    let top: number;
+    if (prefer === 'left' || prefer === 'right') {
+      // Beside the anchor, as tall as the space allows, kept on screen.
+      w = Math.round(Math.min(300, Math.max(190, (window.innerHeight - minTop - 16) / 1.4)));
+      const hgt = w * 1.4;
       top = Math.max(minTop, Math.min(anchor.top + anchor.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
-      left = anchor.right + 16;
-      if (left + w > window.innerWidth - 8) left = anchor.left - w - 16;
+      left = prefer === 'right' ? anchor.right + 16 : anchor.left - w - 16;
+    } else {
+      const room = prefer === 'above' ? anchor.top - minTop - 12 : bottom - anchor.bottom - 12;
+      w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
+      const hgt = w * 1.4;
+      left = anchor.left + anchor.width / 2 - w / 2;
+      top = prefer === 'above' ? anchor.top - hgt - 12 : anchor.bottom + 12;
+      if ((prefer === 'above' && top < minTop) || (prefer === 'below' && top + hgt > window.innerHeight - 8)) {
+        // Not enough room: stand beside the anchor instead.
+        top = Math.max(minTop, Math.min(anchor.top + anchor.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
+        left = anchor.right + 16;
+        if (left + w > window.innerWidth - 8) left = anchor.left - w - 16;
+      }
     }
     left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
     big.style.setProperty('--w', `${w}px`);

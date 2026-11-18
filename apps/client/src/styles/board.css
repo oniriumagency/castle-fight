@@ -1918,3 +1918,125 @@
   filter: brightness(1.12);
   box-shadow: 0 0 0 2px rgb(255 211 106 / 70%), var(--drop);
 }
+
+/* ---------- Played history (under each player panel) ---------- */
+
+.played-history {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.side-1 .played-history {
+  left: auto;
+  right: 0;
+  align-items: flex-end;
+}
+
+.played-history[hidden] {
+  display: none;
+}
+
+.hist-card {
+  position: relative;
+  width: 66px;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border-radius: 7px;
+  border: 2px solid #8d8474;
+  background: #000;
+  cursor: zoom-in;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 55%);
+  transition: transform 0.15s, filter 0.15s;
+  animation: histIn 0.35s ease-out both;
+}
+
+.hist-card.newest {
+  width: 104px;
+  border-width: 2px;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 60%), 0 0 0 1px rgb(255 255 255 / 15%);
+}
+
+.hist-card:not(.newest) {
+  opacity: 0.88;
+}
+
+.hist-card.s-construccion { border-color: #e0a94a; }
+.hist-card.s-asalto { border-color: #e36b5a; }
+.hist-card.s-arcano { border-color: #7fd6f2; }
+
+.hist-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.hist-cost {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-family: var(--numeral);
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #f3ead8;
+  background: #120f1a;
+  border: 1px solid var(--gold-d);
+}
+
+.side-1 .hist-cost {
+  left: auto;
+  right: -6px;
+}
+
+.hist-card:hover {
+  transform: scale(1.08);
+  filter: brightness(1.12);
+  opacity: 1;
+}
+
+@keyframes histIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.9); }
+}
+
+/* Phones in landscape: no room under the panels. */
+.board.short .played-history {
+  display: none;
+}
+
+/* Phones in portrait: a small row under each panel. */
+.board.phone-portrait .played-history {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 5px;
+  top: calc(100% + 6px);
+}
+
+.board.phone-portrait .side-1 .played-history {
+  flex-direction: row-reverse;
+}
+
+.board.phone-portrait .hist-card {
+  width: 38px;
+}
+
+.board.phone-portrait .hist-card.newest {
+  width: 56px;
+}
+
+.board.phone-portrait .hist-cost {
+  min-width: 16px;
+  height: 16px;
+  font-size: 0.62rem;
+}
