@@ -13,6 +13,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
+import { askNotificationPermission, callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
@@ -186,6 +187,8 @@ class BoardScreen implements Screen {
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
     window.addEventListener('keydown', this.onKey);
+    // Online, the browser can call the player back when it is their turn: ask on their first click.
+    if (this.session.kind === 'online') this.el.addEventListener('pointerdown', askNotificationPermission, { once: true });
     this.unsubscribeSettings = settings.subscribe((next, prev) => {
       if (next.locale !== prev.locale) this.relocalize();
     });
@@ -545,6 +548,7 @@ class BoardScreen implements Screen {
     const events = update.events;
     const starting = events.some((e) => e.type === 'gameStarted');
     if (starting) {
+      if (this.session.kind === 'online') callAttention(t('gameStartedNotice'), t('gameStartedNoticeBody'));
       this.stats.reset();
       this.history = [[], []];
     }
@@ -678,6 +682,7 @@ class BoardScreen implements Screen {
         const mine = this.session.isLocal(e.player);
         fx.turnStarted(mine, this.session.kind === 'local');
         const title = this.session.kind === 'local' ? this.name(e.player) : mine ? t('yourTurn') : t('theirTurn', { who: this.name(e.player) });
+        if (mine && this.session.kind !== 'local') callAttention(t('yourTurn'), t('yourTurnNotice', { n: e.turn }));
         this.showBanner(e.extraTurn ? t('extraTurn') : title, t('turnN', { n: e.turn }));
         await wait(mine ? 650 : 350);
         break;

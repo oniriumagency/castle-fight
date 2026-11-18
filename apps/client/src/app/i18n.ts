@@ -78,6 +78,9 @@ const STRINGS = {
 
   // Board
   yourTurn: { es: 'Tu turno', en: 'Your turn' },
+  gameStartedNotice: { es: '¡Empieza la partida!', en: 'The game is starting!' },
+  gameStartedNoticeBody: { es: 'Tu rival ya está en la sala de Cardcraft: Castles.', en: 'Your opponent is in the Cardcraft: Castles room.' },
+  yourTurnNotice: { es: 'Cardcraft: Castles · Turno {n}. Vuelve a la partida para jugar.', en: 'Cardcraft: Castles · Turn {n}. Come back to the game to play.' },
   theirTurn: { es: 'Turno de {who}', en: "{who}'s turn" },
   extraTurn: { es: 'Turno extra', en: 'Extra turn' },
   turnN: { es: 'Turno {n}', en: 'Turn {n}' },
