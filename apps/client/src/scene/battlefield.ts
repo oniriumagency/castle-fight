@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
+import { density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle } from './castle';
@@ -7,11 +8,18 @@ import {
   KEEP_STONE,
   WALL_STONE,
   cloudTexture,
+  crystalTexture,
+  flareTexture,
+  flameTexture,
   glowTexture,
   gradientTexture,
   particleTexture,
+  raysTexture,
+  ringTexture,
   rubbleTexture,
   seededRandom,
+  smokeTexture,
+  sparkTexture,
   stoneTexture,
   towerShadeTexture,
 } from './textures';
@@ -19,9 +27,10 @@ import { Tweens, ease } from './tween';
 
 /**
  * The painted battlefield behind the interface: sky, clouds, mountains,
- * ground and the two castles, plus a small particle system for debris,
- * sparks, magic and weather. The board drives it; the later VFX pass can
- * add to `fxLayer` and the helpers here.
+ * ground and the two castles, plus the effects drawn over them: a pooled
+ * particle system (debris, sparks, smoke, flames, ice), shockwave rings,
+ * light rays, lightning, projectiles, status auras on the castles and a
+ * smooth screen shake. `fx/director.ts` decides which effect plays when.
  */
 
 export interface FieldRect {
@@ -40,9 +49,17 @@ interface Particle {
   life: number;
   maxLife: number;
   spin: number;
-  fade: boolean;
-  shrink: boolean;
+  /** Per-frame scale growth (smoke) or shrink (sparks). */
+  grow: number;
+  baseScale: number;
+  stretch: boolean;
+  alpha: number;
+  colorFrom: number;
+  colorTo: number | null;
+  floor: boolean;
 }
+
+export type ParticleShape = 'glow' | 'rubble' | 'smoke' | 'spark' | 'crystal' | 'flame';
 
 export interface BurstOptions {
   count?: number;
@@ -54,8 +71,35 @@ export interface BurstOptions {
   gravity?: number;
   size?: number;
   life?: number;
-  texture?: 'glow' | 'rubble';
+  texture?: ParticleShape;
   blend?: 'add' | 'normal';
+  /** Spawn area around the point, in px. */
+  area?: { w: number; h: number };
+  /** Colour at the end of each particle's life. */
+  colorTo?: number;
+  /** Scale change per frame: >1 grows (smoke), <1 shrinks. */
+  grow?: number;
+  drag?: number;
+  alpha?: number;
+}
+
+export type ProjectileStyle = 'orb' | 'boulder' | 'bolt' | 'fire' | 'arrows' | 'comet' | 'charge' | 'frost';
+
+interface Flash {
+  sprite: Sprite;
+  life: number;
+  maxLife: number;
+  from: number;
+  to: number;
+  alpha: number;
+  spin: number;
+}
+
+interface Aura {
+  burn: number;
+  frost: number;
+  danger: number;
+  timer: number;
 }
 
 function lerpColor(a: number, b: number, t: number): number {
@@ -85,9 +129,24 @@ export class Battlefield {
   private readonly ground = new Graphics();
   private readonly weather = new Container();
   private readonly particles: Particle[] = [];
-  private readonly glowTex: Texture;
-  private readonly rubbleTex: Texture;
+  private readonly pool: Sprite[] = [];
+  private readonly flashes: Flash[] = [];
+  private readonly textures: Record<ParticleShape, Texture>;
+  private readonly ringTex: Texture;
+  private readonly raysTex: Texture;
+  private readonly flareTex: Texture;
+  private readonly bolts = new Graphics();
   private readonly flashOverlay = new Graphics();
+  private readonly auras: [Aura, Aura] = [
+    { burn: 0, frost: 0, danger: 0, timer: 0 },
+    { burn: 0, frost: 0, danger: 0, timer: 0 },
+  ];
+  /** Called for ambient sounds the scene makes on its own (storm thunder). */
+  onAmbient: ((kind: 'thunder') => void) | null = null;
+  private trauma = 0;
+  private shakeTime = 0;
+  private slowFrames = 0;
+  private lightningTimer = 4000;
   private mood: SkyMood = DEFAULT_SKY;
   private tint = { far: DEFAULT_SKY.far, mid: DEFAULT_SKY.near, near: DEFAULT_SKY.near, ground: DEFAULT_SKY.ground };
   private width = 0;
@@ -96,7 +155,6 @@ export class Battlefield {
   /** Keep height that fills the field: the winning Keep of the current rules. */
   private maxPoints = DEFAULT_RULES.keepWin;
   private lastRect: FieldRect | undefined;
-  private shakePower = 0;
   private weatherTimer = 0;
   private castleTargets: [{ keep: number; wall: number }, { keep: number; wall: number }] = [
     { keep: 30, wall: 10 },
@@ -105,8 +163,17 @@ export class Battlefield {
 
   constructor(private readonly app: Application) {
     this.tweens = new Tweens(app.ticker);
-    this.glowTex = particleTexture();
-    this.rubbleTex = rubbleTexture();
+    this.textures = {
+      glow: particleTexture(),
+      rubble: rubbleTexture(),
+      smoke: smokeTexture(),
+      spark: sparkTexture(),
+      crystal: crystalTexture(),
+      flame: flameTexture(),
+    };
+    this.ringTex = ringTexture();
+    this.raysTex = raysTexture();
+    this.flareTex = flareTexture();
     this.sun = new Sprite(glowTexture('255,214,150', 256));
     this.sun.anchor.set(0.5);
     this.sun.blendMode = 'add';
@@ -121,7 +188,7 @@ export class Battlefield {
     this.castles = [new Castle(1, textures, 0xc8963e, 'arquitecta'), new Castle(-1, textures, 0xa8322d, 'mariscal')];
 
     this.world.addChild(this.skyA, this.skyB, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
-    this.world.addChild(this.castles[0], this.castles[1], this.fxLayer, this.weather);
+    this.world.addChild(this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
     this.skyB.alpha = 0;
@@ -283,76 +350,316 @@ export class Battlefield {
     return { x: p.x + this.world.x, y: p.y + this.world.y };
   }
 
+  /** Adds screen shake; strong hits stack up to a cap and fade smoothly. */
   shake(power = 8): void {
     if (!settings.get().screenShake || settings.get().reducedMotion) return;
-    this.shakePower = Math.max(this.shakePower, power);
+    this.trauma = Math.min(1, this.trauma + power / 24);
   }
 
   flash(color = 0xffffff, alpha = 0.35, ms = 260): void {
-    if (settings.get().reducedMotion) return;
+    if (settings.get().reducedMotion) alpha *= 0.4;
     this.flashOverlay.tint = color;
-    this.flashOverlay.alpha = alpha;
+    this.flashOverlay.alpha = Math.max(this.flashOverlay.alpha, alpha);
     void this.tweens.to(this.flashOverlay, { alpha: 0 }, ms);
   }
 
+  /** Screen width and height. */
+  get size(): { width: number; height: number } {
+    return { width: this.width, height: this.height };
+  }
+
+  private takeSprite(texture: Texture): Sprite | null {
+    if (this.particles.length >= particleBudget()) return null;
+    const sprite = this.pool.pop() ?? new Sprite();
+    sprite.texture = texture;
+    sprite.anchor.set(0.5);
+    sprite.rotation = 0;
+    sprite.alpha = 1;
+    sprite.visible = true;
+    if (!sprite.parent) this.fxLayer.addChild(sprite);
+    return sprite;
+  }
+
+  private releaseSprite(sprite: Sprite): void {
+    sprite.visible = false;
+    this.pool.push(sprite);
+  }
+
   burst(x: number, y: number, opts: BurstOptions = {}): void {
-    const count = Math.round((opts.count ?? 16) * (settings.get().reducedMotion ? 0.4 : 1));
+    const count = Math.max(1, Math.round((opts.count ?? 16) * density()));
     const colors = Array.isArray(opts.color) ? opts.color : [opts.color ?? 0xffd27a];
+    const shape = opts.texture ?? 'glow';
+    const texture = this.textures[shape];
+    const additive = shape === 'glow' || shape === 'spark' || shape === 'flame' || shape === 'crystal';
     for (let i = 0; i < count; i++) {
-      const sprite = new Sprite(opts.texture === 'rubble' ? this.rubbleTex : this.glowTex);
-      sprite.anchor.set(0.5);
-      sprite.position.set(x, y);
-      sprite.tint = colors[i % colors.length];
-      sprite.blendMode = opts.blend ?? (opts.texture === 'rubble' ? 'normal' : 'add');
+      const sprite = this.takeSprite(texture);
+      if (!sprite) return;
+      const px = x + (opts.area ? (Math.random() - 0.5) * opts.area.w : 0);
+      const py = y + (opts.area ? (Math.random() - 0.5) * opts.area.h : 0);
+      sprite.position.set(px, py);
+      const color = colors[i % colors.length];
+      sprite.tint = color;
+      sprite.blendMode = opts.blend ?? (additive ? 'add' : 'normal');
       const size = (opts.size ?? 10) * (0.6 + Math.random() * 0.8);
-      sprite.width = sprite.height = size;
+      const base = size / Math.max(texture.width, texture.height);
+      sprite.scale.set(base);
       const angle = (opts.angle ?? -Math.PI / 2) + (Math.random() - 0.5) * (opts.spread ?? Math.PI * 2);
       const speed = (opts.speed ?? 4) * (0.4 + Math.random() * 0.9);
       const life = (opts.life ?? 900) * (0.6 + Math.random() * 0.6);
-      this.fxLayer.addChild(sprite);
+      const alpha = opts.alpha ?? 1;
+      sprite.alpha = alpha;
       this.particles.push({
         sprite,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         gravity: opts.gravity ?? 0.12,
-        drag: 0.985,
+        drag: opts.drag ?? (shape === 'smoke' ? 0.96 : 0.985),
         life,
         maxLife: life,
-        spin: (Math.random() - 0.5) * 0.2,
-        fade: true,
-        shrink: opts.texture !== 'rubble',
+        spin: shape === 'spark' ? 0 : (Math.random() - 0.5) * (shape === 'rubble' ? 0.3 : 0.08),
+        grow: opts.grow ?? (shape === 'smoke' ? 1.012 : shape === 'rubble' || shape === 'crystal' ? 1 : 0.992),
+        baseScale: base,
+        stretch: shape === 'spark' || shape === 'flame',
+        alpha,
+        colorFrom: color,
+        colorTo: opts.colorTo ?? null,
+        floor: shape === 'rubble',
       });
+      if (shape === 'crystal' || shape === 'rubble') sprite.rotation = Math.random() * Math.PI * 2;
     }
   }
 
-  /** A glowing missile that arcs from one castle to the other. Resolves on impact. */
-  projectile(from: { x: number; y: number }, to: { x: number; y: number }, color = 0xffb35a, ms = 520): Promise<void> {
-    const head = new Sprite(this.glowTex);
-    head.anchor.set(0.5);
-    head.tint = color;
-    head.blendMode = 'add';
-    head.width = head.height = 30;
-    this.fxLayer.addChild(head);
-    const lift = Math.min(260, Math.abs(to.x - from.x) * 0.35);
-    const cx = (from.x + to.x) / 2;
-    const cy = Math.min(from.y, to.y) - lift;
-    let trail = 0;
+  /** A sprite that scales and fades on its own (rings, flares, rays). */
+  private pulse(texture: Texture, x: number, y: number, o: { color: number; from: number; to: number; ms: number; alpha?: number; spin?: number; blend?: 'add' | 'normal' }): void {
+    const sprite = this.takeSprite(texture);
+    if (!sprite) return;
+    sprite.position.set(x, y);
+    sprite.tint = o.color;
+    sprite.blendMode = o.blend ?? 'add';
+    const k = 1 / Math.max(texture.width, texture.height);
+    sprite.scale.set(o.from * k);
+    sprite.alpha = o.alpha ?? 1;
+    this.flashes.push({ sprite, life: o.ms, maxLife: o.ms, from: o.from * k, to: o.to * k, alpha: o.alpha ?? 1, spin: o.spin ?? 0 });
+  }
+
+  /** An expanding shockwave ring. */
+  ring(x: number, y: number, color = 0xffffff, radius = 140, ms = 600, alpha = 0.9): void {
+    this.pulse(this.ringTex, x, y, { color, from: radius * 0.15, to: radius * 2, ms, alpha });
+  }
+
+  /** A bright bloom of light. */
+  flare(x: number, y: number, color = 0xffe0a0, size = 220, ms = 500, alpha = 1): void {
+    this.pulse(this.flareTex, x, y, { color, from: size * 0.6, to: size, ms, alpha });
+  }
+
+  /** Slowly turning light rays (legendaries, ultimates, victory). */
+  rays(x: number, y: number, color = 0xffd27a, size = 420, ms = 1400, alpha = 0.7): void {
+    if (effectsLow()) return this.flare(x, y, color, size * 0.6, ms * 0.6, alpha * 0.8);
+    this.pulse(this.raysTex, x, y, { color, from: size * 0.6, to: size, ms, alpha, spin: 0.004 });
+  }
+
+  /** A forked bolt of lightning between two points. */
+  lightning(from: { x: number; y: number }, to: { x: number; y: number }, color = 0xcfe6ff, ms = 380): void {
+    const g = this.bolts;
+    const draw = (width: number, alpha: number, c: number): void => {
+      const segs = 12;
+      let px = from.x;
+      let py = from.y;
+      g.moveTo(px, py);
+      for (let i = 1; i <= segs; i++) {
+        const t = i / segs;
+        const jitter = (1 - Math.abs(t - 0.5) * 2) * 38 + 6;
+        const nx = from.x + (to.x - from.x) * t + (i < segs ? (Math.random() - 0.5) * jitter : 0);
+        const ny = from.y + (to.y - from.y) * t + (i < segs ? (Math.random() - 0.5) * jitter * 0.4 : 0);
+        g.lineTo(nx, ny);
+        if (i > 3 && i < segs - 2 && Math.random() < 0.25) {
+          g.lineTo(nx + (Math.random() - 0.5) * 70, ny + 30 + Math.random() * 40);
+          g.moveTo(nx, ny);
+        }
+        px = nx;
+        py = ny;
+      }
+      g.stroke({ width, color: c, alpha, cap: 'round', join: 'round' });
+    };
+    g.clear();
+    draw(9, 0.25, color);
+    draw(3, 1, 0xffffff);
+    g.alpha = 1;
+    g.blendMode = 'add';
+    void this.tweens.to(g, { alpha: 0 }, ms).then(() => {
+      if (g.alpha === 0) g.clear();
+    });
+    this.flare(to.x, to.y, color, 200, 400);
+  }
+
+  /** Brief hit tint and recoil on a castle. */
+  hitCastle(player: PlayerId, color = 0xff8a70, power = 1): void {
+    this.castles[player].hit(color, power);
+  }
+
+  /** Persistent effects on a castle: burning, frozen, close to falling. */
+  setAura(player: PlayerId, aura: { burn?: number; frost?: number; danger?: number }): void {
+    Object.assign(this.auras[player], aura);
+    this.castles[player].setFrost(this.auras[player].frost > 0);
+  }
+
+  /** A projectile from one castle to the other. Resolves on impact. */
+  projectile(from: { x: number; y: number }, to: { x: number; y: number }, color = 0xffb35a, ms = 520, style: ProjectileStyle = 'orb'): Promise<void> {
+    if (style === 'arrows') return this.volley(from, to, color, ms);
+    if (style === 'charge') return this.charge(from, to, color, ms);
+    const comet = style === 'comet';
+    const start = comet ? { x: to.x + (from.x < to.x ? -this.width * 0.35 : this.width * 0.35), y: -40 } : from;
+    const shape: ParticleShape = style === 'boulder' ? 'rubble' : style === 'frost' ? 'crystal' : 'glow';
+    const head = this.takeSprite(this.textures[shape]);
+    if (!head) return new Promise((r) => setTimeout(r, ms));
+    const headSize = style === 'boulder' ? 26 : comet ? 54 : style === 'fire' ? 38 : 30;
+    head.scale.set(headSize / Math.max(head.texture.width, head.texture.height));
+    head.tint = style === 'boulder' ? 0xb0a080 : color;
+    head.blendMode = style === 'boulder' ? 'normal' : 'add';
+    const glow = style === 'boulder' ? null : this.takeSprite(this.textures.glow);
+    if (glow) {
+      glow.tint = color;
+      glow.blendMode = 'add';
+      glow.alpha = 0.6;
+      glow.scale.set((headSize * 2.2) / 32);
+    }
+    const lift = comet ? 0 : Math.min(style === 'boulder' ? 320 : style === 'bolt' ? 120 : 260, Math.abs(to.x - start.x) * (style === 'boulder' ? 0.45 : 0.3));
+    const cx = (start.x + to.x) / 2;
+    const cy = Math.min(start.y, to.y) - lift;
+    let frame = 0;
+    const trail = (x: number, y: number, dx: number, dy: number): void => {
+      frame++;
+      const back = Math.atan2(-dy, -dx);
+      switch (style) {
+        case 'boulder':
+          if (frame % 2 === 0) this.burst(x, y, { count: 1, texture: 'smoke', color: 0x9a8a70, speed: 0.3, gravity: -0.01, size: 22, life: 700, alpha: 0.5 });
+          break;
+        case 'bolt':
+          this.burst(x, y, { count: 2, texture: 'spark', color: [color, 0xffffff], speed: 1.2, angle: back, spread: 0.5, gravity: 0, size: 26, life: 260 });
+          if (frame % 3 === 0) this.burst(x, y, { count: 1, texture: 'crystal', color, speed: 0.6, gravity: 0, size: 10, life: 500 });
+          break;
+        case 'frost':
+          this.burst(x, y, { count: 1, texture: 'crystal', color: [0xbff3ff, 0xffffff], speed: 0.8, gravity: 0.02, size: 12, life: 600 });
+          this.burst(x, y, { count: 1, color, speed: 0.4, gravity: 0, size: 18, life: 300 });
+          break;
+        case 'fire':
+        case 'comet':
+          this.burst(x, y, { count: comet ? 3 : 2, texture: 'flame', color: 0xffd060, colorTo: 0xff3a10, speed: 1, angle: back, spread: 0.8, gravity: -0.03, size: comet ? 34 : 24, life: 420 });
+          if (frame % 2 === 0) this.burst(x, y, { count: 1, texture: 'smoke', color: 0x2a2220, speed: 0.4, gravity: -0.03, size: comet ? 40 : 26, life: 900, alpha: 0.55 });
+          break;
+        default:
+          if (frame % 2 === 0) this.burst(x, y, { count: 2, color, speed: 0.6, gravity: 0, size: 14, life: 380 });
+      }
+    };
+    let prev = { x: start.x, y: start.y };
     return this.tweens
       .run(
         ms,
         (t) => {
-          const x = (1 - t) ** 2 * from.x + 2 * (1 - t) * t * cx + t * t * to.x;
-          const y = (1 - t) ** 2 * from.y + 2 * (1 - t) * t * cy + t * t * to.y;
+          const x = (1 - t) ** 2 * start.x + 2 * (1 - t) * t * cx + t * t * to.x;
+          const y = (1 - t) ** 2 * start.y + 2 * (1 - t) * t * cy + t * t * to.y;
           head.position.set(x, y);
-          if (++trail % 2 === 0) this.burst(x, y, { count: 2, color, speed: 0.6, gravity: 0, size: 14, life: 380 });
+          glow?.position.set(x, y);
+          if (style === 'boulder') head.rotation += 0.25;
+          else head.rotation = Math.atan2(y - prev.y, x - prev.x);
+          trail(x, y, x - prev.x, y - prev.y);
+          prev = { x, y };
         },
-        ease.inCubic,
+        style === 'bolt' ? ease.inOutCubic : ease.inCubic,
       )
-      .then(() => head.destroy());
+      .then(() => {
+        this.releaseSprite(head);
+        if (glow) this.releaseSprite(glow);
+      });
+  }
+
+  /** A volley of arrows; resolves when the first lands. */
+  private volley(from: { x: number; y: number }, to: { x: number; y: number }, color: number, ms: number): Promise<void> {
+    const n = effectsLow() ? 4 : 7;
+    const flights: Promise<void>[] = [];
+    for (let i = 0; i < n; i++) {
+      const arrow = this.takeSprite(this.textures.spark);
+      if (!arrow) break;
+      arrow.tint = i % 2 ? 0xfff0d0 : color;
+      arrow.blendMode = 'add';
+      arrow.scale.set(0.9, 0.5);
+      const delay = i * 45;
+      const spreadX = (Math.random() - 0.5) * 50;
+      const spreadY = (Math.random() - 0.5) * 30;
+      const target = { x: to.x + spreadX, y: to.y + spreadY };
+      const lift = Math.min(260, Math.abs(target.x - from.x) * 0.4);
+      const cx = (from.x + target.x) / 2;
+      const cy = Math.min(from.y, target.y) - lift;
+      arrow.visible = false;
+      flights.push(
+        new Promise<void>((r) => setTimeout(r, delay))
+          .then(() => {
+            arrow.visible = true;
+            let prev = { x: from.x, y: from.y };
+            return this.tweens.run(ms * 0.9, (t) => {
+              const x = (1 - t) ** 2 * from.x + 2 * (1 - t) * t * cx + t * t * target.x;
+              const y = (1 - t) ** 2 * from.y + 2 * (1 - t) * t * cy + t * t * target.y;
+              arrow.position.set(x, y);
+              arrow.rotation = Math.atan2(y - prev.y, x - prev.x);
+              prev = { x, y };
+            }, ease.linear);
+          })
+          .then(() => {
+            this.releaseSprite(arrow);
+            this.burst(target.x, target.y, { count: 3, texture: 'spark', color: 0xffe0a0, speed: 3, spread: 1.6, gravity: 0.1, size: 14, life: 300 });
+          }),
+      );
+    }
+    return flights.length ? Promise.race(flights) : Promise.resolve();
+  }
+
+  /** A charge across the field: a rolling dust cloud with glinting spears. */
+  private charge(from: { x: number; y: number }, to: { x: number; y: number }, color: number, ms: number): Promise<void> {
+    const y = this.groundY - 6;
+    const startX = from.x;
+    let frame = 0;
+    return this.tweens.run(
+      ms * 1.2,
+      (t) => {
+        const x = startX + (to.x - startX) * t;
+        frame++;
+        if (frame % 2 === 0) this.burst(x, y - 6, { count: 2, texture: 'smoke', color: 0xb09670, speed: 1.2, angle: -Math.PI / 2, spread: 1.4, gravity: -0.01, size: 40, life: 900, alpha: 0.65, area: { w: 30, h: 10 } });
+        if (frame % 3 === 0) this.burst(x, y - 18, { count: 1, texture: 'spark', color: [color, 0xffffff], speed: 2, angle: -Math.PI / 2 + (to.x > startX ? 0.4 : -0.4), spread: 0.3, gravity: 0.05, size: 18, life: 250 });
+        if (frame % 4 === 0) this.shake(1.2);
+      },
+      ease.inCubic,
+    );
+  }
+
+  /** A rocket that bursts into coloured sparks (victory). */
+  firework(x: number, y: number, colors: number[]): void {
+    const startY = this.groundY;
+    const rocket = this.takeSprite(this.textures.glow);
+    if (!rocket) return;
+    rocket.tint = 0xfff0c0;
+    rocket.blendMode = 'add';
+    rocket.scale.set(0.5);
+    rocket.position.set(x, startY);
+    void this.tweens
+      .run(
+        700,
+        (t) => {
+          rocket.position.set(x + Math.sin(t * 6) * 6, startY + (y - startY) * t);
+          this.burst(rocket.x, rocket.y, { count: 1, texture: 'spark', color: 0xffd080, speed: 0.6, angle: Math.PI / 2, spread: 0.3, gravity: 0.02, size: 14, life: 300 });
+        },
+        ease.outCubic,
+      )
+      .then(() => {
+        this.releaseSprite(rocket);
+        this.flare(x, y, colors[0], 180, 400, 0.8);
+        this.burst(x, y, { count: 44, texture: 'spark', color: colors, speed: 6, gravity: 0.06, drag: 0.96, size: 22, life: 1400, colorTo: 0x402010 });
+        this.burst(x, y, { count: 16, color: colors, speed: 3, gravity: 0.04, size: 12, life: 1800 });
+      });
   }
 
   private update(dt: number): void {
     const step = dt / 16.67;
+    this.monitorFrames(dt);
     const calm = settings.get().reducedMotion;
     for (const castle of this.castles) castle.tick(dt, calm);
     // Clouds drift.
@@ -365,49 +672,129 @@ export class Battlefield {
       const p = this.particles[i];
       p.life -= dt;
       if (p.life <= 0) {
-        p.sprite.destroy();
-        this.particles.splice(i, 1);
+        this.releaseSprite(p.sprite);
+        this.particles[i] = this.particles[this.particles.length - 1];
+        this.particles.pop();
         continue;
       }
       p.vx *= p.drag;
       p.vy = p.vy * p.drag + p.gravity * step;
       p.sprite.x += p.vx * step;
       p.sprite.y += p.vy * step;
-      p.sprite.rotation += p.spin * step;
-      if (p.sprite.y > this.groundY + 6 && p.gravity > 0) {
+      if (p.floor && p.sprite.y > this.groundY + 6 && p.gravity > 0) {
         p.sprite.y = this.groundY + 6;
         p.vy *= -0.3;
         p.vx *= 0.6;
       }
       const k = p.life / p.maxLife;
-      if (p.fade) p.sprite.alpha = Math.min(1, k * 1.6);
-      if (p.shrink) p.sprite.scale.set(p.sprite.scale.x * (0.995 - (1 - k) * 0.004));
+      p.sprite.alpha = p.alpha * Math.min(1, k * 1.6);
+      if (p.colorTo !== null) p.sprite.tint = lerpColor(p.colorFrom, p.colorTo, 1 - k);
+      if (p.stretch) {
+        const speed = Math.hypot(p.vx, p.vy);
+        p.sprite.rotation = Math.atan2(p.vy, p.vx);
+        p.baseScale *= p.grow;
+        p.sprite.scale.set(p.baseScale * Math.min(2.4, 0.7 + speed * 0.2), p.baseScale);
+      } else {
+        p.sprite.rotation += p.spin * step;
+        p.baseScale *= p.grow ** step;
+        p.sprite.scale.set(p.baseScale);
+      }
     }
+    // Rings, flares and rays.
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const f = this.flashes[i];
+      f.life -= dt;
+      if (f.life <= 0) {
+        this.releaseSprite(f.sprite);
+        this.flashes.splice(i, 1);
+        continue;
+      }
+      const t = 1 - f.life / f.maxLife;
+      const e = 1 - (1 - t) ** 3;
+      f.sprite.scale.set(f.from + (f.to - f.from) * e);
+      f.sprite.alpha = f.alpha * (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85);
+      f.sprite.rotation += f.spin * dt;
+    }
+    this.updateAuras(dt);
     this.updateWeather(dt);
-    // Camera shake.
-    if (this.shakePower > 0.2) {
-      this.world.position.set((Math.random() - 0.5) * this.shakePower, (Math.random() - 0.5) * this.shakePower);
-      this.shakePower *= 0.88;
+    // Camera shake: smooth noise scaled by trauma squared.
+    if (this.trauma > 0.001) {
+      this.shakeTime += dt * 0.045;
+      const amount = this.trauma * this.trauma * 26;
+      const n = (a: number, b: number): number => Math.sin(this.shakeTime * a + b) * 0.6 + Math.sin(this.shakeTime * a * 2.3 + b * 1.7) * 0.4;
+      this.world.position.set(n(1.9, 0.3) * amount, n(2.3, 4.1) * amount * 0.8);
+      this.trauma = Math.max(0, this.trauma - dt * 0.0016);
     } else if (this.world.x || this.world.y) {
       this.world.position.set(0, 0);
-      this.shakePower = 0;
+      this.trauma = 0;
+    }
+  }
+
+  /** Drops to low effects for the visit if frames keep running long. */
+  private monitorFrames(dt: number): void {
+    if (dt > 26 && dt < 250) this.slowFrames = Math.min(240, this.slowFrames + 1);
+    else this.slowFrames = Math.max(0, this.slowFrames - 0.5);
+    if (this.slowFrames > 150 && reportSlowFrames()) this.slowFrames = 0;
+  }
+
+  /** Flames, frost and danger smoke on the castles. */
+  private updateAuras(dt: number): void {
+    if (settings.get().reducedMotion) return;
+    for (const player of [0, 1] as const) {
+      const aura = this.auras[player];
+      if (!aura.burn && !aura.danger && !aura.frost) continue;
+      aura.timer += dt;
+      if (aura.timer < (effectsLow() ? 140 : 70)) continue;
+      aura.timer = 0;
+      const castle = this.castles[player];
+      const keep = this.anchor(player, 'keep');
+      const wall = this.anchor(player, 'wall');
+      const w = castle.keepWidth;
+      if (aura.burn) {
+        // Flames on every standing tower (the Keep most), sometimes on the Wall.
+        const tops = this.towerTops(player);
+        const onWall = Math.random() < 0.3 && castle.wall > 2;
+        const tower = tops.length && Math.random() < 0.4 ? tops[Math.floor(Math.random() * tops.length)] : null;
+        const at = onWall ? wall : tower ? { x: tower.x, y: tower.y + tower.width * 0.4 } : { x: keep.x, y: keep.y + w * 0.6 };
+        const spanW = tower && !onWall ? tower.width * 0.8 : w * 0.8;
+        this.burst(at.x, at.y, { count: 1, texture: 'flame', color: 0xffe080, colorTo: 0xff3010, speed: 1.2, angle: -Math.PI / 2, spread: 0.4, gravity: -0.05, size: 22 + Math.min(aura.burn, 4) * 4, life: 520, area: { w: spanW, h: 6 } });
+        if (Math.random() < 0.5) this.burst(at.x, at.y - 10, { count: 1, color: 0xffa040, speed: 1.6, angle: -Math.PI / 2, spread: 1, gravity: -0.03, size: 6, life: 1200, area: { w: w, h: 10 } });
+        if (Math.random() < 0.4 && !effectsLow()) this.burst(at.x, at.y - 24, { count: 1, texture: 'smoke', color: 0x2a2624, speed: 0.8, angle: -Math.PI / 2, spread: 0.5, gravity: -0.02, size: 34, life: 1800, alpha: 0.45 });
+      }
+      if (aura.frost && Math.random() < 0.5) {
+        this.burst(keep.x, keep.y + w * 1.4, { count: 1, texture: 'crystal', color: [0xdff8ff, 0x9fe6ff], speed: 0.3, gravity: 0.01, size: 10, life: 1600, area: { w: w * 1.6, h: w * 2.5 } });
+      }
+      if (aura.danger && !aura.burn && Math.random() < 0.35 && !effectsLow()) {
+        this.burst(keep.x, keep.y + w * 0.4, { count: 1, texture: 'smoke', color: 0x3a3532, speed: 0.6, angle: -Math.PI / 2 + 0.2, spread: 0.4, gravity: -0.015, size: 30, life: 2200, alpha: 0.4 * aura.danger, area: { w: w * 0.6, h: 4 } });
+      }
     }
   }
 
   private updateWeather(dt: number): void {
     const kind = this.mood.weather;
     if (kind === 'none' || settings.get().reducedMotion) return;
-    this.weatherTimer += dt;
+    if (kind === 'rain') {
+      // Now and then, lightning over the hills and a roll of thunder.
+      this.lightningTimer -= dt;
+      if (this.lightningTimer <= 0) {
+        this.lightningTimer = 5000 + Math.random() * 9000;
+        const x = this.width * (0.15 + Math.random() * 0.7);
+        this.lightning({ x: x + (Math.random() - 0.5) * 80, y: -10 }, { x, y: this.groundY - this.height * (0.1 + Math.random() * 0.15) }, 0xcfe0ff, 300);
+        this.flash(0xdfe8ff, 0.22, 260);
+        setTimeout(() => this.onAmbient?.('thunder'), 250 + Math.random() * 600);
+      }
+    }
+    this.weatherTimer += dt / (effectsLow() ? 0.5 : 1);
     const every = kind === 'rain' ? 14 : kind === 'snow' ? 60 : 120;
     while (this.weatherTimer > every) {
       this.weatherTimer -= every;
       const x = Math.random() * this.width;
       switch (kind) {
         case 'rain':
-          this.burst(x, -10, { count: 1, color: 0x9fb4d8, speed: 14, angle: Math.PI / 2 + 0.15, spread: 0.05, gravity: 0.3, size: 5, life: 1400, blend: 'normal' });
+          this.burst(x, -10, { count: 1, texture: 'spark', color: 0x9fb4d8, speed: 14, angle: Math.PI / 2 + 0.15, spread: 0.05, gravity: 0.3, size: 16, life: 1400, blend: 'normal', alpha: 0.6, grow: 1 });
           break;
         case 'snow':
-          this.burst(x, -10, { count: 1, color: 0xffffff, speed: 1.2, angle: Math.PI / 2, spread: 0.6, gravity: 0.005, size: 7, life: 9000, blend: 'normal' });
+          this.burst(x, -10, { count: 1, texture: 'crystal', color: 0xffffff, speed: 1.2, angle: Math.PI / 2, spread: 0.6, gravity: 0.005, size: 9, life: 9000, blend: 'normal', alpha: 0.85 });
           break;
         case 'embers':
           this.burst(x, this.groundY, { count: 1, color: 0xc77dff, speed: 1, angle: -Math.PI / 2, spread: 0.6, gravity: -0.004, size: 9, life: 4000 });
@@ -416,7 +803,7 @@ export class Battlefield {
           this.burst(x, -10, { count: 1, color: [0xe0a040, 0xc06a2a, 0xd8c060], speed: 1.4, angle: Math.PI / 2 + 0.4, spread: 0.6, gravity: 0.006, size: 8, life: 8000, blend: 'normal' });
           break;
         case 'dust':
-          this.burst(x, this.groundY - Math.random() * 30, { count: 1, color: 0xc8a070, speed: 0.8, angle: 0, spread: 0.6, gravity: -0.002, size: 22, life: 3000, blend: 'normal' });
+          this.burst(x, this.groundY - Math.random() * 30, { count: 1, texture: 'smoke', color: 0xc8a070, speed: 0.8, angle: 0, spread: 0.6, gravity: -0.002, size: 50, life: 3000, alpha: 0.6, grow: 1.004 });
           break;
       }
     }

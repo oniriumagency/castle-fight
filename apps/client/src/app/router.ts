@@ -1,4 +1,5 @@
 import { clear, h } from './dom';
+import { audio } from '../fx/audio';
 
 /** A full-screen view: menu, lobby, hero select, board, results. */
 export interface Screen {
@@ -64,6 +65,7 @@ export function modal(build: (close: () => void) => HTMLElement, opts: { dismiss
   }
   window.addEventListener('keydown', onKey, true);
   overlay.appendChild(backdrop);
+  audio.play('uiOpen');
   requestAnimationFrame(() => requestAnimationFrame(() => backdrop.classList.add('in')));
   const focusable = box.querySelector<HTMLElement>('button, input');
   focusable?.focus({ preventScroll: true });

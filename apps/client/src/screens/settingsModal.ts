@@ -39,7 +39,7 @@ function slider(key: 'masterVolume' | 'musicVolume' | 'sfxVolume', label: string
   return h('label.field', null, label, input);
 }
 
-function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer', label: string): HTMLElement {
+function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted', label: string): HTMLElement {
   return h(
     'div.setting-row',
     null,
@@ -71,11 +71,26 @@ export function openSettings(): void {
         slider('masterVolume', t('masterVolume')),
         slider('musicVolume', t('musicVolume')),
         slider('sfxVolume', t('sfxVolume')),
+        toggle('muted', t('muteAll')),
         h(
           'div.setting-row',
           null,
           h('span', null, t('animationSpeed')),
           segmented(settings.get().animationSpeed, [['normal', t('speedNormal')], ['fast', t('speedFast')]], (v) => settings.set({ animationSpeed: v })),
+        ),
+        h(
+          'div.setting-row',
+          null,
+          h('span', null, t('effectsQuality')),
+          segmented(
+            settings.get().effectsQuality,
+            [
+              ['auto', t('qualityAuto')],
+              ['high', t('qualityHigh')],
+              ['low', t('qualityLow')],
+            ],
+            (v) => settings.set({ effectsQuality: v }),
+          ),
         ),
         toggle('screenShake', t('screenShake')),
         toggle('reducedMotion', t('reducedMotion')),

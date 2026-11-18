@@ -7,9 +7,13 @@ export interface Settings {
   masterVolume: number;
   musicVolume: number;
   sfxVolume: number;
+  /** Silences everything without touching the volumes. */
+  muted: boolean;
   animationSpeed: 'normal' | 'fast';
   reducedMotion: boolean;
   screenShake: boolean;
+  /** Particles, light and weather. `auto` lowers them if the device struggles. */
+  effectsQuality: 'auto' | 'high' | 'low';
   /** Run the turn clock in games against the AI and on one device. */
   localTimer: boolean;
 }
@@ -24,9 +28,11 @@ function defaults(): Settings {
     masterVolume: 0.8,
     musicVolume: 0.6,
     sfxVolume: 0.8,
+    muted: false,
     animationSpeed: 'normal',
     reducedMotion: prefersReduced,
     screenShake: true,
+    effectsQuality: 'auto',
     localTimer: true,
   };
 }

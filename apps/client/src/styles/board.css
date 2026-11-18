@@ -1852,9 +1852,6 @@
   display: none;
 }
 
-.board.short .ult-btn-title {
-  white-space: nowrap;
-}
 
 .discard-pile.has-card {
   cursor: zoom-in;
@@ -1864,3 +1861,48 @@
   filter: brightness(1.12);
   box-shadow: 0 0 0 2px rgb(255 211 106 / 70%), 0 8px 14px rgb(0 0 0 / 60%);
 }
+
+/* Light behind a card as it lands (school colour, stronger by rarity). */
+.play-burst {
+  --c: 255 220 150;
+  width: clamp(240px, 52vh, 440px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(var(--c) / 60%) 0%, rgb(var(--c) / 22%) 32%, transparent 64%);
+  mix-blend-mode: screen;
+  animation: playBurst 1.5s ease-out forwards;
+}
+.play-burst.s-construccion { --c: 240 184 80; }
+.play-burst.s-asalto { --c: 255 106 80; }
+.play-burst.s-arcano { --c: 127 214 242; }
+.play-burst.r-epica { --c: 186 128 255; width: clamp(280px, 62vh, 520px); }
+.play-burst.r-legendaria {
+  --c: 255 190 70;
+  width: clamp(340px, 90vh, 760px);
+  animation-duration: 2.2s;
+}
+.play-burst.r-legendaria::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgb(255 230 160 / 45%) 0deg 5deg, transparent 5deg 22deg);
+  mask-image: radial-gradient(circle, #000 10%, transparent 68%);
+  -webkit-mask-image: radial-gradient(circle, #000 10%, transparent 68%);
+  animation: burstSpin 2.2s linear forwards;
+}
+.play-burst { position: relative; }
+
+@keyframes playBurst {
+  0% { transform: scale(0.3); opacity: 0; }
+  18% { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+@keyframes burstSpin {
+  to { transform: rotate(40deg); }
+}
+
+.reduced-motion .play-burst { animation-duration: 0.6s; }
+.reduced-motion .play-burst::before { display: none; }
+

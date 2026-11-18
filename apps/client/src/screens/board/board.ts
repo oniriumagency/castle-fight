@@ -31,6 +31,7 @@ import { openSettings } from '../settingsModal';
 import { Hand, blockReason, inspectPanel } from './hand';
 import { CastlePlaque, SidePanel } from './hud';
 import { showResults } from './results';
+import { muteButton } from '../../ui/muteButton';
 
 type StateUpdate = Extract<SessionEvent, { type: 'state' }>;
 
@@ -142,7 +143,7 @@ class BoardScreen implements Screen {
     this.el = h(
       'div.board',
       { class: `mode-${session.kind}` },
-      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), this.eventChip, h('div.top-right', null, emoteBtn, logBtn)),
+      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), this.eventChip, h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
       this.panels[0].el,
       this.panels[1].el,
       h('div.board-field', null, this.plaques[0].el, this.plaques[1].el, h('div.piles', null, this.deckPile, this.discardPile)),
@@ -200,6 +201,9 @@ class BoardScreen implements Screen {
     void this.field.setMood(skyFor(null), 600);
     this.field.setShield(0, 0);
     this.field.setShield(1, 0);
+    this.field.setAura(0, { burn: 0, frost: 0, danger: 0 });
+    this.field.setAura(1, { burn: 0, frost: 0, danger: 0 });
+    audio.setTension(0);
   }
 
   resize(): void {
@@ -393,7 +397,7 @@ class BoardScreen implements Screen {
       if (!this.resultsShown) {
         this.resultsShown = true;
         const winner = view.result.winner;
-        fx.gameOver(winner === null ? null : this.session.kind === 'local' ? true : this.session.isLocal(winner));
+        fx.gameOver(winner === null ? null : this.session.kind === 'local' ? true : this.session.isLocal(winner), winner === null ? null : this.sideOf(winner), this.fxContext());
         showResults({
           host: this.layer,
           session: this.session,
@@ -452,6 +456,10 @@ class BoardScreen implements Screen {
       });
       this.plaques[side].update(p.keep, p.wall);
     }
+    fx.auras(
+      this.fxContext(),
+      this.shown.map((p) => ({ burn: p.burn, frozen: RESOURCES.some((r) => p.frost[r] > 0), keep: p.keep, keepStart: view.rules.keepStart })),
+    );
 
     // Hand of the player looking at the screen.
     const handSeat = this.handSeat ?? view.viewer;
@@ -630,7 +638,7 @@ class BoardScreen implements Screen {
         this.shownActive = e.player;
         this.render();
         const mine = this.session.isLocal(e.player);
-        if (mine) audio.play('yourTurn');
+        fx.turnStarted(mine, this.session.kind === 'local');
         const title = this.session.kind === 'local' ? this.name(e.player) : mine ? t('yourTurn') : t('theirTurn', { who: this.name(e.player) });
         this.showBanner(e.extraTurn ? t('extraTurn') : title, t('turnN', { n: e.turn }));
         await wait(mine ? 650 : 350);
@@ -654,36 +662,40 @@ class BoardScreen implements Screen {
           if (e.gained[res] > 0) this.floatAt(panel.resourceRow(res), `+${e.gained[res]}`, 'build');
           if (e.frozen.includes(res)) panel.pulse(`.res-${res}`);
         }
-        audio.play('resource');
+        audio.play('resource', 0.5, { pan: this.sideOf(e.player) === 0 ? -0.4 : 0.4 });
         await wait(320);
         break;
       }
       case 'resourcesChanged': {
         const p = shown[e.player];
         const panel = this.panels[this.sideOf(e.player)];
+        let gained = false;
         for (const res of RESOURCES) {
           const d = e.delta[res] ?? 0;
           if (!d) continue;
+          gained ||= d > 0;
           p.resources[res] = Math.max(0, p.resources[res] + d);
           this.floatAt(panel.resourceRow(res), d > 0 ? `+${d}` : `−${-d}`, d > 0 ? 'build' : 'damage');
         }
         this.render();
-        audio.play('resource');
+        audio.play(gained ? 'resource' : 'resourceLoss', 0.5, { pan: this.sideOf(e.player) === 0 ? -0.4 : 0.4 });
         await wait(260);
         break;
       }
       case 'workersChanged': {
         const p = shown[e.player];
         const panel = this.panels[this.sideOf(e.player)];
+        let hired = false;
         for (const res of RESOURCES) {
           const d = e.delta[res] ?? 0;
           if (!d) continue;
+          hired ||= d > 0;
           p.workers[res] = Math.max(0, p.workers[res] + d);
           panel.pulse(`.res-${res} .res-workers`);
           this.floatAt(panel.resourceRow(res), `${d > 0 ? '+' : '−'}${Math.abs(d)} ⚒`, d > 0 ? 'build' : 'damage');
         }
         this.render();
-        audio.play('worker');
+        audio.play(hired ? 'worker' : 'workerLoss', 0.5, { pan: this.sideOf(e.player) === 0 ? -0.4 : 0.4 });
         await wait(380);
         break;
       }
@@ -696,7 +708,7 @@ class BoardScreen implements Screen {
         const from = this.takeFromHand(e.player, e.uid);
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
-        audio.play('cardPlay');
+        fx.cardLaunched();
         await this.showPlayed(e.cardId, from, e.combo);
         break;
       }
@@ -749,6 +761,7 @@ class BoardScreen implements Screen {
         break;
       }
       case 'deckReshuffled':
+        if (e.player === this.handSeat) audio.play('shuffle');
         this.deckPile.classList.remove('pulse');
         void this.deckPile.offsetWidth;
         this.deckPile.classList.add('pulse');
@@ -815,12 +828,16 @@ class BoardScreen implements Screen {
       case 'drawbridgeLowered':
         shown[e.player].drawbridge = e.type === 'drawbridgeRaised';
         this.render();
-        if (e.type === 'drawbridgeRaised') await wait(300);
+        if (e.type === 'drawbridgeRaised') {
+          fx.drawbridge(e.player, ctx);
+          await wait(300);
+        }
         break;
       case 'handRevealed':
         shown[e.player].handRevealed = true;
         shown[e.player].hand = e.cards.map((c) => ({ uid: c.uid, cardId: c.cardId }));
         this.render();
+        fx.reveal(e.player, ctx);
         await wait(400);
         break;
       case 'handHidden':
@@ -832,14 +849,14 @@ class BoardScreen implements Screen {
         const p = shown[e.player];
         p.enchantments = [...p.enchantments.filter((x) => x.cardId !== e.cardId), { cardId: e.cardId, turnsLeft: e.turns, fresh: true }];
         this.render();
-        audio.play('enchant');
+        fx.enchantment(e.player, ctx);
         this.panels[this.sideOf(e.player)].pulse(`.enchant[data-card="${e.cardId}"]`);
         await wait(450);
         break;
       }
       case 'enchantmentTriggered':
         this.panels[this.sideOf(e.player)].pulse(`.enchant[data-card="${e.cardId}"]`);
-        audio.play('enchant');
+        fx.enchantment(e.player, ctx, true);
         await wait(260);
         break;
       case 'enchantmentRemoved': {
@@ -862,10 +879,8 @@ class BoardScreen implements Screen {
         if (e.ready && !wasReady) {
           this.panels[this.sideOf(e.player)].pulse('.portrait');
           this.panels[this.sideOf(e.player)].pulse('.ult-btn');
-          if (this.session.isLocal(e.player)) {
-            audio.play('ultimateReady');
-            toast(t('ultimateReadyToast'), 'info', 4200);
-          }
+          fx.ultimateReady(e.player, ctx, this.session.isLocal(e.player));
+          if (this.session.isLocal(e.player)) toast(t('ultimateReadyToast'), 'info', 4200);
         }
         break;
       }
@@ -876,12 +891,13 @@ class BoardScreen implements Screen {
         p.ultimateUses++;
         this.render();
         await this.showUltimate(e.player, e.heroId);
-        await fx.ultimate(e.player, ctx);
+        await fx.ultimate(e.player, e.heroId, ctx);
         break;
       }
       case 'extraTurnGranted':
         shown[e.player].extraTurns++;
         this.render();
+        fx.extraTurn(e.player, ctx);
         this.showBanner(t('extraTurn'), this.name(e.player));
         await wait(500);
         break;
@@ -890,7 +906,7 @@ class BoardScreen implements Screen {
         break;
       case 'timedOut':
         this.showBanner(t('timeUp'), this.name(e.player));
-        audio.play('error');
+        fx.timeUp();
         await wait(600);
         break;
       case 'turnEnded':
@@ -950,11 +966,19 @@ class BoardScreen implements Screen {
       { duration: 520 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
     );
     await anim.finished.catch(() => undefined);
-    if (getCard(cardId).rarity === 'legendaria') {
-      this.field.flash(0xffc060, 0.25, 500);
-      await wait(350);
-    }
+    const landed = card.getBoundingClientRect();
+    this.playBurst(cardId, combo);
+    await fx.cardLanded(cardId, { x: landed.left + landed.width / 2, y: landed.top + landed.height / 2 }, combo, this.fxContext());
     await wait(combo ? 520 : 380);
+  }
+
+  /** Light behind a card as it lands, in its school and rarity colours. */
+  private playBurst(cardId: string, combo: boolean): void {
+    const card = getCard(cardId);
+    const burst = h('div.play-burst', { class: `s-${card.school} r-${card.rarity}${combo ? ' combo' : ''}`, 'aria-hidden': 'true' });
+    this.stage.prepend(burst);
+    this.playedCard?.classList.add('landed', `land-${card.rarity}`);
+    setTimeout(() => burst.remove(), 2400);
   }
 
   /** Sends the card on stage to the discard pile. */
@@ -1128,7 +1152,7 @@ class BoardScreen implements Screen {
     const mine = this.session.isLocal(view.pending?.player ?? view.active);
     if (mine && secs <= 5 && secs > 0 && secs !== this.lastTick) {
       this.lastTick = secs;
-      audio.play('tick');
+      fx.clockTick(secs);
     }
   }
 

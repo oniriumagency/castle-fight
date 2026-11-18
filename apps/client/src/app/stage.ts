@@ -1,5 +1,7 @@
 import { Application } from 'pixi.js';
+import { audio } from '../fx/audio';
 import { Battlefield } from '../scene/battlefield';
+import { effectsLow } from './quality';
 
 /**
  * The single PixiJS application behind every screen. The battlefield stays
@@ -16,12 +18,13 @@ export async function initStage(): Promise<void> {
     background: 0x0d1020,
     antialias: true,
     autoDensity: true,
-    resolution: Math.min(window.devicePixelRatio || 1, 2),
+    resolution: Math.min(window.devicePixelRatio || 1, effectsLow() ? 1.5 : 2),
     powerPreference: 'high-performance',
   });
   document.getElementById('stage')!.appendChild(app.canvas);
   field = new Battlefield(app);
   field.layout();
+  field.onAmbient = (kind) => audio.play(kind, 0.5, { gain: 0.7, pan: Math.random() - 0.5 });
   window.addEventListener('resize', () => requestAnimationFrame(() => app.resize()));
 }
 

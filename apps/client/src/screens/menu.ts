@@ -11,6 +11,7 @@ import { skyFor } from '../ui/theme';
 import { flow } from './flow';
 import { openHowToPlay } from './howToPlay';
 import { openSettings } from './settingsModal';
+import { muteButton } from '../ui/muteButton';
 
 /** A few showpiece cards fanned beside the menu: a legendary between two epics. */
 function showcase(): HTMLElement {
@@ -98,6 +99,7 @@ export function menuScreen(): Screen {
             html(iconSvg('globe')),
             settings.get().locale === 'es' ? 'English' : 'Español',
           ),
+          muteButton('btn.icon-only'),
         ),
         h('footer.menu-foot', null, t('version')),
       ),
