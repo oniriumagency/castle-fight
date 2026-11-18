@@ -1,4 +1,4 @@
-import { HEROES, getHero, type HeroId, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
+import { getHero, type HeroId, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
 import { callAttention } from '../../app/attention';
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
@@ -8,6 +8,7 @@ import { gamesOf, loadRecord, nemesisOf, recordAi, recordOnline, type Outcome } 
 import type { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
+import { heroSelectScreen, type HeroSelectMode } from '../heroSelect';
 
 export interface ResultsOptions {
   host: HTMLElement;
@@ -94,55 +95,42 @@ export function showResults(o: ResultsOptions): void {
       : h('tr', null, h('td', null, String(value(seats[0]))), h('th', { scope: 'row' }, label), h('td', null, String(value(seats[1]))));
   const stat = (seat: PlayerId) => o.stats.players[seat] ?? { damageDealt: 0, built: 0, biggestHit: 0, cardsPlayed: 0, ultimates: 0 };
 
-  // The hero for the rematch: each player on this device may switch before it starts.
-  const picks: Partial<Record<PlayerId, HeroId>> = {};
-  const pickButtons: HTMLButtonElement[] = [];
-  const heroRow = (seat: PlayerId): HTMLElement => {
-    picks[seat] = o.view.players[seat].hero;
-    const buttons = HEROES.map((hero) => {
-      const btn = h(
-        'button.opp-pick',
-        {
-          type: 'button',
-          title: L(hero.name),
-          'aria-label': L(hero.name),
-          'aria-pressed': String(hero.id === picks[seat]),
-          style: `--hero:${heroCss(hero.id)}`,
-        },
-        h('img', { src: artUrl(hero.art), alt: '' }),
-      ) as HTMLButtonElement;
-      btn.addEventListener('click', () => {
-        if (picks[seat] === hero.id) return;
-        audio.play('uiClick');
-        picks[seat] = hero.id;
-        for (const b of buttons) b.setAttribute('aria-pressed', String(b === btn));
-        heroName.textContent = L(hero.name);
-      });
-      pickButtons.push(btn);
-      return btn;
-    });
-    const heroName = h('small.rematch-hero-name', null, L(getHero(picks[seat]!).name));
-    return h(
-      'div.rematch-hero-row',
-      null,
-      h('span.rematch-hero-label', null, shared ? o.name(seat) : t('rematchHero'), heroName),
-      h('div.rematch-hero-picks', null, buttons),
-    );
-  };
-  const mine = seats.filter((seat) => o.session.isLocal(seat));
-  const heroPicker = mine.length ? h('div.rematch-heroes', null, mine.map(heroRow)) : null;
-
   const rematchBtn = h('button.btn.primary.big', { type: 'button' }, t('rematch'));
   const rematchNote = h('p.rematch-note');
-  rematchBtn.addEventListener('click', () => {
-    audio.play('uiClick');
+  // Rematch: the players on this device choose their heroes again first (the full hero screen, over the board).
+  const mine = seats.filter((seat) => o.session.isLocal(seat)).sort((x, y) => x - y);
+  const mode: HeroSelectMode = o.session.kind === 'online' ? 'online' : o.session.kind === 'local' ? 'local' : multi ? 'ffa' : 'ai';
+  const askRematch = (heroes: HeroId[]): void => {
+    const picks: Partial<Record<PlayerId, HeroId>> = {};
+    mine.forEach((seat, i) => {
+      if (heroes[i]) picks[seat] = heroes[i];
+    });
     o.session.rematch(picks);
     if (o.session.kind === 'online') {
-      // The choice went with the request.
-      for (const b of pickButtons) b.disabled = true;
       rematchBtn.disabled = true;
       rematchNote.textContent = multi ? t('waitingOthers') : t('waitingOpponent', { who: o.name(seats[1]) });
     }
+  };
+  rematchBtn.addEventListener('click', () => {
+    audio.play('uiClick');
+    const layer = h('div.rematch-pick');
+    const close = (): void => {
+      screen.unmount?.();
+      layer.remove();
+    };
+    const screen = heroSelectScreen(mode, undefined, {
+      initial: mine.map((seat) => o.view.players[seat].hero),
+      onPick: (heroes) => {
+        close();
+        askRematch(heroes);
+      },
+      onBack: close,
+    });
+    screen.el.classList.add('screen', 'scroll');
+    layer.append(screen.el);
+    o.host.appendChild(layer);
+    screen.mount?.();
+    requestAnimationFrame(() => requestAnimationFrame(() => screen.el.classList.add('in')));
   });
 
   const hideBtn = h('button.btn.ghost', { type: 'button' }, t('viewBoard'));
@@ -178,7 +166,6 @@ export function showResults(o: ResultsOptions): void {
         row(t('statUltimates'), (s) => stat(s).ultimates),
       ),
     ),
-    heroPicker,
     rematchNote,
     h(
       'div.results-actions',
