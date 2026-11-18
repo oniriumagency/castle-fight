@@ -78,6 +78,8 @@ const STRINGS = {
 
   // Board
   yourTurn: { es: 'Tu turno', en: 'Your turn' },
+  rotateTitle: { es: 'Gira tu móvil', en: 'Turn your phone' },
+  rotateHint: { es: 'Cardcraft: Castles se juega en horizontal.', en: 'Cardcraft: Castles is played in landscape.' },
   gameStartedNotice: { es: '¡Empieza la partida!', en: 'The game is starting!' },
   gameStartedNoticeBody: { es: 'Tu rival ya está en la sala de Cardcraft: Castles.', en: 'Your opponent is in the Cardcraft: Castles room.' },
   yourTurnNotice: { es: 'Cardcraft: Castles · Turno {n}. Vuelve a la partida para jugar.', en: 'Cardcraft: Castles · Turn {n}. Come back to the game to play.' },
@@ -135,7 +137,6 @@ const STRINGS = {
   passDeviceHint: { es: 'Tu mano queda oculta hasta que pulses el botón.', en: 'Your hand stays hidden until you press the button.' },
   ready: { es: 'Estoy listo', en: "I'm ready" },
   timeUp: { es: '¡Se acabó el tiempo!', en: "Time's up!" },
-  rotateHint: { es: 'Gira el teléfono para jugar más cómodo', en: 'Turn your phone sideways for a better view' },
   emotes: { es: 'Emotes', en: 'Emotes' },
 
   // Choices

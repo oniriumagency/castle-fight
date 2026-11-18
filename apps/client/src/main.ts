@@ -18,6 +18,7 @@ import './styles/board.css';
 
 import { toast } from './app/dom';
 import { t } from './app/i18n';
+import { initLandscapeOnly } from './app/orientation';
 import { settings } from './app/settings';
 import { battlefield, initStage } from './app/stage';
 import { audio } from './fx/audio';
@@ -36,6 +37,7 @@ function applyDocumentSettings(): void {
 async function boot(): Promise<void> {
   applyDocumentSettings();
   settings.subscribe(applyDocumentSettings);
+  initLandscapeOnly();
   await initStage();
   // Development only: drive effects and sounds from the console.
   if (import.meta.env.DEV) Object.assign(window, { __dev: { fx, audio, field: battlefield() } });

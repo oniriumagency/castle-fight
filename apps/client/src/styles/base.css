@@ -401,3 +401,57 @@ input[type='range'] {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
 }
+
+/* Phones play in landscape only: upright, a screen asks to turn the phone. */
+.rotate-screen {
+  display: none;
+}
+
+@media (orientation: portrait) {
+  .phone .rotate-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    text-align: center;
+    background: radial-gradient(ellipse at 50% 40%, #241c36, #0b0912 75%);
+    color: var(--text, #f3ead8);
+  }
+}
+
+.rotate-icon svg {
+  width: 96px;
+  height: 96px;
+  color: var(--gold, #e3b656);
+  animation: rotatePhone 2.4s ease-in-out infinite;
+}
+
+.rotate-title {
+  margin: 8px 0 0;
+  font-family: var(--display, serif);
+  font-size: 1.6rem;
+  color: var(--gold, #e3b656);
+  letter-spacing: 0.04em;
+}
+
+.rotate-hint {
+  margin: 0;
+  max-width: 280px;
+  color: var(--muted, #b9b0c8);
+}
+
+@keyframes rotatePhone {
+  0%, 20% { transform: rotate(0deg); }
+  50%, 80% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.reduced-motion .rotate-icon svg {
+  animation: none;
+  transform: rotate(-90deg);
+}
