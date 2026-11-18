@@ -150,6 +150,22 @@ function holyFire(seat: PlayerId, ctx: FxContext): void {
   for (let i = 0; i < 5; i++) setTimeout(() => wave(i), ms(i * 220));
 }
 
+/** Waves of the hero's light around a castle whose ultimate was just fired (~2.4 s, does not block). */
+function castleGlow(side: PlayerId, color: number, light: number, ctx: FxContext): void {
+  const field = ctx.field;
+  const base = field.anchor(side, 'base');
+  const keep = field.anchor(side, 'keep');
+  const height = Math.max(80, base.y - keep.y);
+  field.flare(keep.x, keep.y + height * 0.45, light, 340, 2400, 0.25);
+  field.ring(base.x, base.y - 10, light, 230, 1100, 0.7);
+  const wave = (i: number): void => {
+    field.flare(keep.x, keep.y + height * 0.4, i % 2 ? 0xffd27a : light, 260, 700, 0.25);
+    field.burst(base.x, base.y - 8, { count: 12, texture: 'flame', color: [light, 0xffd27a], colorTo: color, speed: 2.6, angle: -Math.PI / 2, spread: 0.3, gravity: -0.07, size: 26, life: 1000, alpha: 0.65, area: { w: 180, h: 12 } });
+    field.burst(base.x, base.y - height * 0.45, { count: 10, texture: 'glow', color: [light, 0xffffff, 0xffe07a], speed: 1.3, angle: -Math.PI / 2, spread: 1, gravity: -0.05, size: 14, life: 1400, alpha: 0.85, area: { w: 170, h: height * 0.9 } });
+  };
+  for (let i = 0; i < 7; i++) setTimeout(() => wave(i), ms(i * 300));
+}
+
 export const fx = {
   /** A new turn: forget the last card. */
   turnStarted(mine: boolean, local: boolean): void {
@@ -445,16 +461,22 @@ export const fx = {
     audio.play('ultimate', 0.5, { pan: pan(ctx, seat) * 0.5 });
     const flavour = HERO_CUE[heroId];
     if (flavour) audio.play(flavour, 0.5, { pan: pan(ctx, seat) * 0.5 });
-    audio.duck(0.3, 2200);
+    audio.duck(0.3, 2600);
+    // The castle itself shines, and keeps glowing while the effect plays out.
+    field.radiateCastle(side, light, ms(3000));
+    castleGlow(side, color, light, ctx);
     // A pillar of light out of the keep.
     for (let i = 0; i < 5; i++) field.flare(at.x, at.y - i * 80, light, 220 - i * 20, 1000 + i * 120, 0.45);
     field.rays(at.x, at.y, light, 700, 2000, 0.45);
-    field.flash(light, 0.32, 600);
+    field.rays(at.x, at.y, 0xffd27a, 520, 2400, 0.3);
+    field.flash(light, 0.4, 700);
     field.burst(at.x, base.y, { count: 40, texture: 'spark', color: [light, 0xffffff, 0xffe066], speed: 7, angle: -Math.PI / 2, spread: 0.7, gravity: 0.02, size: 26, life: 1100, area: { w: 60, h: 10 } });
+    field.burst(at.x, at.y, { count: 30, texture: 'spark', color: [0xffffff, light, 0xffe066], speed: 11, gravity: 0.08, drag: 0.96, size: 20, life: 900 });
     await wait(500);
     field.ring(at.x, at.y, light, 300, 900, 1);
     field.ring(base.x, base.y - 10, 0xffffff, 200, 700, 0.6);
-    field.shake(10);
+    field.ring(at.x, at.y, 0xffe7a0, 460, 1200, 0.6);
+    field.shake(12);
     switch (heroId) {
       case 'arquitecta':
         field.burst(base.x, base.y - 6, { count: 12, texture: 'smoke', color: 0xc0a880, speed: 2, spread: Math.PI * 0.8, gravity: -0.01, size: 60, life: 1600, alpha: 0.6 });

@@ -30,7 +30,7 @@ import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
-import { skyFor } from '../../ui/theme';
+import { heroCss, skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
 import { Hand, blockReason, inspectPanel, type InspectPanel } from './hand';
@@ -1154,8 +1154,10 @@ class BoardScreen implements Screen {
         p.ultimateCharge = 0;
         p.ultimateUses++;
         this.render();
-        await this.showUltimate(e.player, e.heroId);
+        // Everyone sees who fired it: the call, a flash and the castle shining.
+        const reveal = this.showUltimate(e.player, e.heroId);
         await fx.ultimate(e.player, e.heroId, ctx);
+        await reveal;
         break;
       }
       case 'extraTurnGranted':
@@ -1449,8 +1451,9 @@ class BoardScreen implements Screen {
 
   private async showUltimate(seat: PlayerId, heroId: string): Promise<void> {
     const card = heroCard(heroId, { className: 'ultimate-reveal' });
-    const box = h('div.ultimate-box', { class: `from-${this.sideOf(seat)}` }, card, h('div.ultimate-title', null, t('ultimate')));
+    const box = h('div.ultimate-box', { class: `from-${this.sideOf(seat)}` }, card);
     this.stage.appendChild(box);
+    this.showUltimateUsedCall(seat, heroId, box.getBoundingClientRect());
     await box
       .animate(
         [
@@ -1462,9 +1465,34 @@ class BoardScreen implements Screen {
         { duration: 520 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
       )
       .finished.catch(() => undefined);
-    await wait(700);
+    await wait(1100);
     await box.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(1.15)' }], { duration: 280 * animScale(), fill: 'forwards' }).finished.catch(() => undefined);
     box.remove();
+  }
+
+  /**
+   * "¡(Player) ha usado su definitiva!" over the hero card, with a flash of
+   * the hero's colour across the screen (every player sees it).
+   */
+  private showUltimateUsedCall(seat: PlayerId, heroId: string, card: DOMRect): void {
+    for (const old of this.floaters.querySelectorAll('.ult-used-call, .ult-used-flash')) old.remove();
+    // On their own screen the player reads "You used your ultimate!"; the others read their name.
+    const self = this.session.kind !== 'local' && this.session.isLocal(seat);
+    const text = self ? t('ultimateUsedSelf') : t('ultimateUsedCall', { who: this.name(seat) });
+    const style = `--hero:${heroCss(heroId as HeroId)}`;
+    const flash = h('div.ult-used-flash', { style });
+    const top = Math.max(70, card.top - 8);
+    const call = h(
+      'div.ult-used-call',
+      { style: `${style};left:${card.left + card.width / 2}px;top:${top}px` },
+      h('div.ult-used-rays'),
+      h('div.ult-used-ring'),
+      h('div.ult-used-ring.late'),
+      h('strong', { 'data-text': text }, text),
+    );
+    this.floaters.append(flash, call);
+    setTimeout(() => flash.remove(), 1600);
+    setTimeout(() => call.remove(), 2900);
   }
 
   /** Big centered "Ultimate ready!" with rays, a ring and sparks (does not block the game). */
