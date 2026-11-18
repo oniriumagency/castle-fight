@@ -37,6 +37,23 @@ pnpm dev:client    # cliente en http://localhost:5173 (redirige /api al Worker)
 pnpm --filter @cardcraft-castles/server smoke   # dos bots se emparejan y juegan una partida contra el Worker local
 ```
 
+## Despliegue
+
+El juego está publicado en <https://games.onirium.agency>, en el plan gratuito de Cloudflare. Es un solo Worker (`cardcraft-castles`) que sirve el cliente compilado como archivos estáticos y atiende `/api/*` con el servidor, así que la página, la API y los WebSockets comparten origen.
+
+Cada push a `main` lo publica el flujo [Deploy](.github/workflows/deploy.yml): comprueba tipos y tests, compila el cliente, ejecuta `wrangler deploy --env production` y, al terminar, dos bots juegan una partida entera en una sala privada contra el servidor publicado. También se puede lanzar a mano desde la pestaña Actions.
+
+Necesita dos secretos en el repositorio (Settings → Secrets and variables → Actions):
+
+| Secreto | Valor |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Token de API creado con la plantilla "Edit Cloudflare Workers", limitado a la cuenta y a la zona `onirium.agency`. |
+| `CLOUDFLARE_ACCOUNT_ID` | El Account ID de la cuenta de Cloudflare. |
+
+El dominio está en `apps/server/wrangler.jsonc` (`env.production.routes`). Es un dominio personalizado del Worker: Cloudflare crea el registro DNS y el certificado al publicar, y la zona tiene que estar en la misma cuenta. No hace falta ningún túnel.
+
+Para publicar desde tu máquina, con Wrangler ya autenticado (`wrangler login`), usa `pnpm run deploy`. Sin el `run`, `pnpm deploy` es otra orden de pnpm.
+
 ## Cómo encajan las piezas
 
 El cliente nunca decide el resultado de una jugada. Envía la intención (`play`, `discard`, `ultimate`, `choose`), el servidor la aplica con `applyAction` del motor y devuelve a cada jugador su propia vista (`getPlayerView`) junto con la lista de lo que ha pasado (`redactEvents`) para animarlo. La mano y el mazo de cada jugador solo viajan a su dueño. La interfaz habla con el servidor a través del SDK de `@cardcraft-castles/protocol/client`, que se encarga de reconectar y recuperar el asiento.
