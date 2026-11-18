@@ -941,3 +941,10 @@ input.shake {
     flex: 2 1 auto;
   }
 }
+
+.turn-picker .inf {
+  font-family: var(--body, serif);
+  font-size: 1.45em;
+  line-height: 0.8;
+  font-weight: 700;
+}

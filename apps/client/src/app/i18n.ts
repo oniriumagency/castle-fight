@@ -42,6 +42,7 @@ const STRINGS = {
   turnTime: { es: 'Tiempo por turno', en: 'Time per turn' },
   secondsShort: { es: '{n} s', en: '{n}s' },
   secondsLong: { es: '{n} segundos', en: '{n} seconds' },
+  noTimeLimit: { es: 'Sin límite', en: 'No limit' },
   privateRoom: { es: 'Privada (solo con enlace)', en: 'Private (link only)' },
   watchFull: { es: 'Llena', en: 'Full' },
   roomWaiting: { es: 'Esperando rival', en: 'Waiting for opponent' },

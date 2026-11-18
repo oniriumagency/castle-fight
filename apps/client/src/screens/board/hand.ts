@@ -12,6 +12,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
+import { comboTag } from '../../game/combo';
 import { cardBack, cardFace, glossaryFor } from '../../ui/card';
 
 export interface HandContext {
@@ -208,6 +209,7 @@ export class Hand {
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     big.classList.add('hover-preview');
     big.classList.toggle('combo', slot.el.classList.contains('combo'));
+    if (big.classList.contains('combo')) big.append(comboTag(slot.cardId));
     big.classList.toggle('blocked', slot.el.classList.contains('blocked'));
     const r = slot.el.getBoundingClientRect();
     const hostRect = host.getBoundingClientRect();

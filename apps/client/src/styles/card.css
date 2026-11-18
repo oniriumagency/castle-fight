@@ -419,3 +419,13 @@
   .card.landed > .trim { animation: none !important; }
 }
 .reduced-motion .card.landed > .trim { animation: none; }
+
+/* Combo on: an arcane halo around the card, and the Combo keyword lit up. */
+.card.combo {
+  --glow: 0 0 calc(18 * var(--u)) calc(4 * var(--u)) rgb(79 216 255 / 75%), 0 0 calc(46 * var(--u)) calc(10 * var(--u)) rgb(60 140 255 / 38%);
+}
+.card.combo .kw-combo {
+  color: #0b7fae;
+  text-shadow: 0 0 calc(6 * var(--u)) rgb(79 216 255 / 70%);
+  letter-spacing: 0.02em;
+}

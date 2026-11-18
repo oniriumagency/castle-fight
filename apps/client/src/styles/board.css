@@ -703,7 +703,7 @@
 
 .opp-hand .card.face {
   transform: none;
-  cursor: pointer;
+  cursor: zoom-in;
   --w: calc(var(--card-w) * 0.5);
   margin: 0 2px;
 }
@@ -904,6 +904,9 @@
   background: linear-gradient(180deg, #b8f6ff, #3fc6e8);
   box-shadow: 0 0 18px #4fd8ff;
   transform: rotate(8deg);
+  white-space: nowrap;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
 }
 
 .event-reveal-box,
@@ -1906,3 +1909,12 @@
 .reduced-motion .play-burst { animation-duration: 0.6s; }
 .reduced-motion .play-burst::before { display: none; }
 
+
+.combo-tag b {
+  letter-spacing: 0.08em;
+}
+
+.opp-hand .card.face:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 0 0 2px rgb(255 211 106 / 70%), var(--drop);
+}

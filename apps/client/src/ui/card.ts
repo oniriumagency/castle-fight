@@ -2,6 +2,7 @@ import {
   DEFAULT_RULES,
   RARITY_NAMES,
   SCHOOL_NAMES,
+  TERMS,
   getBattleEvent,
   getCard,
   getHero,
@@ -85,7 +86,8 @@ function keywordPattern(): RegExp {
 
 /** Rules text as HTML with keywords in bold. */
 export function rulesHtml(text: string): string {
-  return escapeHtml(text).replace(keywordPattern(), '<b>$1</b>');
+  const combo = L(TERMS.combo);
+  return escapeHtml(text).replace(keywordPattern(), (word) => (word === combo ? `<b class="kw-combo">${word}</b>` : `<b>${word}</b>`));
 }
 
 /** Explanations for the keywords a text uses, for the inspect view. */

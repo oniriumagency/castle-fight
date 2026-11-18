@@ -208,6 +208,17 @@ describe('reconnection', () => {
     expect(room.record.seats[0]!.reconnectBy).toBeNull();
   });
 
+  it('never runs out a turn when the room has no time limit', () => {
+    const room = makeRoom({ timings: { turnSeconds: 0 } });
+    const { a } = room.start();
+    expect(a.last('state')!.deadline).toBeNull();
+    const turn = room.record.game!.turn;
+    room.advance(TURN_MS * 20);
+    expect(room.record.status).toBe('playing');
+    expect(room.record.game!.turn).toBe(turn);
+    expect(room.record.clock).toBeNull();
+  });
+
   it('forfeits a player who does not come back in time', () => {
     const room = makeRoom({ timings: { turnSeconds: 600 } });
     const { a, b } = room.start();
