@@ -477,6 +477,9 @@ class BoardScreen implements Screen {
     }
   }
 
+  /** Bumped for every update animated, and when one is given up on, so a late one stops. */
+  private animGen = 0;
+
   private async pump(): Promise<void> {
     if (this.busy) return;
     this.busy = true;
@@ -486,6 +489,7 @@ class BoardScreen implements Screen {
         const update = this.queue.shift()!;
         // An animation that never ends (a paused or throttled tab) must not freeze the board.
         const kinds = update.events.map((e) => e.type);
+        const gen = ++this.animGen;
         const timedOut = await Promise.race([
           this.animate(update).then(
             () => false,
@@ -497,7 +501,12 @@ class BoardScreen implements Screen {
           ),
           new Promise<boolean>((resolve) => setTimeout(() => resolve(true), MAX_ANIMATION_MS)),
         ]);
-        if (timedOut) reportProblem('animationTimeout', 'An update took too long to animate', { events: kinds.slice(0, 40), ...this.snapshot() });
+        if (timedOut) {
+          // The late animation must not keep changing the board when it wakes up
+          // (it used to add its drawn cards to the hand a second time).
+          if (this.animGen === gen) this.animGen++;
+          reportProblem('animationTimeout', 'An update took too long to animate', { events: kinds.slice(0, 40), ...this.snapshot() });
+        }
         this.view = update.view;
         this.shown = update.view.players.map(clonePlayer);
         this.shownActive = update.view.active;
@@ -745,8 +754,9 @@ class BoardScreen implements Screen {
       this.hand.el.classList.add('concealed');
     }
 
+    const gen = this.animGen;
     for (const e of events) {
-      if (this.destroyed) return;
+      if (this.destroyed || gen !== this.animGen) return;
       await this.play(e, update.view);
     }
     await wait(120);
@@ -823,7 +833,9 @@ class BoardScreen implements Screen {
       this.handModel = [];
       this.render();
       const cards = view.players[view.viewer].hand;
+      const gen = this.animGen;
       for (const card of cards) {
+        if (gen !== this.animGen) return;
         this.handModel = [...this.handModel, card];
         this.render();
         audio.play('cardDraw');
@@ -984,7 +996,10 @@ class BoardScreen implements Screen {
         p.hand = [...p.hand, ...e.cards];
         p.deckCount = Math.max(0, p.deckCount - e.cards.length);
         if (e.player === this.handSeat) {
+          const gen = this.animGen;
           for (const card of e.cards) {
+            if (gen !== this.animGen) break;
+            if (this.handModel.some((c) => c.uid === card.uid)) continue;
             this.handModel = [...this.handModel, card];
             this.render();
             audio.play('cardDraw');
