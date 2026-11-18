@@ -1,5 +1,6 @@
 import { h, html } from './dom';
 import { t } from './i18n';
+import { isInstalled } from './install';
 
 /**
  * Phones play in landscape only. Where the browser allows it (Android), the
@@ -16,7 +17,8 @@ export function isPhone(): boolean {
 async function lockLandscape(): Promise<void> {
   try {
     const root = document.documentElement;
-    if (!document.fullscreenElement && root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+    // The installed app already runs full screen.
+    if (!document.fullscreenElement && !isInstalled() && root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
     const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
     await orientation.lock?.('landscape');
   } catch {

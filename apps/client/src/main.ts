@@ -18,6 +18,7 @@ import './styles/board.css';
 
 import { toast } from './app/dom';
 import { t } from './app/i18n';
+import { initInstall } from './app/install';
 import { initLandscapeOnly } from './app/orientation';
 import { settings } from './app/settings';
 import { battlefield, initStage } from './app/stage';
@@ -37,6 +38,7 @@ function applyDocumentSettings(): void {
 async function boot(): Promise<void> {
   applyDocumentSettings();
   settings.subscribe(applyDocumentSettings);
+  initInstall();
   initLandscapeOnly();
   await initStage();
   // Development only: drive effects and sounds from the console.
@@ -66,7 +68,8 @@ async function boot(): Promise<void> {
       toast(t('lobbyOffline'), 'warn', 5000);
     }
   }
-  flow.menu();
+  // An unfinished game on this device (phone locked, tab reloaded hours later): straight back into it.
+  if (!flow.resumeLocal()) flow.menu();
 }
 
 void boot();

@@ -207,7 +207,11 @@ const STRINGS = {
   speedFast: { es: 'Rápida', en: 'Fast' },
   reducedMotion: { es: 'Reducir movimiento', en: 'Reduce motion' },
   screenShake: { es: 'Sacudida de pantalla', en: 'Screen shake' },
-  localTimer: { es: 'Reloj de turno en partidas locales', en: 'Turn clock in local games' },
+  localTimer: { es: 'Reloj de turno con dos jugadores en un dispositivo', en: 'Turn clock with two players on one device' },
+  installApp: { es: 'Instalar en el móvil', en: 'Install on your phone' },
+  continueGame: { es: 'Continuar partida', en: 'Continue game' },
+  continueGameHint: { es: 'Retoma la partida que dejaste a medias', en: 'Pick up the game you left unfinished' },
+  gameRestored: { es: 'Partida recuperada: sigues donde lo dejaste', en: 'Game restored: you are back where you left off' },
   mute: { es: 'Silenciar', en: 'Mute' },
   unmute: { es: 'Activar sonido', en: 'Unmute' },
   muteAll: { es: 'Silenciar todo', en: 'Mute everything' },
@@ -250,10 +254,6 @@ const STRINGS = {
 } as const satisfies Record<string, LocalizedText>;
 
 export type StringKey = keyof typeof STRINGS;
-
-export function detectLocale(): Locale {
-  return navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en';
-}
 
 export function locale(): Locale {
   return settings.get().locale;
