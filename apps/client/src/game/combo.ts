@@ -13,8 +13,12 @@ export function comboBonusText(cardId: string): string {
   return parts.join(', ');
 }
 
-/** The "COMBO: +8 Wall" badge on a card whose Combo is on. */
-export function comboTag(cardId: string): HTMLElement {
+/**
+ * The badge on a card that would get its stronger effect if played now:
+ * "COMBO +8 Wall" for a Combo, "BOOSTED" for a condition that holds.
+ */
+export function boostTag(cardId: string, combo: boolean): HTMLElement {
+  if (!combo) return h('span.combo-tag', null, h('b', null, t('boosted').toUpperCase()));
   const bonus = comboBonusText(cardId);
   return h('span.combo-tag', null, h('b', null, t('comboReady').toUpperCase()), bonus ? ` ${bonus}` : '');
 }

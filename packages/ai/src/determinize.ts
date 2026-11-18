@@ -72,10 +72,9 @@ function guessPlayer(
     extraTurns: pub.extraTurns,
     lastPlayedCard: pub.lastPlayedCard,
     comboSchool: pub.comboSchool,
-    // The view does not carry these. Only Ambush reads them, and it asks about
-    // the card that closed the previous turn, which is what `comboSchool` holds.
+    // Cards played earlier this turn are not in the view; no condition reads them.
     schoolsThisTurn: [],
-    schoolsLastTurn: pub.comboSchool ? [pub.comboSchool] : [],
+    schoolsLastTurn: pub.schoolsLastTurn.slice(),
   };
 }
 

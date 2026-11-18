@@ -13,7 +13,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
-import { comboBonusText, comboTag } from '../../game/combo';
+import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
@@ -961,7 +961,10 @@ class BoardScreen implements Screen {
   private async showPlayed(cardId: string, from: DOMRect, combo: boolean): Promise<void> {
     this.clearPlayed();
     const card = cardFace(cardId, { className: 'played' });
-    if (combo && comboBonusText(cardId)) card.append(comboTag(cardId));
+    if (combo && comboBonusText(cardId)) {
+      card.classList.add('combo', 'boosted');
+      card.append(boostTag(cardId, true));
+    }
     this.stage.replaceChildren(card);
     this.playedCard = card;
     const target = card.getBoundingClientRect();
@@ -1235,8 +1238,10 @@ class BoardScreen implements Screen {
     if (!ctx || !cardId) return;
     const reason = blockReason(ctx, cardId);
     const big = cardFace(cardId, { tilt: true, cost: undefined });
-    big.classList.toggle('combo', !reason && this.hand.elementOf(uid)?.classList.contains('combo') === true);
-    if (big.classList.contains('combo')) big.append(comboTag(cardId));
+    const handCard = this.hand.elementOf(uid);
+    big.classList.toggle('combo', !reason && handCard?.classList.contains('combo') === true);
+    big.classList.toggle('boosted', !reason && handCard?.classList.contains('boosted') === true);
+    if (big.classList.contains('boosted')) big.append(boostTag(cardId, big.classList.contains('combo')));
     const costEl = this.hand.elementOf(uid)?.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     this.openInspect(

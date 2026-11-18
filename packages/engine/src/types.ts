@@ -366,12 +366,15 @@ export interface GameState {
 
 export interface BoardPlayer {
   hero: HeroId;
+  keep: number;
   resources: ResourceMap;
   enchantments: Enchantment[];
   ultimateCharge: number;
   ultimateUses: number;
   lastPlayedCard: CardId | null;
   comboSchool: School | null;
+  /** Schools of the cards played during this player's last turn (drives some card conditions). */
+  schoolsLastTurn: School[];
   hand: VisibleCard[];
 }
 
@@ -551,6 +554,8 @@ export interface PlayerPublicState {
   extraTurns: number;
   lastPlayedCard: CardId | null;
   comboSchool: School | null;
+  /** Schools of the cards played during this player's last turn. */
+  schoolsLastTurn: School[];
   /** Your own cards are always visible; the opponent's only when revealed. */
   hand: VisibleCard[];
   deckCount: number;

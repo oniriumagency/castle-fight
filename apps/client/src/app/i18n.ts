@@ -145,6 +145,7 @@ const STRINGS = {
   logPlayed: { es: '{who} juega {card}', en: '{who} plays {card}' },
   logPlayedCombo: { es: '{who} juega {card} con Combo ({bonus})', en: '{who} plays {card} with Combo ({bonus})' },
   comboDamage: { es: '{n} de daño', en: '{n} damage' },
+  boosted: { es: 'Potenciada', en: 'Boosted' },
   logDiscarded: { es: '{who} descarta {card}', en: '{who} discards {card}' },
   logTimeoutDiscard: { es: '{who} se quedó sin tiempo y descarta {card}', en: '{who} ran out of time and discards {card}' },
   logEffectDiscard: { es: '{who} pierde {card}', en: '{who} loses {card}' },
