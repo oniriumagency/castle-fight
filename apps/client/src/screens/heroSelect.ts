@@ -7,7 +7,7 @@ import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
 import { DIFFICULTIES, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_NAMES, type Difficulty } from '../game/ai';
 import { artUrl, iconSvg } from '../ui/assets';
-import { heroCard, heroParts, rulesHtml } from '../ui/card';
+import { heroCard, heroParts, rulesHtml, setTableSize } from '../ui/card';
 import { heroCss } from '../ui/theme';
 import { flow } from './flow';
 
@@ -222,6 +222,8 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
   return {
     el,
     mount() {
+      // The free-for-all choice shows the heroes' 3-player texts.
+      setTableSize(mode === 'ffa' ? 3 : 2);
       build();
       battlefield().castles[0].setHero(picked);
       unsubscribe = settings.subscribe((next, prev) => {
@@ -229,6 +231,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
       });
     },
     unmount() {
+      setTableSize(2);
       unsubscribe();
     },
     resize() {
