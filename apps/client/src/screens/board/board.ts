@@ -101,6 +101,7 @@ class BoardScreen implements Screen {
   private unsubscribe: () => void = () => {};
   private unsubscribeSettings: () => void = () => {};
   private raf = 0;
+  private backgroundTimer = 0;
   private playedCard: HTMLElement | null = null;
   private closeInspect: (() => void) | null = null;
   private resultsShown = false;
@@ -195,6 +196,12 @@ class BoardScreen implements Screen {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+    // No frames in a background tab: keep the turn clock (and its ticks) going.
+    this.backgroundTimer = window.setInterval(() => {
+      if (!document.hidden) return;
+      this.tickTimer();
+      this.tickPresence();
+    }, 250);
   }
 
   unmount(): void {
@@ -202,6 +209,7 @@ class BoardScreen implements Screen {
     this.unsubscribe();
     this.unsubscribeSettings();
     cancelAnimationFrame(this.raf);
+    window.clearInterval(this.backgroundTimer);
     window.removeEventListener('keydown', this.onKey);
     this.closeInspect?.();
     this.session.leave();
