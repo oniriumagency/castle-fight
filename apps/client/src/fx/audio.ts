@@ -1,5 +1,4 @@
 import { settings } from '../app/settings';
-import { Instruments } from './sound/instruments';
 import { MusicPlayer, type MusicTrack } from './sound/music';
 import { idle, renderRecipe } from './sound/render';
 import { RECIPES, WARM_ORDER, type Cue } from './sound/sfx';
@@ -10,15 +9,15 @@ export type { MusicTrack } from './sound/music';
 
 /**
  * Every sound goes through here: `audio.play(cue)` for effects and
- * `audio.music(track)` for the score. All of it is synthesized in the
- * browser (see `sound/`), so the game downloads no audio at all. Nothing is
- * built until the first tap or key press (browsers require it), and then
- * the instruments and the most common effects are rendered a few at a time
- * in idle moments.
+ * `audio.music(track)` for the score. The effects are synthesized in the
+ * browser (see `sound/`); the music is streamed from `public/music/`.
+ * Nothing is built until the first tap or key press (browsers require it),
+ * and then the most common effects are rendered a few at a time in idle
+ * moments.
  *
  *   sfx ──┬──────────────► master ─► limiter ─► speakers
  *         └─► reverb ──────┘   ▲
- *   music ─► duck ─────────────┘ (and a reverb send)
+ *   music ─► duck ─────────────┘
  */
 
 const INTENSITY_BUCKETS = [0.2, 0.55, 0.9];
@@ -50,7 +49,6 @@ class AudioBus {
   private duckGain: GainNode | null = null;
   private reverb: ConvolverNode | null = null;
   private player: MusicPlayer | null = null;
-  private instruments: Instruments | null = null;
   private bank = new Map<string, Promise<AudioBuffer | null>>();
   private lastPlayed = new Map<Cue, number>();
   private voices = 0;
@@ -63,22 +61,28 @@ class AudioBus {
     const unlock = (): void => {
       const ctx = this.ensure();
       if (ctx && ctx.state !== 'running' && document.visibilityState === 'visible') {
-        void ctx.resume().then(() => this.player?.resync());
+        void ctx.resume();
         // iOS needs a sound started inside the gesture to wake the output.
         const silent = ctx.createBufferSource();
         silent.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
         silent.connect(ctx.destination);
         silent.start();
       }
+      this.player?.unlock();
     };
     window.addEventListener('pointerdown', unlock, { passive: true });
     window.addEventListener('keydown', unlock);
+    // iOS only counts the end of a touch as a gesture that may start media.
+    window.addEventListener('touchend', unlock, { passive: true });
+    window.addEventListener('click', unlock);
     // No music in a background tab, and no battery spent on it.
     document.addEventListener('visibilitychange', () => {
       const ctx = this.ctx;
       if (!ctx) return;
-      if (document.visibilityState === 'hidden') void ctx.suspend();
-      else void ctx.resume().then(() => this.player?.resync());
+      if (document.visibilityState === 'hidden') {
+        this.player?.hide();
+        void ctx.suspend();
+      } else void ctx.resume().then(() => this.player?.show());
     });
     settings.subscribe(() => this.applyVolumes());
   }
@@ -110,18 +114,14 @@ class AudioBus {
     this.reverb.buffer = impulseResponse(ctx);
     const reverbReturn = ctx.createGain();
     reverbReturn.gain.value = 0.55;
-    const musicSend = ctx.createGain();
-    musicSend.gain.value = 0.28;
 
     this.sfx.connect(this.master);
     this.musicBus.connect(this.duckGain).connect(this.master);
-    this.duckGain.connect(musicSend).connect(this.reverb);
     this.reverb.connect(reverbReturn).connect(this.master);
     this.master.connect(limiter).connect(ctx.destination);
     this.applyVolumes();
 
-    this.instruments = new Instruments(ctx);
-    this.player = new MusicPlayer(ctx, this.musicBus, this.instruments);
+    this.player = new MusicPlayer(ctx, this.musicBus);
     this.player.setTension(this.tension);
     if (this.wantedTrack) this.player.play(this.wantedTrack);
     void this.warm();
@@ -139,11 +139,10 @@ class AudioBus {
     set(this.musicBus, s.musicVolume * 1.5);
   }
 
-  /** Renders the instruments, then the common effects, without blocking frames. */
+  /** Renders the common effects without blocking frames. */
   private async warm(): Promise<void> {
     if (this.warmed) return;
     this.warmed = true;
-    await this.instruments?.prepare();
     for (const cue of WARM_ORDER) {
       if (RECIPES[cue].scaled) for (const k of INTENSITY_BUCKETS) void this.buffer(cue, k);
       else void this.buffer(cue, 0.5);
