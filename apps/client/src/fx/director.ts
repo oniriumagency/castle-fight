@@ -166,12 +166,13 @@ export const fx = {
     }
   },
 
-  async damage(e: Damage, ctx: FxContext, heights: { keep: number; wall: number }): Promise<void> {
+  /** `shieldLeft`: Shield charges after this hit (a blocked hit lowers the dome once it lands). */
+  async damage(e: Damage, ctx: FxContext, heights: { keep: number; wall: number }, shieldLeft?: number): Promise<void> {
     const field = ctx.field;
     const target = ctx.side(e.target);
     const from = ctx.side(e.source);
     const aimAt = e.kind === 'piercing' || e.wallLoss === 0 ? 'keep' : 'wall';
-    const at = field.anchor(target, aimAt);
+    const at = (e.blocked && field.domePoint(target, from)) || field.anchor(target, aimAt);
     const style = attackStyle(e);
     const color = e.cause === 'ultimate' && ultimateHero ? heroColor(ultimateHero) | 0x303030 : DAMAGE_COLOR[e.kind];
     const p = pan(ctx, e.target);
@@ -192,10 +193,16 @@ export const fx = {
     }
     if (e.blocked) {
       audio.play('blocked', 0.5, { pan: p });
+      field.shieldHit(target);
       field.ring(at.x, at.y, 0xaee8ff, 120, 600, 1);
-      field.ring(at.x, at.y, 0xffffff, 70, 400, 0.8);
-      field.burst(at.x, at.y, { count: 26, texture: 'crystal', color: [0xaee8ff, 0xffffff], speed: 5, gravity: 0, size: 12, life: 650 });
-      field.hitCastle(target, 0x9fe6ff, 0.4);
+      field.ring(at.x, at.y, 0xc9a8ff, 70, 450, 0.8);
+      field.flare(at.x, at.y, 0xc9e8ff, 110, 380, 0.5);
+      field.burst(at.x, at.y, { count: 26, texture: 'crystal', color: [0xaee8ff, 0xd8c8ff, 0xffffff], speed: 5, gravity: 0, size: 12, life: 650 });
+      field.burst(at.x, at.y, { count: 12, texture: 'spark', color: [0xffffff, 0xaee8ff], speed: 6, gravity: 0.05, size: 18, life: 400 });
+      if (shieldLeft !== undefined) {
+        if (shieldLeft === 0) field.shatterShield(target);
+        field.setShield(target, shieldLeft);
+      }
       ctx.float('✦', at.x, at.y - 20, 'blocked');
       await wait(380);
       return;
