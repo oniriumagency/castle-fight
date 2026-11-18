@@ -115,7 +115,7 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'fortaleza-viva': () => {
     // No battle event in the way: one landing on turn 9 would change the Keep.
-    let { state } = play('fortaleza-viva', { keepTurn: false, rules: { eventEveryTurns: 1000 } });
+    let { state } = play('fortaleza-viva', { keepTurn: false, rules: { eventEveryRounds: 1000 } });
     expect(state.players[ME].keep).toBe(50);
     // +5 Keep at the start of each of my next 5 turns, then it expires.
     for (let i = 1; i <= 5; i++) {
@@ -129,7 +129,7 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[ME].keep).toBe(75);
   },
   'puente-levadizo': () => {
-    let { state } = play('puente-levadizo', { keepTurn: false, rules: { eventEveryTurns: 1000 } });
+    let { state } = play('puente-levadizo', { keepTurn: false, rules: { eventEveryRounds: 1000 } });
     expect(state.players[ME].wall).toBe(23);
     expect(state.players[ME].drawbridge).toBe(true);
     // It stays up over turns until a piercing attack comes.
@@ -341,7 +341,7 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'lluvia-de-ascuas': () => {
     // No battle event in the way: one landing on turn 9 would change the Wall.
-    let { state } = play('lluvia-de-ascuas', { keepTurn: false, rules: { eventEveryTurns: 1000 } });
+    let { state } = play('lluvia-de-ascuas', { keepTurn: false, rules: { eventEveryRounds: 1000 } });
     // Burn ticks at the start of the burned player's turn: 4 turns, 3 damage each.
     expect(state.active).toBe(OPP);
     expect(state.players[OPP].wall).toBe(12);

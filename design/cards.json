@@ -10,7 +10,7 @@
     "handSize": 6,
     "turnSeconds": 30,
     "maxEnchantments": 2,
-    "eventEveryTurns": 8
+    "eventEveryRounds": 4
   },
   "schools": {
     "construccion": {
@@ -1340,8 +1340,8 @@
         "en": "Eclipse"
       },
       "text": {
-        "es": "Durante 2 turnos, las cartas Arcanas cuestan la mitad.",
-        "en": "For 2 turns, Arcane cards cost half."
+        "es": "Durante 1 ronda (un turno de cada jugador), las cartas Arcanas cuestan la mitad.",
+        "en": "For 1 round (one turn for each player), Arcane cards cost half."
       },
       "art": "events/eclipse.jpg"
     },
@@ -1376,8 +1376,8 @@
         "en": "Winter Truce"
       },
       "text": {
-        "es": "Durante 2 turnos no se pueden jugar cartas de Asalto.",
-        "en": "For 2 turns, Assault cards cannot be played."
+        "es": "Durante 1 ronda (un turno de cada jugador) no se pueden jugar cartas de Asalto.",
+        "en": "For 1 round (one turn for each player), Assault cards cannot be played."
       },
       "art": "events/tregua.jpg"
     }

@@ -46,7 +46,7 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   discardMax: 3,
   turnSeconds: design.rules.turnSeconds,
   maxEnchantments: design.rules.maxEnchantments,
-  eventEveryTurns: design.rules.eventEveryTurns,
+  eventEveryRounds: design.rules.eventEveryRounds,
   deckCopies: Object.freeze({ comun: 4, rara: 3, epica: 2, legendaria: 1 }),
   burnDamage: 3,
   burnMaxTurns: 6,
