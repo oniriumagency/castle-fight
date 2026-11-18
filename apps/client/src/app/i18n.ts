@@ -78,6 +78,8 @@ const STRINGS = {
 
   // Board
   yourTurn: { es: 'Tu turno', en: 'Your turn' },
+  rotateTitle: { es: 'Gira tu móvil', en: 'Turn your phone' },
+  rotateHint: { es: 'Cardcraft: Castles se juega en horizontal.', en: 'Cardcraft: Castles is played in landscape.' },
   gameStartedNotice: { es: '¡Empieza la partida!', en: 'The game is starting!' },
   gameStartedNoticeBody: { es: 'Tu rival ya está en la sala de Cardcraft: Castles.', en: 'Your opponent is in the Cardcraft: Castles room.' },
   yourTurnNotice: { es: 'Cardcraft: Castles · Turno {n}. Vuelve a la partida para jugar.', en: 'Cardcraft: Castles · Turn {n}. Come back to the game to play.' },
@@ -135,7 +137,6 @@ const STRINGS = {
   passDeviceHint: { es: 'Tu mano queda oculta hasta que pulses el botón.', en: 'Your hand stays hidden until you press the button.' },
   ready: { es: 'Estoy listo', en: "I'm ready" },
   timeUp: { es: '¡Se acabó el tiempo!', en: "Time's up!" },
-  rotateHint: { es: 'Gira el teléfono para jugar más cómodo', en: 'Turn your phone sideways for a better view' },
   emotes: { es: 'Emotes', en: 'Emotes' },
 
   // Choices
@@ -206,7 +207,11 @@ const STRINGS = {
   speedFast: { es: 'Rápida', en: 'Fast' },
   reducedMotion: { es: 'Reducir movimiento', en: 'Reduce motion' },
   screenShake: { es: 'Sacudida de pantalla', en: 'Screen shake' },
-  localTimer: { es: 'Reloj de turno en partidas locales', en: 'Turn clock in local games' },
+  localTimer: { es: 'Reloj de turno con dos jugadores en un dispositivo', en: 'Turn clock with two players on one device' },
+  installApp: { es: 'Instalar en el móvil', en: 'Install on your phone' },
+  continueGame: { es: 'Continuar partida', en: 'Continue game' },
+  continueGameHint: { es: 'Retoma la partida que dejaste a medias', en: 'Pick up the game you left unfinished' },
+  gameRestored: { es: 'Partida recuperada: sigues donde lo dejaste', en: 'Game restored: you are back where you left off' },
   mute: { es: 'Silenciar', en: 'Mute' },
   unmute: { es: 'Activar sonido', en: 'Unmute' },
   muteAll: { es: 'Silenciar todo', en: 'Mute everything' },
@@ -249,10 +254,6 @@ const STRINGS = {
 } as const satisfies Record<string, LocalizedText>;
 
 export type StringKey = keyof typeof STRINGS;
-
-export function detectLocale(): Locale {
-  return navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en';
-}
 
 export function locale(): Locale {
   return settings.get().locale;

@@ -2,12 +2,14 @@ import { CARDS, GAME_TITLE } from '@cardcraft-castles/engine';
 import { h, html } from '../app/dom';
 import { t } from '../app/i18n';
 import type { Screen } from '../app/router';
+import { canInstall, onInstallChange, promptInstall } from '../app/install';
 import { settings } from '../app/settings';
 import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
 import { iconSvg, type IconName } from '../ui/assets';
 import { cardFace } from '../ui/card';
 import { skyFor } from '../ui/theme';
+import { hasSavedGame } from '../game/localSession';
 import { flow } from './flow';
 import { openHowToPlay } from './howToPlay';
 import { openSettings } from './settingsModal';
@@ -78,6 +80,7 @@ export function menuScreen(): Screen {
         h(
           'nav.modes',
           null,
+          hasSavedGame() ? modeButton('keep', t('continueGame'), t('continueGameHint'), () => flow.resumeLocal() || build()) : null,
           modeButton('sword', t('playAi'), t('playAiHint'), () => flow.heroSelect('ai')),
           modeButton('globe', t('playOnline'), t('playOnlineHint'), () => flow.lobby()),
           modeButton('users', t('playLocal'), t('playLocalHint'), () => flow.heroSelect('local')),
@@ -99,6 +102,9 @@ export function menuScreen(): Screen {
             html(iconSvg('globe')),
             settings.get().locale === 'es' ? 'English' : 'Español',
           ),
+          canInstall()
+            ? h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), void promptInstall()) }, html(iconSvg('keep')), t('installApp'))
+            : null,
           muteButton('btn.icon-only'),
         ),
         h('footer.menu-foot', null, t('version')),
@@ -108,6 +114,7 @@ export function menuScreen(): Screen {
   };
 
   let unsubscribe = (): void => {};
+  let unsubscribeInstall = (): void => {};
   return {
     el,
     mount() {
@@ -123,9 +130,11 @@ export function menuScreen(): Screen {
       unsubscribe = settings.subscribe((next, prev) => {
         if (next.locale !== prev.locale) build();
       });
+      unsubscribeInstall = onInstallChange(build);
     },
     unmount() {
       unsubscribe();
+      unsubscribeInstall();
     },
     resize() {
       requestAnimationFrame(() => battlefield().layout());

@@ -19,6 +19,48 @@ export interface LocalOptions {
   difficulty?: Difficulty;
 }
 
+/** The game in progress on this device, kept so it survives a locked phone or a reload. */
+interface SavedGame {
+  v: 1;
+  kind: 'ai' | 'local';
+  seats: [Seat, Seat];
+  difficulty: Difficulty;
+  state: GameState;
+  viewer: PlayerId;
+  savedAt: number;
+}
+
+const SAVE_KEY = 'cardcraft-castles:local-game';
+const STATS_KEY = 'cardcraft-castles:local-stats';
+
+function readSave(): SavedGame | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const save = JSON.parse(raw) as SavedGame;
+    if (save?.v !== 1 || (save.kind !== 'ai' && save.kind !== 'local') || !save.state || save.state.phase === 'finished') return null;
+    // A save from an older version of the rules that no longer reads cleanly is dropped.
+    getPlayerView(save.state, 0);
+    return save;
+  } catch {
+    clearSavedGame();
+    return null;
+  }
+}
+
+/** Whether there is an unfinished game on this device to continue. */
+export function hasSavedGame(): boolean {
+  return readSave() !== null;
+}
+
+export function clearSavedGame(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // Storage blocked: nothing was saved either.
+  }
+}
+
 function randomSeed(): string {
   return Array.from(crypto.getRandomValues(new Uint32Array(3))).join('-');
 }
@@ -40,12 +82,48 @@ export class LocalSession extends BaseSession implements MatchSession {
   private aiTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
 
-  constructor(options: LocalOptions) {
+  constructor(options: LocalOptions, saved?: SavedGame) {
     super();
     this.kind = options.kind;
     this.seats = options.seats;
     this.difficulty = options.difficulty ?? 'normal';
-    this.start();
+    if (saved) {
+      this.state = saved.state;
+      this.viewer = saved.viewer;
+      this.publish([], true);
+    } else this.start();
+  }
+
+  /** The unfinished game saved on this device, ready to play on from where it was left. */
+  static resume(): LocalSession | null {
+    const save = readSave();
+    if (!save) return null;
+    return new LocalSession({ kind: save.kind, seats: save.seats, difficulty: save.difficulty }, save);
+  }
+
+  statsKey(): string {
+    return STATS_KEY;
+  }
+
+  private save(): void {
+    if (this.state.phase === 'finished') {
+      clearSavedGame();
+      return;
+    }
+    const save: SavedGame = {
+      v: 1,
+      kind: this.kind,
+      seats: this.seats,
+      difficulty: this.difficulty,
+      state: this.state,
+      viewer: this.viewer,
+      savedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    } catch {
+      // Storage full or blocked: the game still plays, it just won't survive a reload.
+    }
   }
 
   isLocal(seat: PlayerId): boolean {
@@ -68,13 +146,15 @@ export class LocalSession extends BaseSession implements MatchSession {
     return this.state.pending?.player ?? this.state.active;
   }
 
-  private publish(events: GameEvent[]): void {
+  private publish(events: GameEvent[], resumed = false): void {
     this.viewer = this.currentViewer();
+    this.save();
     this.emit({
       type: 'state',
       view: getPlayerView(this.state, this.viewer),
       events: redactEvents(events, this.viewer),
       deadline: this.deadline,
+      ...(resumed ? { resumed } : {}),
     });
   }
 
@@ -120,9 +200,13 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.startClock();
   }
 
-  /** The clock runs from the moment the player can act, not while cards are flying. */
+  /**
+   * The clock runs from the moment the player can act, not while cards are
+   * flying. Games against the AI have no clock: they can be paused and picked
+   * up hours later.
+   */
   private startClock(): void {
-    if (!settings.get().localTimer || this.clockTurn === this.state.turn) return;
+    if (this.kind === 'ai' || !settings.get().localTimer || this.state.rules.turnSeconds <= 0 || this.clockTurn === this.state.turn) return;
     this.clockTurn = this.state.turn;
     this.deadline = Date.now() + this.state.rules.turnSeconds * 1000;
     this.emit({ type: 'clock', deadline: this.deadline });
