@@ -714,6 +714,13 @@ class BoardScreen implements Screen {
         const title = this.session.kind === 'local' ? this.name(e.player) : mine ? t('yourTurn') : t('theirTurn', { who: this.name(e.player) });
         if (mine && this.session.kind !== 'local') callAttention(t('yourTurn'), t('yourTurnNotice', { n: e.turn }));
         this.showBanner(e.extraTurn ? t('extraTurn') : title, t('turnN', { n: e.turn }));
+        // Your turn starts with the ultimate charged: say so loudly, once the banner has gone.
+        if (mine && shown[e.player].ultimateReady) {
+          const seat = e.player;
+          setTimeout(() => {
+            if (!this.destroyed && this.shownActive === seat && this.shown?.[seat].ultimateReady) this.showUltimateReady(seat);
+          }, 1050 * animScale());
+        }
         await wait(mine ? 650 : 350);
         break;
       }
@@ -1241,6 +1248,25 @@ class BoardScreen implements Screen {
     await wait(700);
     await box.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(1.15)' }], { duration: 280 * animScale(), fill: 'forwards' }).finished.catch(() => undefined);
     box.remove();
+  }
+
+  /** Big centered "Ultimate ready!" with rays, a ring and sparks (does not block the game). */
+  private showUltimateReady(seat: PlayerId): void {
+    this.stage.parentElement?.querySelector('.ult-ready')?.remove();
+    const fxEl = h(
+      'div.ult-ready',
+      { 'aria-live': 'polite' },
+      h('div.ult-ready-rays'),
+      h('div.ult-ready-ring'),
+      h('div.ult-ready-ring.late'),
+      h('strong', { 'data-text': t('ultimateReadyBig') }, t('ultimateReadyBig')),
+      h('small', null, t('ultimateReadyHint')),
+    );
+    this.banner.after(fxEl);
+    const r = fxEl.getBoundingClientRect();
+    fx.ultimateReadyBanner(seat, this.fxContext(), r.left + r.width / 2, r.top + r.height / 2);
+    this.panels[this.sideOf(seat)].pulse('.ult-btn');
+    setTimeout(() => fxEl.remove(), 2600);
   }
 
   private showBanner(title: string, sub = ''): void {
