@@ -105,10 +105,11 @@ export interface Rules {
   twilightEvery: number;
   /** Twilight Fury: extra damage of every attack, per level. */
   twilightAttackBonus: number;
-  /** Twilight Fury: Wall the active player loses at the start of their turn, per level. */
-  twilightErosion: number;
-  /** Twilight Fury: Keep the active player loses at the start of their turn, per level (never below 1). */
-  twilightKeepErosion: number;
+  /**
+   * Twilight Fury: normal damage the active player takes at the start of
+   * their turn, per level: the Wall first, the rest to the Keep (never below 1).
+   */
+  twilightDamage: number;
   /** Twilight Fury: extra Castle every card that builds it raises, per level. */
   twilightBuildBonus: number;
 }
@@ -198,7 +199,7 @@ export type EffectOp =
   | { op: 'destroyEnchantment' }
   /** The opponent's hand is revealed until your next turn. */
   | { op: 'revealHand' }
-  /** Until your next turn, piercing damage against you is treated as normal. */
+  /** The next piercing attack against you is treated as normal damage. */
   | { op: 'drawbridge' }
   /** Look at the opponent's hand and discard one card of your choice. */
   | { op: 'peekAndDiscard' }
@@ -326,7 +327,7 @@ export interface PlayerState {
   frost: ResourceMap;
   /** Shield charges. */
   shield: number;
-  /** Piercing damage against this player is treated as normal until their next turn. */
+  /** The next piercing attack against this player is treated as normal damage. */
   drawbridge: boolean;
   /** This player's hand is visible to the opponent until the opponent's next turn. */
   handRevealed: boolean;

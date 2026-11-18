@@ -181,7 +181,8 @@ function opNominal(op: EffectOp, w: Weights): number {
     case 'revealHand':
       return 1;
     case 'drawbridge':
-      return 2;
+      // It waits for the next piercing attack, however long that takes.
+      return 3;
     case 'peekAndDiscard':
       return 6;
     case 'discardRandom':

@@ -129,16 +129,24 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[ME].keep).toBe(75);
   },
   'puente-levadizo': () => {
-    let { state } = play('puente-levadizo', { keepTurn: false });
+    let { state } = play('puente-levadizo', { keepTurn: false, rules: { eventEveryTurns: 1000 } });
     expect(state.players[ME].wall).toBe(23);
     expect(state.players[ME].drawbridge).toBe(true);
-    // Piercing damage is treated as normal damage until my next turn.
-    setHand(state, OPP, ['saetas-negras']);
-    state = playCard(state, 'saetas-negras').state;
+    // It stays up over turns until a piercing attack comes.
+    state = pass(pass(state));
+    expect(state.players[ME].drawbridge).toBe(true);
+    // The next piercing attack is treated as normal damage and lowers it.
+    setHand(state, OPP, ['saetas-negras', 'saetas-negras']);
+    state.actionsLeft = 2;
+    const first = playCard(state, 'saetas-negras');
+    expect(first.state.players[ME].wall).toBe(13);
+    expect(first.state.players[ME].keep).toBe(50);
+    expect(first.state.players[ME].drawbridge).toBe(false);
+    expect(first.events.some((e) => e.type === 'drawbridgeLowered')).toBe(true);
+    // The one after goes straight to the Keep again.
+    state = playCard(first.state, 'saetas-negras').state;
     expect(state.players[ME].wall).toBe(13);
-    expect(state.players[ME].keep).toBe(50);
-    expect(state.active).toBe(ME);
-    expect(state.players[ME].drawbridge).toBe(false);
+    expect(state.players[ME].keep).toBe(40);
   },
   'maestro-de-obras': () => {
     const { state } = play('maestro-de-obras');

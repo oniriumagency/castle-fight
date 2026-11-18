@@ -102,10 +102,15 @@ function twilight(state: GameState, events: GameEvent[], player: PlayerId, befor
   if (level === 0) return;
   const rules = state.rules;
   if (level > before) events.push({ type: 'twilightRose', level });
-  // Like a battle event: not an attack, ignores Shield and does not charge the ultimate.
+  // Normal damage: the Wall takes it first and the rest goes to the Keep.
+  // Like a battle event it is not an attack: it ignores Shield, does not
+  // charge the ultimate and never takes the Keep below 1.
   const reason = { kind: 'twilight' as const, id: 'twilight' };
-  loseStructure(state, events, player, 'wall', level * (rules.twilightErosion ?? 0), 0, reason);
-  loseStructure(state, events, player, 'keep', level * (rules.twilightKeepErosion ?? 0), rules.eventKeepFloor, reason);
+  const self = state.players[player]!;
+  const amount = level * (rules.twilightDamage ?? 0);
+  const onWall = Math.min(self.wall, amount);
+  loseStructure(state, events, player, 'wall', onWall, 0, reason);
+  loseStructure(state, events, player, 'keep', amount - onWall, rules.eventKeepFloor, reason);
 }
 
 /** The game is decided on points: highest Keep, then Wall, among the castles standing; a tie is a draw. */
@@ -149,10 +154,6 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
   delete self.drawShort;
 
   // 1. "Until your next turn" effects.
-  if (self.drawbridge) {
-    self.drawbridge = false;
-    events.push({ type: 'drawbridgeLowered', player });
-  }
   for (let i = 0; i < state.players.length; i++) {
     // Hands this player revealed hide again. (Old saves have no `revealedBy`: 2 players only.)
     const p = state.players[i]!;

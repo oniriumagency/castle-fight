@@ -11,8 +11,7 @@ const FURY: Partial<Rules> = {
   twilightRound: 2,
   twilightEvery: 2,
   twilightAttackBonus: 3,
-  twilightErosion: 3,
-  twilightKeepErosion: 2,
+  twilightDamage: 5,
   twilightBuildBonus: 3,
 };
 
@@ -93,20 +92,23 @@ describe('Twilight Fury', () => {
   });
 
   it('is announced when its round begins and wears down whoever starts a turn', () => {
-    const start = scenario({ rules: FURY, keepTurn: false, you: { wall: 10, keep: 40 }, opponent: { wall: 10, keep: 40 } });
+    const start = scenario({ rules: FURY, keepTurn: false, you: { wall: 10, keep: 40 }, opponent: { wall: 3, keep: 40 } });
     const second = discardCard(start); // round 1, opponent
     expect(eventsOf(second.events, 'twilightRose')).toEqual([]);
     const { state, events } = discardCard(second.state); // round 2: it falls on my turn
     expect(state.round).toBe(2);
     expect(eventsOf(events, 'twilightRose')).toEqual([{ type: 'twilightRose', level: 1 }]);
-    expect(state.players[ME]!.wall).toBe(7);
-    expect(state.players[ME]!.keep).toBe(38);
+    // Normal damage: 5 at level 1, all on a Wall tall enough to take it.
+    expect(state.players[ME]!.wall).toBe(5);
+    expect(state.players[ME]!.keep).toBe(40);
     // Not an attack: no ultimate charge.
     expect(state.players[ME]!.ultimateCharge).toBe(0);
     // The opponent's turn in the same round wears them too, without a new announcement.
     const next = discardCard(state);
     expect(eventsOf(next.events, 'twilightRose')).toEqual([]);
-    expect(next.state.players[OPP]!.wall).toBe(7);
+    // A short Wall takes what it can and the rest reaches the Keep.
+    expect(next.state.players[OPP]!.wall).toBe(0);
+    expect(next.state.players[OPP]!.keep).toBe(38);
   });
 
   it('falls in the same round with three players', () => {

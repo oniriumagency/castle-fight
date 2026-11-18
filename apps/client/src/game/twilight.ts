@@ -1,6 +1,6 @@
-import { TERMS, roundOf, twilightLevel, type Rules } from '@cardcraft-castles/engine';
+import { roundOf, twilightLevel, type Rules } from '@cardcraft-castles/engine';
 import { h, html } from '../app/dom';
-import { L, t, type StringKey } from '../app/i18n';
+import { t, type StringKey } from '../app/i18n';
 import { modal } from '../app/router';
 import { iconSvg } from '../ui/assets';
 import { twilightCard, type CardOptions } from '../ui/card';
@@ -12,7 +12,7 @@ export function twilightOn(rules: Rules): boolean {
 }
 
 /** Placeholder values for the rule texts. */
-export function twilightValues(rules: Rules): { start: number; step: number; atk: number; build: number; wall: number; keep: number; before: number; duelTurn: number } {
+export function twilightValues(rules: Rules): { start: number; step: number; atk: number; build: number; dmg: number; before: number; duelTurn: number } {
   const n = (v: number | undefined): number => v ?? 0;
   const start = n(rules.twilightRound);
   return {
@@ -20,8 +20,7 @@ export function twilightValues(rules: Rules): { start: number; step: number; atk
     step: n(rules.twilightEvery),
     atk: n(rules.twilightAttackBonus),
     build: n(rules.twilightBuildBonus),
-    wall: n(rules.twilightErosion),
-    keep: n(rules.twilightKeepErosion),
+    dmg: n(rules.twilightDamage),
     before: Math.max(0, start - 1),
     duelTurn: Math.max(1, start * 2 - 1),
   };
@@ -79,10 +78,10 @@ export function openTwilightInfo(rules: Rules, level = 0): () => void {
       h('td', null, `${from}–${from + v.step - 1}`),
       h('td', null, `+${v.atk * n}`),
       h('td', null, `+${v.build * n}`),
-      h('td', null, `−${v.wall * n} / −${v.keep * n}`),
+      h('td', null, String(v.dmg * n)),
     );
   });
-  const wearHead = `${t('twilightTableWear')} (${L(TERMS.wall)} / ${L(TERMS.keep)})`;
+  const wearHead = t('twilightTableWear');
   return modal(() =>
     h(
       'div.modal.panel.twilight-info',
