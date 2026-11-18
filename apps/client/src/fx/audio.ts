@@ -75,14 +75,13 @@ class AudioBus {
     // iOS only counts the end of a touch as a gesture that may start media.
     window.addEventListener('touchend', unlock, { passive: true });
     window.addEventListener('click', unlock);
-    // No music in a background tab, and no battery spent on it.
+    // Music and sounds keep playing in a background tab or window. Phones may
+    // still pause audio in the background: start it again on return.
     document.addEventListener('visibilitychange', () => {
       const ctx = this.ctx;
-      if (!ctx) return;
-      if (document.visibilityState === 'hidden') {
-        this.player?.hide();
-        void ctx.suspend();
-      } else void ctx.resume().then(() => this.player?.show());
+      if (!ctx || document.visibilityState !== 'visible') return;
+      if (ctx.state !== 'running') void ctx.resume();
+      this.player?.resume();
     });
     settings.subscribe(() => this.applyVolumes());
   }

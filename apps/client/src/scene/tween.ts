@@ -22,12 +22,39 @@ interface Running {
   done: () => void;
 }
 
-/** Frame-driven tweens on the Pixi ticker (no dependency needed). */
+/** How long without a frame before the backup timer takes over. */
+const STALL_MS = 200;
+
+/**
+ * Frame-driven tweens on the Pixi ticker (no dependency needed). Browsers stop
+ * drawing frames in a background tab, so while tweens are running a backup
+ * timer keeps them moving: the game, and its sounds, go on in the background.
+ */
 export class Tweens {
   private running = new Set<Running>();
+  private lastTick = performance.now();
+  private backup: number | null = null;
 
   constructor(ticker: Ticker) {
-    ticker.add((t) => this.update(t.deltaMS));
+    ticker.add((t) => {
+      this.lastTick = performance.now();
+      this.update(t.deltaMS);
+    });
+  }
+
+  private watch(): void {
+    if (this.backup !== null) return;
+    this.backup = window.setInterval(() => {
+      const now = performance.now();
+      if (now - this.lastTick > STALL_MS) {
+        this.update(now - this.lastTick);
+        this.lastTick = now;
+      }
+      if (this.running.size === 0 && this.backup !== null) {
+        window.clearInterval(this.backup);
+        this.backup = null;
+      }
+    }, STALL_MS);
   }
 
   private update(dt: number): void {
@@ -50,6 +77,7 @@ export class Tweens {
     }
     return new Promise((resolve) => {
       this.running.add({ elapsed: 0, duration: ms, step: (t) => step(easing(t)), done: resolve });
+      this.watch();
     });
   }
 
