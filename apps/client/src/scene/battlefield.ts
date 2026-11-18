@@ -397,6 +397,19 @@ export class Battlefield {
     this.flare(x, gy - d.ry * 0.5, 0xaee8ff, d.rx * 2.2, 500, 0.5);
   }
 
+  /** A fallen player's gravestone on their castle: rises with dust, or appears at once (`instant`). */
+  setFallen(player: PlayerId, on: boolean, instant = false): void {
+    const castle = this.castles[player];
+    if (!castle || castle.fallen === on) return;
+    castle.setFallen(on, instant);
+    if (!on || instant) return;
+    const base = this.anchor(player, 'base');
+    const w = castle.keepWidth;
+    this.burst(base.x, base.y - 4, { count: 16, texture: 'smoke', color: 0x9a8a70, speed: 1.6, angle: -Math.PI / 2, spread: 2.2, gravity: -0.01, size: w * 1.2, life: 1600, alpha: 0.55, area: { w: w * 1.2, h: 6 } });
+    this.burst(base.x, base.y - 6, { count: 14, texture: 'rubble', speed: 3, angle: -Math.PI / 2, spread: 1.4, gravity: 0.3, size: 7, life: 900, area: { w: w, h: 4 } });
+    this.shake(5);
+  }
+
   setShield(player: PlayerId, charges: number): void {
     this.castles[player].setShield(charges);
   }

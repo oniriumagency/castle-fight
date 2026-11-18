@@ -270,6 +270,7 @@ class BoardScreen implements Screen {
     this.ultMode.destroy();
     void this.field.setMood(skyFor(null), 600);
     for (const side of this.sides()) {
+      this.field.setFallen(side, false);
       this.field.setShield(side, 0);
       this.field.setAura(side, { burn: 0, frost: 0, danger: 0 });
     }
@@ -420,6 +421,17 @@ class BoardScreen implements Screen {
     for (const seat of this.seats()) this.field.setShield(this.sideOf(seat), view.players[seat].shield);
   }
 
+  /** Whether a seat's castle has fallen for good: out of a free-for-all, or beaten at the end. */
+  private isFallen(view: PlayerView, seat: PlayerId): boolean {
+    const winner = view.result?.winner;
+    return !!view.players[seat].eliminated || (view.phase === 'finished' && winner !== null && winner !== undefined && winner !== seat);
+  }
+
+  /** Gravestones on the fallen castles, without animation (resume, end of an update). */
+  private syncGraves(view: PlayerView): void {
+    for (const seat of this.seats()) this.field.setFallen(this.sideOf(seat), this.isFallen(view, seat), true);
+  }
+
   // ---------------------------------------------------------------------------
   // Session
   // ---------------------------------------------------------------------------
@@ -495,6 +507,7 @@ class BoardScreen implements Screen {
     if (this.destroyed || !this.view) return;
     this.field.setCastles(this.castleValues());
     this.setShields(this.view);
+    this.syncGraves(this.view);
     this.handSeat = this.view.viewer;
     this.handModel = [...this.view.players[this.view.viewer].hand];
     this.render();
@@ -800,6 +813,7 @@ class BoardScreen implements Screen {
     this.handSeat = view.viewer;
     if (starting) {
       // Castles rise from the ground and the hand is dealt.
+      for (const side of this.sides()) this.field.setFallen(side, false);
       this.field.setCastles(this.sides().map(() => ({ keep: 0, wall: 0 })));
       this.castleValues().forEach((v, side) => void this.field.animateCastle(side, v.keep, v.wall, 1100 * animScale()));
       audio.play('build');
@@ -816,6 +830,7 @@ class BoardScreen implements Screen {
       await wait(700);
     } else {
       this.field.setCastles(this.castleValues());
+      this.syncGraves(view);
       this.handModel = [...view.players[view.viewer].hand];
     }
     this.setShields(view);
@@ -1030,6 +1045,7 @@ class BoardScreen implements Screen {
       }
       case 'playerEliminated': {
         shown[e.player].eliminated = true;
+        this.field.setFallen(this.sideOf(e.player), true);
         this.render();
         const mine = this.session.isLocal(e.player);
         audio.play(mine ? 'defeat' : 'keepFall');
@@ -1159,6 +1175,10 @@ class BoardScreen implements Screen {
         break;
       case 'gameOver':
         this.clearPlayed();
+        // The beaten castles get their gravestones.
+        if (e.winner !== null) {
+          for (const seat of this.seats()) if (seat !== e.winner) this.field.setFallen(this.sideOf(seat), true);
+        }
         await wait(700);
         break;
       case 'gameStarted':

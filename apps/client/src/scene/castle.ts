@@ -3,6 +3,7 @@ import type { HeroId } from '@cardcraft-castles/engine';
 import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
 import { glowTexture } from './textures';
+import { drawTombstone } from './tombstone';
 
 /**
  * One castle, drawn in the style of its hero (see `castleStyles.ts`).
@@ -184,6 +185,10 @@ export class Castle extends Container {
   private readonly wallDetails = new Graphics();
   private readonly wallTop = new Graphics();
   private readonly rubble = new Graphics();
+  /** The hero's gravestone on a fallen castle. */
+  private readonly grave = new Graphics();
+  /** 0 to 1 while the gravestone rises; -1 with none. */
+  private graveRise = -1;
   private readonly anim = new Graphics();
   /** Animated pieces that stand behind the Keep (the crane). */
   private readonly animBack = new Graphics();
@@ -238,6 +243,7 @@ export class Castle extends Container {
       this.cracks,
       this.wallLayer,
       this.rubble,
+      this.grave,
       this.anim,
       this.glows,
       this.frostCoat,
@@ -333,6 +339,42 @@ export class Castle extends Container {
     this.kickPhase = 0;
   }
 
+  /**
+   * The castle's player is out: the hero's gravestone rises on the ruins
+   * (`instant` for a resumed game or a layout change).
+   */
+  setFallen(on: boolean, instant = false): void {
+    if (!on) {
+      this.graveRise = -1;
+      this.grave.clear();
+      return;
+    }
+    if (this.graveRise >= 0 && !instant) return;
+    this.graveRise = instant ? 1 : 0;
+    this.drawGrave();
+  }
+
+  get fallen(): boolean {
+    return this.graveRise >= 0;
+  }
+
+  private drawGrave(): void {
+    const l = this.layoutValue;
+    if (!l || this.graveRise < 0) return;
+    drawTombstone(this.grave, this.style, this.bannerColor, l.keepWidth * 1.15);
+    this.grave.position.set(l.x - this.facing * l.keepWidth * 0.12, l.groundY - 1);
+    this.placeGrave();
+  }
+
+  /** Rises out of the ground with a small overshoot. */
+  private placeGrave(): void {
+    const t = Math.max(0, Math.min(1, this.graveRise));
+    const c = 1.7;
+    const e = t >= 1 ? 1 : 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2;
+    this.grave.scale.set(0.6 + 0.4 * Math.min(1, t * 1.6), Math.max(0.001, e));
+    this.grave.alpha = Math.min(1, t * 3);
+  }
+
   /** Ice over the stones while a resource is frozen. */
   setFrost(on: boolean): void {
     if (on === this.frozen) return;
@@ -382,6 +424,10 @@ export class Castle extends Container {
     this.x = x;
     if (!calm) this.phase += dt * 0.004;
     this.drawAnim(dt, calm);
+    if (this.graveRise >= 0 && this.graveRise < 1) {
+      this.graveRise = Math.min(1, this.graveRise + dt / 900);
+      this.placeGrave();
+    }
     if (this.shieldCharges > 0) this.tickShield(dt, calm);
   }
 
@@ -491,6 +537,7 @@ export class Castle extends Container {
     this.drawWall(l);
     this.drawCracks(l, dmg);
     this.drawRubble(l, fallen);
+    if (this.graveRise >= 0) this.drawGrave();
     if (this.shieldCharges > 0) this.drawShield();
     if (this.frozen) this.drawFrost();
   }
