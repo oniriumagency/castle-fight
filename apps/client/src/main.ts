@@ -28,6 +28,7 @@ import { fx } from './fx/director';
 import { online, roomIdFromUrl } from './net/online';
 import { flow } from './screens/flow';
 import { joinOnline } from './screens/online';
+import { initFeedback } from './ui/feedback';
 import { toggleMute } from './ui/muteButton';
 
 function applyDocumentSettings(): void {
@@ -43,6 +44,7 @@ async function boot(): Promise<void> {
   initInstall();
   initLandscapeOnly();
   await initStage();
+  initFeedback();
   // Development only: drive effects and sounds from the console.
   if (import.meta.env.DEV) Object.assign(window, { __dev: { fx, audio, field: battlefield() } });
   // M mutes everywhere, except while typing.

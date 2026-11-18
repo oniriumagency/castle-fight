@@ -585,3 +585,257 @@ input[type='range'] {
 .sound-panel.muted .sound-rows {
   opacity: 0.5;
 }
+
+/* ---------- Reports and suggestions (bottom left, every screen) ---------- */
+
+.feedback-btn {
+  position: fixed;
+  left: calc(10px + var(--safe-l));
+  bottom: calc(10px + var(--safe-b));
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--gold-l);
+}
+
+.feedback-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.feedback-hint {
+  position: fixed;
+  left: calc(10px + var(--safe-l));
+  bottom: calc(66px + var(--safe-b));
+  z-index: 41;
+  width: min(300px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgb(39 32 56 / 97%), rgb(22 19 31 / 97%));
+  box-shadow: 0 10px 30px rgb(0 0 0 / 55%), 0 0 18px rgb(227 182 86 / 22%);
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.35;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transform-origin: 22px 100%;
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+
+.feedback-hint.in {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* The bubble's tail, pointing down at the button. */
+.feedback-hint::after {
+  content: '';
+  position: absolute;
+  left: 15px;
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  background: rgb(22 19 31);
+  border-right: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+  transform: rotate(45deg);
+}
+
+.reduced-motion .feedback-hint {
+  transition: opacity 0.2s;
+  transform: none;
+}
+
+.modal.feedback {
+  width: min(600px, 100%);
+  gap: 12px;
+}
+
+.modal.feedback > * {
+  /* The dialog scrolls when it does not fit; nothing in it gets squashed. */
+  flex-shrink: 0;
+}
+
+.modal.feedback.dropping {
+  outline: 2px dashed var(--gold);
+  outline-offset: -8px;
+}
+
+.feedback-intro,
+.feedback-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.feedback-note {
+  font-size: 0.85rem;
+}
+
+.feedback-kinds {
+  align-self: flex-start;
+}
+
+.feedback-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.feedback-text {
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: rgb(0 0 0 / 35%);
+  border: 1px solid var(--gold-d);
+  border-radius: 6px;
+  padding: 0.6em 0.8em 1.6em;
+  min-height: 130px;
+  width: 100%;
+  resize: vertical;
+  outline: none;
+}
+
+.feedback-text:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgb(227 182 86 / 20%);
+}
+
+.feedback-count {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.feedback-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feedback-attach-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.feedback-attach-row small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.feedback-attach svg {
+  width: 16px;
+  height: 16px;
+}
+
+.feedback-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.feedback-thumbs:empty {
+  display: none;
+}
+
+.feedback-thumb {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #000;
+}
+
+.feedback-thumb img {
+  display: block;
+  height: 72px;
+  max-width: 140px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.feedback-thumb-x {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #ffd2c8;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff6b57, #c4211a 60%, #8e110c);
+  color: #fff;
+  cursor: pointer;
+}
+
+.feedback-thumb-x svg {
+  width: 10px;
+  height: 10px;
+}
+
+.feedback-status {
+  margin: 0;
+  min-height: 0;
+  font-size: 0.95rem;
+}
+
+.feedback-status:empty {
+  display: none;
+}
+
+.feedback-status.error {
+  color: var(--danger);
+}
+
+/* Short screens (phones held sideways): a smaller button and a tighter dialog. */
+@media (max-height: 500px) {
+  .feedback-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    left: calc(6px + var(--safe-l));
+    bottom: calc(6px + var(--safe-b));
+  }
+
+  .feedback-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .feedback-hint {
+    left: calc(6px + var(--safe-l));
+    bottom: calc(52px + var(--safe-b));
+    width: min(260px, calc(100vw - 32px));
+    font-size: 0.88rem;
+    padding: 9px 12px;
+  }
+
+  .modal.feedback {
+    padding: 14px 16px;
+    gap: 8px;
+  }
+
+  .modal.feedback .feedback-intro {
+    display: none;
+  }
+
+  .feedback-text {
+    min-height: 84px;
+    height: 96px;
+  }
+
+  .feedback-thumb img {
+    height: 52px;
+  }
+}

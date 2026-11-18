@@ -50,6 +50,12 @@ Necesita dos secretos en el repositorio (Settings → Secrets and variables → 
 | `CLOUDFLARE_API_TOKEN` | Token de API creado con la plantilla "Edit Cloudflare Workers", limitado a la cuenta y a la zona `onirium.agency`. |
 | `CLOUDFLARE_ACCOUNT_ID` | El Account ID de la cuenta de Cloudflare. |
 
+### Reportes y sugerencias de los jugadores
+
+El botón de abajo a la izquierda (en todas las pantallas) abre un formulario para enviar errores, sugerencias o comentarios con hasta tres capturas. Junto al texto se guarda la versión del juego, la pantalla, el modo, los héroes, el turno y el navegador. Se guardan en un Durable Object (`Reports`, con SQLite) del mismo Worker, así que no hace falta crear nada más en Cloudflare; se conservan los 500 más recientes.
+
+Se leen en <https://games.onirium.agency/reportes> con una clave. La clave es el secreto `REPORTS_KEY` del Worker: Cloudflare → Workers & Pages → `cardcraft-castles` → Settings → Variables and Secrets → Add, tipo *Secret*, nombre `REPORTS_KEY`. Los despliegues no la borran. Sin ella, la página avisa de que falta.
+
 El dominio está en `apps/server/wrangler.jsonc` (`env.production.routes`). Es un dominio personalizado del Worker: Cloudflare crea el registro DNS y el certificado al publicar, y la zona tiene que estar en la misma cuenta. No hace falta ningún túnel.
 
 Para publicar desde tu máquina, con Wrangler ya autenticado (`wrangler login`), usa `pnpm run deploy`. Sin el `run`, `pnpm deploy` es otra orden de pnpm.

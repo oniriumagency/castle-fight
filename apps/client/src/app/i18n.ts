@@ -32,6 +32,40 @@ const STRINGS = {
   cancel: { es: 'Cancelar', en: 'Cancel' },
   version: { es: 'Versión preliminar', en: 'Preview build' },
 
+  // Reports and suggestions (button at the bottom left)
+  feedbackButton: { es: 'Reportar un error o enviar una sugerencia', en: 'Report a bug or send a suggestion' },
+  feedbackHint: {
+    es: 'Gracias por probar Cardcraft: Castles. Pulsa aquí para reportar bugs o enviar sugerencias y comentarios al desarrollador.',
+    en: 'Thanks for trying Cardcraft: Castles. Tap here to report bugs or send suggestions and comments to the developer.',
+  },
+  feedbackTitle: { es: 'Reportes y sugerencias', en: 'Reports and suggestions' },
+  feedbackIntro: {
+    es: 'Cuéntanos qué ha fallado o qué mejorarías. Lo lee directamente el desarrollador.',
+    en: 'Tell us what went wrong or what you would improve. The developer reads it personally.',
+  },
+  feedbackKindBug: { es: 'Error', en: 'Bug' },
+  feedbackKindIdea: { es: 'Sugerencia', en: 'Suggestion' },
+  feedbackKindOther: { es: 'Comentario', en: 'Comment' },
+  feedbackPlaceholder: {
+    es: 'Escribe aquí lo que quieras. Si es un error, cuéntanos qué hacías cuando pasó.',
+    en: 'Write whatever you like. For a bug, tell us what you were doing when it happened.',
+  },
+  feedbackAttach: { es: 'Adjuntar captura', en: 'Attach screenshot' },
+  feedbackAttachHint: { es: 'Hasta {n} imágenes. También puedes pegarlas con Ctrl+V.', en: 'Up to {n} images. You can also paste them with Ctrl+V.' },
+  feedbackRemoveImage: { es: 'Quitar imagen', en: 'Remove image' },
+  feedbackContextNote: {
+    es: 'Se envía también la versión del juego, el modo, tu héroe y tu navegador para ayudar a reproducirlo.',
+    en: 'The game version, mode, your hero and your browser are sent too, to help reproduce it.',
+  },
+  feedbackSend: { es: 'Enviar', en: 'Send' },
+  feedbackSending: { es: 'Enviando…', en: 'Sending…' },
+  feedbackThanks: { es: '¡Gracias! Tu mensaje ha llegado al desarrollador.', en: 'Thank you! Your message reached the developer.' },
+  feedbackEmpty: { es: 'Escribe algo o adjunta una captura.', en: 'Write something or attach a screenshot.' },
+  feedbackTooMany: { es: 'Como mucho {n} imágenes.', en: 'At most {n} images.' },
+  feedbackBadImage: { es: 'Ese archivo no es una imagen que se pueda enviar.', en: 'That file is not an image that can be sent.' },
+  feedbackRateLimited: { es: 'Has enviado muchos mensajes seguidos. Prueba de nuevo en unos minutos.', en: 'You sent many messages in a row. Try again in a few minutes.' },
+  feedbackFailed: { es: 'No se pudo enviar. Revisa tu conexión y vuelve a intentarlo.', en: 'Could not send it. Check your connection and try again.' },
+
   // Lobby
   lobbyTitle: { es: 'Salas abiertas', en: 'Open rooms' },
   lobbyEmpty: { es: 'No hay salas abiertas. Crea una y comparte el enlace.', en: 'No open rooms. Create one and share the link.' },
