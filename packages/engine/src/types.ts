@@ -198,7 +198,7 @@ export type EffectOp =
   | { op: 'destroyEnchantment' }
   /** The opponent's hand is revealed until your next turn. */
   | { op: 'revealHand' }
-  /** Until your next turn, piercing damage against you is treated as normal. */
+  /** The next piercing attack against you is treated as normal damage. */
   | { op: 'drawbridge' }
   /** Look at the opponent's hand and discard one card of your choice. */
   | { op: 'peekAndDiscard' }
@@ -326,7 +326,7 @@ export interface PlayerState {
   frost: ResourceMap;
   /** Shield charges. */
   shield: number;
-  /** Piercing damage against this player is treated as normal until their next turn. */
+  /** The next piercing attack against this player is treated as normal damage. */
   drawbridge: boolean;
   /** This player's hand is visible to the opponent until the opponent's next turn. */
   handRevealed: boolean;

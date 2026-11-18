@@ -97,7 +97,7 @@ Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. To
 
 **Turno.** Al empezar el turno, en este orden: el jugador repone la mano hasta 6, terminan los efectos «hasta tu próximo turno», salta el evento de batalla si toca, la Quemadura hace su daño, se activan los encantamientos de inicio de turno y los trabajadores producen. Después el jugador juega una carta pagando su coste o descarta una. Al terminar el turno no se roba: el hueco de la carta jugada sigue ahí durante el turno del rival. Las cartas que un rival te obliga a descartar (Prisión de Hielo, Espía en la Corte...) no se reponen al empezar tu siguiente turno, sino en el de después (`drawShort`).
 
-**Daño.** El daño normal golpea la Muralla y el sobrante pasa al Torreón. El perforante va directo al Torreón. El daño «solo a la Muralla» no pasa al Torreón. Cada golpe se resuelve por separado: Doble Salva son dos golpes y Hueste Imparable también.
+**Daño.** El daño normal golpea la Muralla y el sobrante pasa al Torreón. El perforante va directo al Torreón. El daño «solo a la Muralla» no pasa al Torreón. Puente Levadizo convierte en normal el próximo ataque perforante que reciba su dueño, sin importar cuándo llegue, y entonces se baja (`drawbridgeLowered`); si un Escudo bloquea antes el golpe, el puente sigue alzado. Cada golpe se resuelve por separado: Doble Salva son dos golpes y Hueste Imparable también.
 
 **Ataques.** Son los golpes de cartas y definitivas. Las bonificaciones (Estandarte de Guerra, pasiva del Mariscal) suman a cada golpe; Contrafuertes resta 3 a cada golpe que alcanza la Muralla; un Escudo bloquea un golpe entero. La Quemadura y los eventos no son ataques.
 

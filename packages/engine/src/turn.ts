@@ -149,10 +149,6 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
   delete self.drawShort;
 
   // 1. "Until your next turn" effects.
-  if (self.drawbridge) {
-    self.drawbridge = false;
-    events.push({ type: 'drawbridgeLowered', player });
-  }
   for (let i = 0; i < state.players.length; i++) {
     // Hands this player revealed hide again. (Old saves have no `revealedBy`: 2 players only.)
     const p = state.players[i]!;

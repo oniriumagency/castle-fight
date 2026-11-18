@@ -187,7 +187,7 @@ const STRINGS = {
   frozenTurns: { es: 'Congelado {n} turno(s)', en: 'Frozen for {n} turn(s)' },
   burnTurns: { es: 'Quemadura: {n} turno(s), 2 de daño por turno', en: 'Burn: {n} turn(s), 2 damage per turn' },
   shieldCharges: { es: 'Escudo: bloquea {n} ataque(s)', en: 'Shield: blocks {n} attack(s)' },
-  drawbridgeUp: { es: 'Puente levadizo: el daño perforante cuenta como normal', en: 'Drawbridge: piercing damage counts as normal' },
+  drawbridgeUp: { es: 'Puente levadizo: el próximo ataque perforante cuenta como normal', en: 'Drawbridge: the next piercing attack counts as normal' },
   handVisible: { es: 'Mano revelada', en: 'Hand revealed' },
   turnsLeft: { es: '{n} turno(s)', en: '{n} turn(s)' },
   attacksLeft: { es: '{n} ataque(s)', en: '{n} attack(s)' },
