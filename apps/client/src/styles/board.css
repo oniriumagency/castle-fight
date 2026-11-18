@@ -2040,3 +2040,29 @@
   height: 16px;
   font-size: 0.62rem;
 }
+
+/* A battle event stays in the middle until the player closes it. */
+.event-hold {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  padding: 16px 20px 18px;
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 50% 40%, rgb(30 24 44 / 92%), rgb(12 10 20 / 88%));
+  border: 1px solid rgb(227 182 86 / 35%);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 70%);
+}
+
+.event-hold .card.event-reveal {
+  cursor: pointer;
+}
+
+.event-close {
+  min-width: 140px;
+}
+
+.board.touch .event-hold .card.event-reveal {
+  --w: clamp(150px, 30vh, 240px);
+}

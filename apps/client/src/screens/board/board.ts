@@ -604,6 +604,7 @@ class BoardScreen implements Screen {
   private async snapTo(view: PlayerView, starting: boolean): Promise<void> {
     if (starting) {
       this.resultsShown = false;
+      this.closeEvent = null;
       this.layer.replaceChildren();
       this.curtainFor = null;
       this.logList.replaceChildren();
@@ -1137,22 +1138,48 @@ class BoardScreen implements Screen {
     if (cardId) this.setDiscardTop(cardId);
   }
 
+  /** Dismisses the battle event card left on screen, if any. */
+  private closeEvent: (() => void) | null = null;
+
+  /**
+   * A new battle event: its card appears in the middle and stays there until
+   * the player clicks it or presses Close (or Escape). The game goes on meanwhile.
+   */
   private async showEventReveal(eventId: string): Promise<void> {
+    this.closeEvent?.();
     const card = eventCard(eventId, { className: 'event-reveal' });
-    const box = h('div.event-reveal-box', null, h('div.event-reveal-title', null, L({ es: 'Evento de batalla', en: 'Battle event' })), card);
-    this.stage.appendChild(box);
-    const anim = box.animate(
-      [
-        { transform: 'scale(0.6) rotate(-6deg)', opacity: 0 },
-        { transform: 'scale(1.05) rotate(1deg)', opacity: 1, offset: 0.6 },
-        { transform: 'none', opacity: 1 },
-      ],
-      { duration: 600 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
+    const closeBtn = h('button.btn.event-close', { type: 'button' }, t('close'));
+    const box = h(
+      'div.event-reveal-box.event-hold',
+      { role: 'dialog', 'aria-label': L({ es: 'Evento de batalla', en: 'Battle event' }) },
+      h('div.event-reveal-title', null, L({ es: 'Evento de batalla', en: 'Battle event' })),
+      card,
+      closeBtn,
     );
-    await anim.finished.catch(() => undefined);
-    await wait(1500);
-    await box.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.9)' }], { duration: 300 * animScale(), fill: 'forwards' }).finished.catch(() => undefined);
-    box.remove();
+    const close = (): void => {
+      if (this.closeEvent !== close) return;
+      this.closeEvent = null;
+      audio.play('uiBack');
+      box
+        .animate([{ opacity: 1 }, { opacity: 0, transform: 'translate(-50%, -50%) scale(0.9)' }], { duration: 250 * animScale(), fill: 'forwards' })
+        .finished.catch(() => undefined)
+        .then(() => box.remove());
+    };
+    this.closeEvent = close;
+    closeBtn.addEventListener('click', close);
+    card.addEventListener('click', close);
+    this.layer.appendChild(box);
+    await box
+      .animate(
+        [
+          { transform: 'translate(-50%, -50%) scale(0.6) rotate(-6deg)', opacity: 0 },
+          { transform: 'translate(-50%, -50%) scale(1.05) rotate(1deg)', opacity: 1, offset: 0.6 },
+          { transform: 'translate(-50%, -50%)', opacity: 1 },
+        ],
+        { duration: 600 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
+      )
+      .finished.catch(() => undefined);
+    await wait(700);
   }
 
   private async showUltimate(seat: PlayerId, heroId: string): Promise<void> {
@@ -1333,6 +1360,7 @@ class BoardScreen implements Screen {
     if (e.target instanceof HTMLInputElement || document.querySelector('.modal-backdrop')) return;
     if (e.key === 'Escape') {
       if (this.closeInspect) this.closeInspect();
+      else if (this.closeEvent) this.closeEvent();
       else this.hand.select(null);
       return;
     }
