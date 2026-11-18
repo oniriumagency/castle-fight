@@ -1530,3 +1530,15 @@
     padding-block: 6px;
   }
 }
+
+/* Keep the "ready" label inside the panel. */
+.side-0 .portrait.ready .ult-label {
+  left: -4px;
+  transform: none;
+}
+
+.side-1 .portrait.ready .ult-label {
+  left: auto;
+  right: -4px;
+  transform: none;
+}

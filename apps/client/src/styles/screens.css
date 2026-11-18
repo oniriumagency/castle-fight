@@ -819,3 +819,17 @@ input.shake {
     padding-block: 6px;
   }
 }
+
+.option-hint {
+  font-family: var(--text);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .option-hint {
+    display: none;
+  }
+}

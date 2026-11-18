@@ -5,7 +5,7 @@ import type { Screen } from '../app/router';
 import { settings } from '../app/settings';
 import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
-import { DIFFICULTIES, type Difficulty } from '../game/ai';
+import { DIFFICULTIES, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_NAMES, type Difficulty } from '../game/ai';
 import { artUrl, iconSvg } from '../ui/assets';
 import { heroCard, heroParts, rulesHtml } from '../ui/card';
 import { heroColor, heroCss } from '../ui/theme';
@@ -116,10 +116,11 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
                   build();
                 },
               },
-              t(level),
+              L(DIFFICULTY_NAMES[level]),
             ),
           ),
         ),
+        h('small.option-hint', null, L(DIFFICULTY_DESCRIPTIONS[difficulty])),
       ),
       h(
         'div.option-row',

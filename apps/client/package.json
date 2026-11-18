@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@cardcraft-castles/ai": "workspace:*",
     "@cardcraft-castles/engine": "workspace:*",
     "@cardcraft-castles/protocol": "workspace:*",
     "@fontsource/cinzel": "^5.3.0",
