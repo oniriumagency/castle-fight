@@ -6,6 +6,7 @@ import {
   isComboActive,
   isConditionMet,
   playBlocker,
+  type HeroId,
   type PlayerId,
   type PlayerView,
   type VisibleCard,
@@ -207,7 +208,7 @@ export class Hand {
     const slot = this.slots.find((s) => s.uid === uid);
     if (!host || !slot?.cardId || this.selected !== null) return;
     this.hidePreview();
-    const big = cardFace(slot.cardId, { calm: true });
+    const big = cardFace(slot.cardId, { calm: true, hero: this.hero() });
     const costEl = slot.el.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     big.classList.add('hover-preview');
@@ -243,8 +244,13 @@ export class Hand {
     this.onSelect(uid);
   }
 
+  /** Hero of the player holding these cards. */
+  private hero(): HeroId | undefined {
+    return this.ctx ? this.ctx.view.players[this.ctx.seat].hero : undefined;
+  }
+
   private makeCard(card: VisibleCard): HTMLElement {
-    const el = card.cardId ? cardFace(card.cardId, { tilt: true, calm: true }) : cardBack();
+    const el = card.cardId ? cardFace(card.cardId, { tilt: true, calm: true, hero: this.hero() }) : cardBack();
     el.classList.add('hand-card');
     el.setAttribute('role', 'listitem');
     el.tabIndex = 0;
