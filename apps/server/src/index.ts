@@ -62,6 +62,9 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
+/** A client error report is cut to this size before it is logged. */
+const MAX_CLIENT_REPORT_BYTES = 8192;
+
 function clientIdOf(value: unknown): string | null {
   return typeof value === 'string' && /^[0-9a-f]{24}$/.test(value) ? value : null;
 }
@@ -105,6 +108,21 @@ export default {
           ip: ipOf(request),
         });
         return fromLobby(result, 201, (room) => ({ room }));
+      }
+
+      if (path === '/api/client-error') {
+        // Problems the game's page reports about itself (script errors, a frozen board),
+        // so they show up in the Worker's logs. Nothing is stored.
+        if (request.method !== 'POST') return fail(405, 'badRequest', 'Method not allowed');
+        const text = (await request.text().catch(() => '')).slice(0, MAX_CLIENT_REPORT_BYTES);
+        let report: unknown = text;
+        try {
+          report = JSON.parse(text);
+        } catch {
+          // Keep the raw text.
+        }
+        console.warn('[client]', JSON.stringify({ report, country: request.headers.get('cf-ipcountry') ?? undefined }));
+        return new Response(null, { status: 204, headers: CORS });
       }
 
       if (path === '/api/quick-join') {
