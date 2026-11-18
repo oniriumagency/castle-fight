@@ -42,6 +42,11 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   ],
   'bastion-ciclopeo': [{ op: 'wall', amount: 37 }],
   'aguja-celeste': [{ op: 'keep', amount: 33 }],
+  'gremios-unidos': [
+    { op: 'gainWorker', worker: 'piedra', amount: 1 },
+    { op: 'gainWorker', worker: 'acero', amount: 1 },
+    { op: 'gainWorker', worker: 'mana', amount: 1 },
+  ],
   'ciudadela-eterna': [{ op: 'keep', amount: 33 }, { op: 'wall', amount: 25 }, { op: 'cleanse' }],
   'escombros-utiles': [
     { op: 'discardOwn', count: 3, upTo: true },
