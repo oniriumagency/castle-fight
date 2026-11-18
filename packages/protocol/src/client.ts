@@ -185,6 +185,17 @@ export class Emitter<Events extends object> {
     return () => void set.delete(listener as (payload: never) => void);
   }
 
+  /** The next `type` event (that passes `test`, if given). */
+  once<K extends keyof Events>(type: K, test: (payload: Events[K]) => boolean = () => true): Promise<Events[K]> {
+    return new Promise((resolve) => {
+      const stop = this.on(type, (payload) => {
+        if (!test(payload)) return;
+        stop();
+        resolve(payload);
+      });
+    });
+  }
+
   protected emit<K extends keyof Events>(type: K, payload: Events[K]): void {
     for (const listener of [...(this.listeners.get(type) ?? [])]) {
       try {
@@ -479,7 +490,7 @@ export type RoomEndReason =
   | 'left'
   /** You called `close()`. */
   | 'closedByClient'
-  /** The room expired or was closed while you were away. */
+  /** Your seat is gone: you were away too long and lost the game, or the room expired. */
   | 'seatLost';
 
 export interface RoomStateUpdate {
@@ -494,8 +505,9 @@ export interface RoomStateUpdate {
 
 export interface RoomEvents {
   status: ConnectionStatus;
-  /** You took (or took back) a seat. */
+  /** You took (or took back) a seat. Comes again after every reconnection. */
   welcome: { seat: PlayerId; room: RoomInfo };
+  /** Room info. `seats[i].reconnectBy` is already on the local clock. */
   room: RoomInfo;
   state: RoomStateUpdate;
   emote: { seat: PlayerId; emote: Emote; mine: boolean };
@@ -659,21 +671,23 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
   protected onMessage(raw: unknown): void {
     const message = raw as RoomServerMessage;
     switch (message.type) {
-      case 'welcome':
+      case 'welcome': {
         this.clockOffset = message.now - Date.now();
+        const room = this.localRoom(message.room);
         this.currentSeat = message.seat;
-        this.currentRoom = message.room;
+        this.currentRoom = room;
         this.platform.storage.setItem(
           this.seatKey(),
           JSON.stringify({ token: message.token, seat: message.seat, at: Date.now() } satisfies StoredSeat),
         );
-        this.emit('welcome', { seat: message.seat, room: message.room });
-        this.emit('room', message.room);
+        this.emit('welcome', { seat: message.seat, room });
+        this.emit('room', room);
         break;
+      }
       case 'room':
         this.clockOffset = message.now - Date.now();
-        this.currentRoom = message.room;
-        this.emit('room', message.room);
+        this.currentRoom = this.localRoom(message.room);
+        this.emit('room', this.currentRoom);
         break;
       case 'state':
         this.clockOffset = message.now - Date.now();
@@ -691,10 +705,14 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
         break;
       case 'error':
         if (message.code === 'badToken') {
-          // The seat expired or the room was recreated: take a new seat if we were asked to.
+          // The stored seat is gone. While the room still waits for players we can take a new
+          // one; once a game has started (and was lost by forfeit) there is nothing to go back to.
           this.forgetSeat();
-          if (this.join) this.send({ type: 'join', v: PROTOCOL_VERSION, ...this.join });
-          else this.end('seatLost', message.message);
+          if (this.join && this.currentRoom?.status === 'waiting') {
+            this.send({ type: 'join', v: PROTOCOL_VERSION, ...this.join });
+          } else {
+            this.end('seatLost', message.message);
+          }
           return;
         }
         this.emit('error', { code: message.code, message: message.message });
@@ -706,6 +724,13 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
 
   private send(message: RoomClientMessage): boolean {
     return this.sendRaw(JSON.stringify(message));
+  }
+
+  /** Server times in the room info, moved to the local clock. */
+  private localRoom(room: RoomInfo): RoomInfo {
+    const seat = (s: RoomInfo['seats'][number]): RoomInfo['seats'][number] =>
+      s && s.reconnectBy !== null ? { ...s, reconnectBy: s.reconnectBy - this.clockOffset } : s;
+    return { ...room, seats: [seat(room.seats[0]), seat(room.seats[1])] };
   }
 
   private seatKey(): string {

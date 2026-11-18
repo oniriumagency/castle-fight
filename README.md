@@ -10,9 +10,9 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | `design/art-prompts.md` | Prompts de las 72 ilustraciones. |
 | `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`), con el nombre de archivo indicado en cada prompt. |
 | `packages/engine` | Motor de reglas puro y determinista, sin dependencias. Lo usan el servidor, el cliente, la IA y las simulaciones. [Documentación](packages/engine/README.md). |
-| `packages/protocol` | Tipos de los mensajes entre cliente y servidor. |
+| `packages/protocol` | Mensajes entre cliente y servidor y el SDK de cliente tipado (`@cardcraft-castles/protocol/client`) con lobby, salas, reconexión y reloj. [Documentación](packages/protocol/README.md). |
 | `apps/client` | Cliente web (Vite + PixiJS). Por ahora es un esqueleto que juega una partida local con el motor. |
-| `apps/server` | Servidor autoritativo en Cloudflare Workers: un Durable Object para el lobby y uno por sala. Por ahora es un esqueleto que ya juega partidas completas por WebSocket. |
+| `apps/server` | Servidor autoritativo en Cloudflare Workers (plan gratuito): un Durable Object para el lobby en vivo y uno por sala, con reloj de turno, reconexión, revancha, partida rápida, salas privadas por enlace y límites contra abusos. [Documentación](apps/server/README.md). |
 
 ## Puesta en marcha
 
@@ -20,7 +20,7 @@ Hace falta Node 22 o posterior y pnpm 10.
 
 ```sh
 pnpm install
-pnpm test          # tests del motor (uno por carta, héroe y evento)
+pnpm test          # tests del motor (uno por carta, héroe y evento) y del servidor (unitarios y extremo a extremo)
 pnpm typecheck
 pnpm build         # compila el cliente y empaqueta el servidor
 pnpm sim           # 1000 partidas aleatorias con un resumen de equilibrio
@@ -31,12 +31,12 @@ Para desarrollar:
 ```sh
 pnpm dev:server    # Worker local en http://localhost:8787
 pnpm dev:client    # cliente en http://localhost:5173 (redirige /api al Worker)
-pnpm --filter @cardcraft-castles/server smoke   # dos bots juegan una partida contra el Worker local
+pnpm --filter @cardcraft-castles/server smoke   # dos bots se emparejan y juegan una partida contra el Worker local
 ```
 
 ## Cómo encajan las piezas
 
-El cliente nunca decide el resultado de una jugada. Envía la intención (`play`, `discard`, `ultimate`, `choose`), el servidor la aplica con `applyAction` del motor y devuelve a cada jugador su propia vista (`getPlayerView`) junto con la lista de lo que ha pasado (`redactEvents`) para animarlo. La mano y el mazo de cada jugador solo viajan a su dueño.
+El cliente nunca decide el resultado de una jugada. Envía la intención (`play`, `discard`, `ultimate`, `choose`), el servidor la aplica con `applyAction` del motor y devuelve a cada jugador su propia vista (`getPlayerView`) junto con la lista de lo que ha pasado (`redactEvents`) para animarlo. La mano y el mazo de cada jugador solo viajan a su dueño. La interfaz habla con el servidor a través del SDK de `@cardcraft-castles/protocol/client`, que se encarga de reconectar y recuperar el asiento.
 
 Las cartas se definen en dos sitios: nombre, texto, coste, escuela y rareza en `design/cards.json`, y la mecánica en `packages/engine/src/data/cardEffects.ts`, con el mismo id. El motor no arranca si falta alguna en cualquiera de los dos lados, y los tests fallan si una carta no tiene su test.
 

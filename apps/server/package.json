@@ -8,8 +8,9 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "build": "wrangler deploy --dry-run --outdir dist",
-    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json",
-    "smoke": "tsx scripts/smoke.ts"
+    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json && tsc -p test/tsconfig.json",
+    "smoke": "tsx scripts/smoke.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@cardcraft-castles/engine": "workspace:*",
@@ -20,6 +21,7 @@
     "@types/node": "^22.0.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
     "wrangler": "^4.164.0"
   }
 }
