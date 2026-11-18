@@ -39,6 +39,8 @@ export interface Rules {
   resourceStart: number;
   /** Starting number of each worker. */
   workerStart: number;
+  /** Extra Wall for the player who moves second, to make up for the lost tempo. */
+  secondPlayerWall: number;
   /** Cards in hand; the hand refills to this size at the end of your turn. */
   handSize: number;
   /** Turn clock for online play. The engine has no clock: see the `timeout` action. */

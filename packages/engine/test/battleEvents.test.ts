@@ -17,7 +17,7 @@ const EVENT_TESTS: Record<string, () => void> = {
   tormenta: () => {
     const { state } = fire('tormenta', { you: { wall: 3 } });
     expect(state.players[ME].wall).toBe(0);
-    expect(state.players[OPP].wall).toBe(5);
+    expect(state.players[OPP].wall).toBe(7);
   },
   mercado: () => {
     const { state } = fire('mercado');
@@ -46,7 +46,7 @@ const EVENT_TESTS: Record<string, () => void> = {
     const { state } = fire('terremoto', { you: { keep: 3 } });
     // Events never kill: the Keep stops at 1.
     expect(state.players[ME].keep).toBe(1);
-    expect(state.players[OPP].keep).toBe(26);
+    expect(state.players[OPP].keep).toBe(43);
     expect(state.result).toBeNull();
   },
   cosecha: () => {
@@ -100,7 +100,7 @@ describe('battle events', () => {
 
   it('losses from events do not charge the ultimate and ignore Shield', () => {
     const { state } = fire('tormenta', { you: { shield: 1 } });
-    expect(state.players[ME].wall).toBe(5);
+    expect(state.players[ME].wall).toBe(7);
     expect(state.players[ME].shield).toBe(1);
     expect(state.players[ME].ultimateCharge).toBe(0);
   });

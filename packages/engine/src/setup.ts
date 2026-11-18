@@ -76,6 +76,8 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
   state.players = [createPlayer(state, options.heroes[0]), createPlayer(state, options.heroes[1])];
   state.upcomingEvent.id = rollBattleEvent(state, null);
   const firstPlayer = options.firstPlayer ?? (randomInt(state, 2) as PlayerId);
+  // Moving second costs a tempo; a slightly taller Wall makes up for it.
+  state.players[firstPlayer === 0 ? 1 : 0].wall += rules.secondPlayerWall;
 
   const events: GameEvent[] = [
     { type: 'gameStarted', firstPlayer, heroes: [options.heroes[0], options.heroes[1]] },

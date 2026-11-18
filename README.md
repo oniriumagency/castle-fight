@@ -10,6 +10,7 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | `design/art-prompts.md` | Prompts de las 72 ilustraciones. |
 | `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`), con el nombre de archivo indicado en cada prompt. |
 | `packages/engine` | Motor de reglas puro y determinista, sin dependencias. Lo usan el servidor, el cliente, la IA y las simulaciones. [Documentación](packages/engine/README.md). |
+| `packages/ai` | IA rival con tres dificultades, que corre en el navegador sin servidor, y simulaciones de equilibrio IA contra IA. [Documentación](packages/ai/README.md). |
 | `packages/protocol` | Mensajes entre cliente y servidor y el SDK de cliente tipado (`@cardcraft-castles/protocol/client`) con lobby, salas, reconexión y reloj. [Documentación](packages/protocol/README.md). |
 | `apps/client` | Cliente web (Vite + PixiJS). Por ahora es un esqueleto que juega una partida local con el motor. |
 | `apps/server` | Servidor autoritativo en Cloudflare Workers (plan gratuito): un Durable Object para el lobby en vivo y uno por sala, con reloj de turno, reconexión, revancha, partida rápida, salas privadas por enlace y límites contra abusos. [Documentación](apps/server/README.md). |
@@ -20,10 +21,12 @@ Hace falta Node 22 o posterior y pnpm 10.
 
 ```sh
 pnpm install
-pnpm test          # tests del motor (uno por carta, héroe y evento) y del servidor (unitarios y extremo a extremo)
+pnpm test          # tests del motor (uno por carta, héroe y evento), de la IA y del servidor (unitarios y extremo a extremo)
 pnpm typecheck
 pnpm build         # compila el cliente y empaqueta el servidor
 pnpm sim           # 1000 partidas aleatorias con un resumen de equilibrio
+pnpm balance       # todos los héroes entre sí, jugados por la IA: héroes, cartas y duración
+pnpm ladder        # cuánto gana cada nivel de la IA al anterior
 ```
 
 Para desarrollar:
