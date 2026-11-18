@@ -492,8 +492,6 @@ export function discardFromHand(
   const [card] = p.hand.splice(index, 1);
   p.discard.push(card!.cardId);
   events.push({ type: 'cardDiscarded', player, uid, cardId: card!.cardId, reason });
-  // A rival made them throw it away: the gap stays through their next turn.
-  if (reason === 'effect' && player !== state.active) p.drawShort = (p.drawShort ?? 0) + 1;
   return true;
 }
 

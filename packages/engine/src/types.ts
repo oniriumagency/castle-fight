@@ -331,12 +331,6 @@ export interface PlayerState {
   drawbridge: boolean;
   /** This player's hand is visible to the opponent until the opponent's next turn. */
   handRevealed: boolean;
-  /**
-   * Cards a rival's effect made this player discard since their last turn: they
-   * draw that many fewer when their next turn starts (the hand only refills on
-   * the turn after). Missing in old saves: 0.
-   */
-  drawShort?: number;
   /** Who revealed it; the hand hides again when that player's next turn starts. */
   revealedBy?: PlayerId;
   /** 3+ players: this castle fell and the player no longer takes turns. */

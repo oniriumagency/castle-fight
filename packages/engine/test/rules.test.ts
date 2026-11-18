@@ -195,15 +195,9 @@ describe('turn flow', () => {
     );
   });
 
-  it('a card a rival makes you discard is not replaced until the turn after your next', () => {
-    let state = playCard(scenario({ hand: ['prision-de-hielo'], keepTurn: false }), 'prision-de-hielo').state;
-    // Their turn starts with the gap still there...
-    expect(state.active).toBe(OPP);
-    expect(state.players[OPP].hand).toHaveLength(5);
-    state = pass(state);
-    expect(state.players[OPP].hand).toHaveLength(4);
-    // ...and their following turn starts with a full hand again.
-    state = pass(state);
+  it('a turn always starts with a full hand, even after a rival made you discard', () => {
+    const state = playCard(scenario({ hand: ['prision-de-hielo'], keepTurn: false }), 'prision-de-hielo').state;
+    // The rival threw one of their cards away during my turn; their turn starts by drawing it back.
     expect(state.active).toBe(OPP);
     expect(state.players[OPP].hand).toHaveLength(6);
   });
