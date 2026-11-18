@@ -43,6 +43,7 @@ const STRINGS = {
   secondsShort: { es: '{n} s', en: '{n}s' },
   secondsLong: { es: '{n} segundos', en: '{n} seconds' },
   noTimeLimit: { es: 'Sin límite', en: 'No limit' },
+  playedHistory: { es: 'Últimas cartas jugadas', en: 'Last cards played' },
   privateRoom: { es: 'Privada (solo con enlace)', en: 'Private (link only)' },
   watchFull: { es: 'Llena', en: 'Full' },
   roomWaiting: { es: 'Esperando rival', en: 'Waiting for opponent' },
@@ -136,6 +137,12 @@ const STRINGS = {
 
   // Choices
   chooseFrost: { es: 'Elige el recurso del rival que se congela', en: "Choose the opponent's resource to freeze" },
+  discardPickTitle: { es: 'Descarta hasta {max} cartas', en: 'Discard up to {max} cards' },
+  discardPickHint: {
+    es: 'Toca las cartas que quieres tirar. Descartar usa tu jugada y al final del turno robas hasta completar la mano.',
+    en: 'Tap the cards you want to throw away. Discarding uses your play, and at the end of the turn you draw back up to a full hand.',
+  },
+  discardN: { es: 'Descartar ({n})', en: 'Discard ({n})' },
   chooseDiscard: { es: 'Elige la carta del rival que se descarta', en: "Choose the opponent's card to discard" },
   chooseEnchantment: { es: 'Elige el encantamiento rival que se destruye', en: 'Choose the enemy enchantment to destroy' },
   opponentChoosing: { es: '{who} está eligiendo…', en: '{who} is choosing…' },
@@ -210,8 +217,8 @@ const STRINGS = {
     en: 'Win by raising your <b>Keep</b> to {win} or bringing your opponent’s down to 0.',
   },
   rulesTurn: {
-    es: 'En tu turno, tus trabajadores producen recursos. Después juegas una carta pagando su coste, o descartas una. Al acabar repones la mano hasta {hand}.',
-    en: 'On your turn your workers produce resources. Then you play one card by paying its cost, or discard one. Afterwards your hand refills to {hand}.',
+    es: 'En tu turno, tus trabajadores producen recursos. Después juegas una carta pagando su coste, o descartas de 1 a 3 cartas. Al acabar repones la mano hasta {hand}.',
+    en: 'On your turn your workers produce resources. Then you play one card by paying its cost, or discard 1 to 3 cards. Afterwards your hand refills to {hand}.',
   },
   rulesSchools: {
     es: 'Cada escuela se paga con su recurso: <b>Construcción</b> con Piedra, <b>Asalto</b> con Acero y <b>Arcano</b> con Maná. Los Canteros, Herreros y Arcanistas producen 1 por turno cada uno.',

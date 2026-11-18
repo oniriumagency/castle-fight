@@ -66,8 +66,14 @@ export function parseActionIntent(raw: unknown): ActionIntent | null {
   if (!isRecord(raw)) return null;
   switch (raw.type) {
     case 'play':
-    case 'discard':
-      return isUid(raw.uid) ? { type: raw.type, uid: raw.uid } : null;
+      return isUid(raw.uid) ? { type: 'play', uid: raw.uid } : null;
+    case 'discard': {
+      if (!isUid(raw.uid)) return null;
+      if (raw.also === undefined) return { type: 'discard', uid: raw.uid };
+      // The engine checks the total against its rules; this only bounds the message.
+      if (!Array.isArray(raw.also) || raw.also.length > 8 || !raw.also.every(isUid)) return null;
+      return { type: 'discard', uid: raw.uid, also: raw.also.slice() };
+    }
     case 'ultimate':
     case 'concede':
       return { type: raw.type };

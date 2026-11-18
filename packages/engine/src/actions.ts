@@ -100,11 +100,19 @@ function validate(state: GameState, action: Action): EngineError | null {
       return isUltimateReady(state, action.player)
         ? null
         : fail('ultimateNotReady', 'The ultimate is not charged yet');
-    case 'play':
-    case 'discard': {
+    case 'play': {
       const card = state.players[action.player].hand.find((c) => c.uid === action.uid);
       if (!card) return fail('cardNotInHand', 'That card is not in your hand');
-      return action.type === 'play' ? playBlocker(state, action.player, card.cardId) : null;
+      return playBlocker(state, action.player, card.cardId);
+    }
+    case 'discard': {
+      const uids = [action.uid, ...(action.also ?? [])];
+      if (uids.length > state.rules.discardMax || new Set(uids).size !== uids.length) {
+        return fail('invalidAction', `Discard between 1 and ${state.rules.discardMax} different cards`);
+      }
+      const hand = state.players[action.player].hand;
+      if (!uids.every((uid) => hand.some((c) => c.uid === uid))) return fail('cardNotInHand', 'That card is not in your hand');
+      return null;
     }
     default:
       return fail('invalidAction', 'Unknown action');
@@ -133,9 +141,10 @@ function playCard(state: GameState, events: GameEvent[], player: PlayerId, uid: 
   runOps(state, events, { player, source: { kind: 'card', id: cardId }, combo }, card.effects);
 }
 
-function discardCard(state: GameState, events: GameEvent[], player: PlayerId, uid: number): void {
+/** The discard action: one to `rules.discardMax` cards. The Saboteur's steal happens once per action. */
+function discardCards(state: GameState, events: GameEvent[], player: PlayerId, uids: number[]): void {
   const self = state.players[player];
-  discardFromHand(state, events, player, uid, 'action');
+  for (const uid of uids) discardFromHand(state, events, player, uid, 'action');
   self.comboSchool = null;
   state.actionsLeft -= 1;
 
@@ -199,7 +208,7 @@ export function applyAction(previous: GameState, action: Action): ActionResult {
       playCard(state, events, action.player, action.uid);
       break;
     case 'discard':
-      discardCard(state, events, action.player, action.uid);
+      discardCards(state, events, action.player, [action.uid, ...(action.also ?? [])]);
       break;
     case 'ultimate':
       useUltimate(state, events, action.player);

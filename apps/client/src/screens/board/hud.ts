@@ -50,11 +50,15 @@ export class SidePanel {
   private readonly ultHint: HTMLElement;
   private readonly ultEffect: HTMLElement;
   private readonly ultMeter: HTMLElement;
+  private readonly history: HTMLElement;
+  private historyKey = '';
   private heroId = '';
   private lastKey = '';
   onUltimate: () => void = () => {};
   onInspect: (cardId: string) => void = () => {};
   onInspectHero: (heroId: string) => void = () => {};
+  /** The mouse is on a card of the history: show it large next to `anchor` (null: hide). */
+  onPreview: (cardId: string | null, anchor?: DOMRect) => void = () => {};
 
   constructor(readonly side: 0 | 1) {
     const ringRadius = 46;
@@ -93,6 +97,8 @@ export class SidePanel {
       else this.onInspectHero(this.heroId);
     });
 
+    this.history = h('div.played-history', { 'aria-label': t('playedHistory') });
+
     this.name = h('strong.player-name');
     this.heroName = h('span.hero-name');
     this.statuses = h('div.statuses');
@@ -127,6 +133,7 @@ export class SidePanel {
       this.statuses,
       this.enchantments,
       this.piles,
+      this.history,
     );
   }
 
@@ -230,6 +237,40 @@ export class SidePanel {
     );
 
     this.piles.innerHTML = `<span title="${L(TERMS.deck)}">${iconSvg('book')} ${p.deckCount}</span>`;
+  }
+
+  /** The last cards this player played, newest first; the newest is shown larger. */
+  setHistory(cardIds: readonly string[]): void {
+    const key = cardIds.join('|');
+    if (key === this.historyKey) return;
+    this.historyKey = key;
+    this.onPreview(null);
+    this.history.replaceChildren(
+      ...cardIds.map((cardId, i) => {
+        const card = getCard(cardId);
+        const el = h(
+          'button.hist-card',
+          {
+            type: 'button',
+            class: `s-${card.school} r-${card.rarity}${i === 0 ? ' newest' : ''}`,
+            title: L(card.name),
+            'aria-label': `${L(card.name)}: ${L(card.text)}`,
+            onclick: () => {
+              this.onPreview(null);
+              this.onInspect(cardId);
+            },
+          },
+          h('img', { src: artUrl(card.art), alt: '', draggable: 'false' }),
+          h('span.hist-cost', null, String(card.cost)),
+        );
+        el.addEventListener('pointerenter', (e) => {
+          if (e.pointerType === 'mouse') this.onPreview(cardId, el.getBoundingClientRect());
+        });
+        el.addEventListener('pointerleave', () => this.onPreview(null));
+        return el;
+      }),
+    );
+    this.history.hidden = cardIds.length === 0;
   }
 
   /** Online presence: a dropped opponent shows a countdown. */

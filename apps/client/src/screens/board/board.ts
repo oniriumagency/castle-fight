@@ -49,6 +49,9 @@ function clonePlayer(p: PlayerPublicState): PlayerPublicState {
   return structuredClone(p);
 }
 
+/** Cards shown in each player's played history. */
+const HISTORY_SIZE = 3;
+
 const wait = (base: number): Promise<void> => new Promise((r) => setTimeout(r, base * animScale()));
 
 export function boardScreen(session: MatchSession): Screen {
@@ -162,6 +165,10 @@ class BoardScreen implements Screen {
       panel.onUltimate = () => this.act({ type: 'ultimate', player: this.view?.viewer ?? 0 });
       panel.onInspect = (cardId) => this.inspectCard(cardId);
       panel.onInspectHero = (heroId) => this.inspectHero(heroId);
+      panel.onPreview = (cardId, anchor) => {
+        if (cardId && anchor) this.showCardPreview(cardId, anchor, panel.side === 0 ? 'right' : 'left');
+        else this.hidePilePreview();
+      };
     }
     this.hand.onSelect = (uid) => this.onSelect(uid);
     this.hand.onPlay = (uid) => this.tryPlay(uid);
@@ -438,6 +445,8 @@ class BoardScreen implements Screen {
   }
 
   private render(): void {
+    // The turn moved on (clock, opponent) while the discard picker was open.
+    if (this.closeDiscard && !this.canAct()) this.closeDiscard();
     const view = this.view;
     if (!view || !this.shown) {
       this.turnLabel.textContent = '';
@@ -455,6 +464,7 @@ class BoardScreen implements Screen {
         mine: this.session.isLocal(seat),
       });
       this.plaques[side].update(p.keep, p.wall);
+      this.panels[side].setHistory(this.shownHistory[seat]);
     }
     fx.auras(
       this.fxContext(),
@@ -534,10 +544,14 @@ class BoardScreen implements Screen {
   private async animate(update: StateUpdate): Promise<void> {
     const events = update.events;
     const starting = events.some((e) => e.type === 'gameStarted');
-    if (starting) this.stats.reset();
+    if (starting) {
+      this.stats.reset();
+      this.history = [[], []];
+    }
     // After a reload the server only sends the current state: pick up the figures saved before it.
     else if (update.resumed) this.loadStats();
     this.stats.add(events);
+    for (const e of events) if (e.type === 'cardPlayed') this.history[e.player] = [e.cardId, ...this.history[e.player]].slice(0, HISTORY_SIZE);
     if (events.length) this.saveStats();
     for (const e of events) {
       const line = describeEvent(e, (seat) => this.name(seat));
@@ -567,6 +581,7 @@ class BoardScreen implements Screen {
     if (!key) return;
     try {
       localStorage.setItem(key, JSON.stringify(this.stats));
+      localStorage.setItem(`${key}:history`, JSON.stringify(this.history));
     } catch {
       // Storage full or blocked: the results just show what this page saw.
     }
@@ -578,6 +593,10 @@ class BoardScreen implements Screen {
     try {
       const raw = localStorage.getItem(key);
       if (raw) this.stats.restore(JSON.parse(raw));
+      const history = JSON.parse(localStorage.getItem(`${key}:history`) ?? 'null') as unknown;
+      if (Array.isArray(history) && history.length === 2 && history.every((h) => Array.isArray(h) && h.every((id) => typeof id === 'string'))) {
+        this.history = [history[0].slice(0, HISTORY_SIZE), history[1].slice(0, HISTORY_SIZE)];
+      }
     } catch {
       // Nothing usable saved.
     }
@@ -587,6 +606,7 @@ class BoardScreen implements Screen {
   private async snapTo(view: PlayerView, starting: boolean): Promise<void> {
     if (starting) {
       this.resultsShown = false;
+      this.closeEvent = null;
       this.layer.replaceChildren();
       this.curtainFor = null;
       this.logList.replaceChildren();
@@ -603,6 +623,12 @@ class BoardScreen implements Screen {
       else if (view.players[view.viewer].discardCount > 0) this.setDiscardTop(null);
     }
     this.view = view;
+    // Resumed with nothing saved: at least the last card each player played.
+    for (const seat of [0, 1] as const) {
+      const last = view.players[seat].lastPlayedCard;
+      if (!starting && this.history[seat].length === 0 && last) this.history[seat] = [last];
+    }
+    this.shownHistory = [this.history[0].slice(), this.history[1].slice()];
     this.shown = [clonePlayer(view.players[0]), clonePlayer(view.players[1])];
     this.shownActive = view.active;
     this.handSeat = view.viewer;
@@ -717,6 +743,7 @@ class BoardScreen implements Screen {
         p.hand = p.hand.filter((c) => c.uid !== e.uid);
         p.lastPlayedCard = e.cardId;
         p.discardCount++;
+        this.shownHistory[e.player] = [e.cardId, ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
         const from = this.takeFromHand(e.player, e.uid);
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
@@ -1033,6 +1060,9 @@ class BoardScreen implements Screen {
   }
 
   private pilePreview: HTMLElement | null = null;
+  /** Last cards each seat played, newest first; `shownHistory` follows the animation. */
+  private history: [string[], string[]] = [[], []];
+  private shownHistory: [string[], string[]] = [[], []];
 
   /** Large copy of the last card played, next to the discard pile, to read what it did. */
   private showPilePreview(): void {
@@ -1046,7 +1076,7 @@ class BoardScreen implements Screen {
    * discard pile, or a revealed card of the rival). Not on touch screens,
    * where a tap opens the inspect view instead.
    */
-  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below'): void {
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right'): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
     const big = cardFace(cardId, { calm: true });
@@ -1054,18 +1084,28 @@ class BoardScreen implements Screen {
     const host = this.layer.getBoundingClientRect();
     const minTop = host.top + 56;
     const handTop = this.hand.el.getBoundingClientRect().top;
-    const roomAbove = anchor.top - minTop - 12;
-    const roomBelow = Math.min(window.innerHeight, handTop + 40) - anchor.bottom - 12;
-    const room = prefer === 'above' ? roomAbove : roomBelow;
-    const w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
-    const hgt = w * 1.4;
-    let left = anchor.left + anchor.width / 2 - w / 2;
-    let top = prefer === 'above' ? anchor.top - hgt - 12 : anchor.bottom + 12;
-    if ((prefer === 'above' && top < minTop) || (prefer === 'below' && top + hgt > window.innerHeight - 8)) {
-      // Not enough room: stand beside the anchor instead.
+    const bottom = Math.min(window.innerHeight, handTop + 40);
+    let w: number;
+    let left: number;
+    let top: number;
+    if (prefer === 'left' || prefer === 'right') {
+      // Beside the anchor, as tall as the space allows, kept on screen.
+      w = Math.round(Math.min(300, Math.max(190, (window.innerHeight - minTop - 16) / 1.4)));
+      const hgt = w * 1.4;
       top = Math.max(minTop, Math.min(anchor.top + anchor.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
-      left = anchor.right + 16;
-      if (left + w > window.innerWidth - 8) left = anchor.left - w - 16;
+      left = prefer === 'right' ? anchor.right + 16 : anchor.left - w - 16;
+    } else {
+      const room = prefer === 'above' ? anchor.top - minTop - 12 : bottom - anchor.bottom - 12;
+      w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
+      const hgt = w * 1.4;
+      left = anchor.left + anchor.width / 2 - w / 2;
+      top = prefer === 'above' ? anchor.top - hgt - 12 : anchor.bottom + 12;
+      if ((prefer === 'above' && top < minTop) || (prefer === 'below' && top + hgt > window.innerHeight - 8)) {
+        // Not enough room: stand beside the anchor instead.
+        top = Math.max(minTop, Math.min(anchor.top + anchor.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
+        left = anchor.right + 16;
+        if (left + w > window.innerWidth - 8) left = anchor.left - w - 16;
+      }
     }
     left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
     big.style.setProperty('--w', `${w}px`);
@@ -1100,22 +1140,48 @@ class BoardScreen implements Screen {
     if (cardId) this.setDiscardTop(cardId);
   }
 
+  /** Dismisses the battle event card left on screen, if any. */
+  private closeEvent: (() => void) | null = null;
+
+  /**
+   * A new battle event: its card appears in the middle and stays there until
+   * the player clicks it or presses Close (or Escape). The game goes on meanwhile.
+   */
   private async showEventReveal(eventId: string): Promise<void> {
+    this.closeEvent?.();
     const card = eventCard(eventId, { className: 'event-reveal' });
-    const box = h('div.event-reveal-box', null, h('div.event-reveal-title', null, L({ es: 'Evento de batalla', en: 'Battle event' })), card);
-    this.stage.appendChild(box);
-    const anim = box.animate(
-      [
-        { transform: 'scale(0.6) rotate(-6deg)', opacity: 0 },
-        { transform: 'scale(1.05) rotate(1deg)', opacity: 1, offset: 0.6 },
-        { transform: 'none', opacity: 1 },
-      ],
-      { duration: 600 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
+    const closeBtn = h('button.btn.event-close', { type: 'button' }, t('close'));
+    const box = h(
+      'div.event-reveal-box.event-hold',
+      { role: 'dialog', 'aria-label': L({ es: 'Evento de batalla', en: 'Battle event' }) },
+      h('div.event-reveal-title', null, L({ es: 'Evento de batalla', en: 'Battle event' })),
+      card,
+      closeBtn,
     );
-    await anim.finished.catch(() => undefined);
-    await wait(1500);
-    await box.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.9)' }], { duration: 300 * animScale(), fill: 'forwards' }).finished.catch(() => undefined);
-    box.remove();
+    const close = (): void => {
+      if (this.closeEvent !== close) return;
+      this.closeEvent = null;
+      audio.play('uiBack');
+      box
+        .animate([{ opacity: 1 }, { opacity: 0, transform: 'translate(-50%, -50%) scale(0.9)' }], { duration: 250 * animScale(), fill: 'forwards' })
+        .finished.catch(() => undefined)
+        .then(() => box.remove());
+    };
+    this.closeEvent = close;
+    closeBtn.addEventListener('click', close);
+    card.addEventListener('click', close);
+    this.layer.appendChild(box);
+    await box
+      .animate(
+        [
+          { transform: 'translate(-50%, -50%) scale(0.6) rotate(-6deg)', opacity: 0 },
+          { transform: 'translate(-50%, -50%) scale(1.05) rotate(1deg)', opacity: 1, offset: 0.6 },
+          { transform: 'translate(-50%, -50%)', opacity: 1 },
+        ],
+        { duration: 600 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
+      )
+      .finished.catch(() => undefined);
+    await wait(700);
   }
 
   private async showUltimate(seat: PlayerId, heroId: string): Promise<void> {
@@ -1224,11 +1290,90 @@ class BoardScreen implements Screen {
     this.act({ type: 'play', player: ctx.seat, uid });
   }
 
+  /** Open the discard picker with `uid` chosen: the player may add more cards, up to the rules' cap. */
   private tryDiscard(uid: number): void {
     const ctx = this.hand.context;
     if (!ctx || !this.canAct()) return;
-    this.act({ type: 'discard', player: ctx.seat, uid });
+    const max = ctx.view.rules.discardMax;
+    const hand = this.handModel.filter((c) => c.cardId !== null);
+    if (max <= 1 || hand.length <= 1) {
+      this.act({ type: 'discard', player: ctx.seat, uid });
+      return;
+    }
+    this.closeDiscard?.();
+    this.closeInspect?.();
+    this.hand.select(null);
+    const picked: number[] = [uid];
+    const confirmBtn = h('button.btn.primary', { type: 'button' });
+    const hint = h('p.discard-hint');
+    const options = hand.map((c) => {
+      const btn = h(
+        'button.choice-option.card-option.discard-option',
+        { type: 'button', 'aria-pressed': 'false' },
+        cardFace(c.cardId!, { calm: true }),
+        h('span.discard-mark', null, html(iconSvg('close'))),
+      );
+      btn.addEventListener('click', () => {
+        const at = picked.indexOf(c.uid);
+        if (at >= 0) picked.splice(at, 1);
+        else if (picked.length < max) picked.push(c.uid);
+        else {
+          audio.play('error');
+          return;
+        }
+        audio.play('cardSelect');
+        refresh();
+      });
+      return { uid: c.uid, btn };
+    });
+    const refresh = (): void => {
+      for (const o of options) {
+        const on = picked.includes(o.uid);
+        o.btn.classList.toggle('picked', on);
+        o.btn.setAttribute('aria-pressed', String(on));
+        o.btn.classList.toggle('locked', !on && picked.length >= max);
+      }
+      confirmBtn.textContent = t('discardN', { n: picked.length });
+      (confirmBtn as HTMLButtonElement).disabled = picked.length === 0;
+      hint.textContent = t('discardPickHint', { max });
+    };
+    const box = h(
+      'div.choice-box.panel.discard-box',
+      null,
+      h('h2', null, t('discardPickTitle', { max })),
+      hint,
+      h('div.choice-options', null, options.map((o) => o.btn)),
+      h(
+        'div.discard-actions',
+        null,
+        h('button.btn', { type: 'button', onclick: () => (audio.play('uiBack'), close()) }, t('cancel')),
+        confirmBtn,
+      ),
+    );
+    const wrap = h('div.choice.discard-picker', null, box);
+    const close = (): void => {
+      if (this.closeDiscard === close) this.closeDiscard = null;
+      wrap.remove();
+    };
+    const confirm = (): void => {
+      if (!picked.length || !this.canAct()) return close();
+      close();
+      const [first, ...also] = picked;
+      this.act(also.length ? { type: 'discard', player: ctx.seat, uid: first!, also } : { type: 'discard', player: ctx.seat, uid: first! });
+    };
+    this.closeDiscard = close;
+    this.discardConfirm = confirm;
+    confirmBtn.addEventListener('click', confirm);
+    wrap.addEventListener('click', (e) => {
+      if (e.target === wrap) close();
+    });
+    refresh();
+    this.layer.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add('in'));
   }
+
+  private closeDiscard: (() => void) | null = null;
+  private discardConfirm: (() => void) | null = null;
 
   private onSelect(uid: number | null): void {
     this.closeInspect?.();
@@ -1294,8 +1439,17 @@ class BoardScreen implements Screen {
 
   private onKey = (e: KeyboardEvent): void => {
     if (e.target instanceof HTMLInputElement || document.querySelector('.modal-backdrop')) return;
+    if (this.closeDiscard) {
+      if (e.key === 'Escape') this.closeDiscard();
+      else if (e.key === 'Enter' || e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        this.discardConfirm?.();
+      }
+      return;
+    }
     if (e.key === 'Escape') {
       if (this.closeInspect) this.closeInspect();
+      else if (this.closeEvent) this.closeEvent();
       else this.hand.select(null);
       return;
     }
