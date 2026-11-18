@@ -7,6 +7,7 @@ import {
   EMOTES,
   LIMITS,
   ROOM_ID_PATTERN,
+  ROOM_SIZES,
   TURN_SECONDS_OPTIONS,
   type ActionIntent,
   type Emote,
@@ -132,6 +133,11 @@ export function parseRoomClientMessage(text: string): RoomClientMessage | null {
 /** The other seat. */
 export function otherSeat(seat: PlayerId): PlayerId {
   return seat === 0 ? 1 : 0;
+}
+
+/** A room size a host may choose (one of `ROOM_SIZES`); 2 for anything else. */
+export function cleanRoomSize(raw: unknown): number {
+  return typeof raw === 'number' && (ROOM_SIZES as readonly number[]).includes(raw) ? raw : 2;
 }
 
 /** A turn length a host may choose (one of `TURN_SECONDS_OPTIONS`), or null. */

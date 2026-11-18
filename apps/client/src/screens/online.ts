@@ -20,11 +20,13 @@ export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
   const session = new OnlineSession(connection);
   let opened = false;
 
-  const offState = connection.on('state', () => {
+  const offState = connection.on('state', ({ view }) => {
     if (opened) return;
     opened = true;
     cleanup();
-    flow.board(session);
+    // Free-for-all rooms play on their own board.
+    if (view.players.length > 2) flow.ffaOnline(session);
+    else flow.board(session);
   });
   const offClosed = connection.on('closed', ({ message }) => {
     if (opened) return;

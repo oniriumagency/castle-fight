@@ -60,7 +60,7 @@ export class FakeHost implements RoomHost<FakeSocket> {
   randomIndex = (n: number): number => (this.counter++ * 7) % n;
 }
 
-export function makeRoom(options: { timings?: Partial<RoomTimings>; private?: boolean } = {}) {
+export function makeRoom(options: { timings?: Partial<RoomTimings>; private?: boolean; size?: number } = {}) {
   const host = new FakeHost();
   const record = newRoomRecord(
     {
@@ -69,6 +69,7 @@ export function makeRoom(options: { timings?: Partial<RoomTimings>; private?: bo
       host: 'Ana',
       private: options.private ?? false,
       timings: { ...DEFAULT_TIMINGS, ...options.timings },
+      ...(options.size ? { size: options.size } : {}),
     },
     host.time,
   );

@@ -9,6 +9,7 @@ import {
   cleanNickname,
   cleanRoomName,
   cleanTurnSeconds,
+  cleanRoomSize,
   isRoomId,
   type ApiErrorCode,
   type HealthResponse,
@@ -99,6 +100,7 @@ export default {
           name: cleanRoomName(body.name) ?? cleanRoomName(`Sala de ${nickname}`)!,
           private: body.private === true,
           turnSeconds: cleanTurnSeconds(body.turnSeconds),
+          size: cleanRoomSize(body.size),
           clientId: clientIdOf(body.clientId),
           ip: ipOf(request),
         });

@@ -742,7 +742,7 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
   private localRoom(room: RoomInfo): RoomInfo {
     const seat = (s: RoomInfo['seats'][number]): RoomInfo['seats'][number] =>
       s && s.reconnectBy !== null ? { ...s, reconnectBy: s.reconnectBy - this.clockOffset } : s;
-    return { ...room, seats: [seat(room.seats[0]), seat(room.seats[1])] };
+    return { ...room, seats: room.seats.map(seat) };
   }
 
   private seatKey(): string {

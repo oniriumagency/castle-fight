@@ -1,4 +1,4 @@
-import { DEFAULT_TIMINGS, TURN_SECONDS_OPTIONS, UNLIMITED_TURN, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
+import { DEFAULT_TIMINGS, ROOM_SIZES, TURN_SECONDS_OPTIONS, UNLIMITED_TURN, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
 import type { LobbyConnection } from '@cardcraft-castles/protocol/client';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
@@ -57,6 +57,28 @@ export function lobbyScreen(): Screen {
   const roomName = h('input', { type: 'text', maxlength: 32, placeholder: t('roomNameDefault', { name: settings.get().nickname || '…' }) });
   const privateToggle = h('input', { type: 'checkbox' });
   let turnSeconds = storedTurnSeconds();
+  let roomSize = 2;
+  const sizePicker = h('div.segmented.size-picker', { role: 'group', 'aria-label': t('roomSize') });
+  const renderSizePicker = (): void => {
+    sizePicker.replaceChildren(
+      ...ROOM_SIZES.map((size) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            'aria-pressed': String(size === roomSize),
+            onclick: () => {
+              audio.play('uiClick');
+              roomSize = size;
+              renderSizePicker();
+            },
+          },
+          size === 2 ? t('sizeDuel') : t('sizeFfa'),
+        ),
+      ),
+    );
+  };
+  renderSizePicker();
   const turnPicker = h('div.segmented.turn-picker', { role: 'group', 'aria-label': t('turnTime') });
   const renderTurnPicker = (): void => {
     turnPicker.replaceChildren(
@@ -126,19 +148,19 @@ export function lobbyScreen(): Screen {
             h('small', null, t('hostedBy', { host: room.host }), ' · ', html(iconSvg('clock')), ' ', turnLabel(room.turnSeconds ?? DEFAULT_TIMINGS.turnSeconds)),
           ),
           h('span.room-status', null, statusText(room.status)),
-          h('span.room-players', null, html(iconSvg('users')), t('players', { n: room.players })),
+          h('span.room-players', null, html(iconSvg('users')), t('players', { n: room.players, max: room.size ?? 2 })),
           h(
             'button.btn.primary',
             {
               type: 'button',
-              disabled: room.status !== 'waiting' || room.players >= 2,
+              disabled: room.status !== 'waiting' || room.players >= (room.size ?? 2),
               onclick: () => {
                 if (!requireNickname(nickname)) return;
                 audio.play('uiClick');
                 flow.heroSelect('online', room.id);
               },
             },
-            room.status === 'waiting' && room.players < 2 ? t('join') : t('watchFull'),
+            room.status === 'waiting' && room.players < (room.size ?? 2) ? t('join') : t('watchFull'),
           ),
         ),
       ),
@@ -190,6 +212,7 @@ export function lobbyScreen(): Screen {
         name: roomName.value.trim() || undefined,
         private: privateToggle.checked,
         turnSeconds,
+        size: roomSize,
       });
       flow.heroSelect('online', room.id);
     } catch (error) {
@@ -239,6 +262,7 @@ export function lobbyScreen(): Screen {
         h('button.btn.primary.big', { type: 'button', onclick: () => void quickJoin() }, html(iconSvg('sword')), t('quickJoin')),
         h('div.ornament', null, t('createRoom')),
         h('label.field', null, t('roomName'), roomName),
+        h('div.field', null, h('span', null, t('roomSize')), sizePicker),
         h('div.field', null, h('span', null, t('turnTime')), turnPicker),
         h('label.check', null, privateToggle, h('span', null, t('privateRoom'))),
         h('button.btn.big', { type: 'button', onclick: () => void create() }, t('createRoom')),

@@ -102,7 +102,7 @@ export const CLOSE_CODES = {
   replaced: 4000,
   /** The room was closed (everyone left, or it expired). */
   roomClosed: 4001,
-  /** Both seats are taken and you hold no seat token. */
+  /** Every seat is taken and you hold no seat token. */
   roomFull: 4003,
   /** Too many invalid or too frequent messages. */
   abuse: 4008,
@@ -140,8 +140,10 @@ export interface RoomSummary {
   /** Nickname of the player who created the room. */
   host: string;
   status: RoomStatus;
-  /** Seated players (0 to 2). */
+  /** Seated players (0 to `size`). */
   players: number;
+  /** Seats in the room: 2 for a duel, 3 for free-for-all. Absent from old servers: 2. */
+  size?: number;
   /** Private rooms are only reachable with their link and never listed. */
   private: boolean;
   createdAt: number;
@@ -158,7 +160,12 @@ export interface CreateRoomRequest {
   turnSeconds?: number;
   /** Random id the SDK keeps per browser, so quick join never pairs you with yourself. */
   clientId?: string;
+  /** Seats: 2 (default) or 3 for a free-for-all room. */
+  size?: number;
 }
+
+/** Room sizes a host can pick: a duel or a 3-player free-for-all. */
+export const ROOM_SIZES = [2, 3] as const;
 
 export interface QuickJoinRequest {
   nickname: string;
@@ -299,9 +306,10 @@ export interface RoomInfo {
   name: string;
   private: boolean;
   status: RoomStatus;
-  seats: [SeatInfo | null, SeatInfo | null];
+  /** One entry per seat: 2 in a duel, 3 in a free-for-all room. */
+  seats: (SeatInfo | null)[];
   /** Games won by each seat in this room (rematches add up). */
-  score: [number, number];
+  score: number[];
   /** Games started in this room. */
   games: number;
   ending: GameEnding | null;

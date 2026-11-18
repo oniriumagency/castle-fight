@@ -1393,3 +1393,8 @@ input.shake {
     display: none;
   }
 }
+
+.ffa-clock {
+  font-family: var(--numeral);
+  color: var(--ink);
+}

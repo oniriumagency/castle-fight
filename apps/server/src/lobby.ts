@@ -45,6 +45,8 @@ export interface CreateRoomInput {
   private: boolean;
   /** Seconds per turn chosen by the host; null keeps the server's default. */
   turnSeconds: number | null;
+  /** Seats: 2, or 3 for free-for-all. */
+  size: number;
   clientId: string | null;
   ip: string;
 }
@@ -124,6 +126,7 @@ export class Lobby extends DurableObject<Env> {
         name: cleanRoomName(`Partida rápida de ${input.nickname}`) ?? 'Partida rápida',
         private: false,
         turnSeconds: null,
+        size: 2,
         clientId: input.clientId,
         ip: input.ip,
       },
@@ -213,6 +216,7 @@ export class Lobby extends DurableObject<Env> {
           host: input.nickname,
           private: input.private,
           timings,
+          size: input.size,
         });
         if (!input.private) {
           this.owners.set(id, input.ip);

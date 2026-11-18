@@ -28,11 +28,12 @@ import {
   type PlayerView,
   type Rules,
 } from '@cardcraft-castles/engine';
-import { h } from '../app/dom';
+import { h, toast } from '../app/dom';
 import { L, locale } from '../app/i18n';
 import type { Screen } from '../app/router';
 import { audio } from '../fx/audio';
 import { describeEvent } from '../game/describe';
+import type { OnlineSession } from '../net/online';
 import { cardFace } from '../ui/card';
 import { flow, nickname } from './flow';
 
@@ -81,7 +82,6 @@ const VARIANTS: Variant[] = [
   },
 ];
 
-const ME: PlayerId = 0;
 const AI_DELAY = 750;
 
 function randomHeroes(mine: HeroId): HeroId[] {
@@ -94,8 +94,20 @@ function randomSeed(): string {
   return Array.from(crypto.getRandomValues(new Uint32Array(3))).join('-');
 }
 
-export function ffaScreen(): Screen {
+/**
+ * The free-for-all board. Without a session it is the local prototype (you
+ * against two AIs); with an online session it shows that room's game.
+ */
+export function ffaScreen(session?: OnlineSession): Screen {
   const el = h('div.ffa-screen');
+  const net = session ?? null;
+  /** The seat this device plays. */
+  let ME: PlayerId = net ? net.seat : 0;
+  /** What is on screen: the view of `ME`. */
+  let current: PlayerView | null = null;
+  let deadline: number | null = null;
+  let tickTimer: ReturnType<typeof setInterval> | null = null;
+  let offSession = (): void => {};
   let variant = VARIANTS[0]!;
   let hero: HeroId = HEROES[0]!.id;
   let state: GameState | null = null;
@@ -168,6 +180,7 @@ export function ffaScreen(): Screen {
     const heroes = randomHeroes(hero);
     const created = createGame({ seed: randomSeed(), heroes, rules: variant.rules });
     state = created.state;
+    current = getPlayerView(state, ME);
     names = heroes.map((id, i) =>
       i === ME ? nickname(tx('Tú', 'You')) : `${tx('IA', 'AI')} ${i} · ${L(getHero(id).name)}`,
     );
@@ -179,10 +192,18 @@ export function ffaScreen(): Screen {
     schedule();
   };
 
-  const mover = (s: GameState): PlayerId => s.pending?.player ?? s.active;
+  const mover = (s: { pending: { player: PlayerId } | null; active: PlayerId }): PlayerId => s.pending?.player ?? s.active;
+
+  /** Seat names for an online room: nickname and hero. */
+  const onlineNames = (view: PlayerView): string[] =>
+    view.players.map((p, i) => {
+      const nick = net?.room?.seats[i]?.nickname ?? `${tx('Jugador', 'Player')} ${i + 1}`;
+      return i === ME ? `${nick} (${tx('tú', 'you')})` : `${nick} · ${L(getHero(p.hero).name)}`;
+    });
 
   const record = (events: GameEvent[]): void => {
-    for (const e of redactEvents(events, ME)) {
+    // Local events are redacted here; the server already redacts online ones.
+    for (const e of net ? events : redactEvents(events, ME)) {
       let line: string | null;
       if (e.type === 'playerEliminated') {
         line = tx(`¡Cae el castillo de ${names[e.player]}!`, `${names[e.player]}'s castle falls!`);
@@ -200,10 +221,16 @@ export function ffaScreen(): Screen {
   };
 
   const act = (action: Action): void => {
-    if (!state || closed) return;
+    if (closed) return;
+    if (net) {
+      if (action.type !== 'timeout') net.act(action);
+      return;
+    }
+    if (!state) return;
     const result = applyAction(state, action);
     if (!result.ok) return;
     state = result.state;
+    current = getPlayerView(state, ME);
     record(result.events);
     if (result.events.some((e) => e.type === 'damage' && !e.blocked)) audio.play('uiClick');
     render();
@@ -211,7 +238,7 @@ export function ffaScreen(): Screen {
   };
 
   const schedule = (): void => {
-    if (aiTimer || !state || state.phase === 'finished' || mover(state) === ME) return;
+    if (net || aiTimer || !state || state.phase === 'finished' || mover(state) === ME) return;
     aiTimer = setTimeout(() => {
       aiTimer = null;
       if (closed || !state || state.phase === 'finished' || mover(state) === ME) return;
@@ -234,7 +261,7 @@ export function ffaScreen(): Screen {
 
   const castlePanel = (view: PlayerView, seat: PlayerId): HTMLElement => {
     const p: PlayerPublicState = view.players[seat]!;
-    const s = state!;
+    const s = view;
     const leader = leaderOf(view);
     const targetable = aiming !== null && seat !== ME && !p.eliminated;
     const statuses: string[] = [];
@@ -295,7 +322,13 @@ export function ffaScreen(): Screen {
     needs && choosesTargets(view) && view.players.filter((p, i) => i !== ME && !p.eliminated).length > 1;
 
   const onCard = (view: PlayerView, uid: number, cardId: string): void => {
-    if (!state || mover(state) !== ME || state.phase !== 'action') return;
+    if (mover(view) !== ME) return;
+    // "Discard a card of your own" choices can be answered by tapping the card.
+    if (view.pending?.kind === 'discardOwn' && view.pending.options.includes(String(uid))) {
+      act({ type: 'choose', player: ME, option: String(uid) });
+      return;
+    }
+    if (view.phase !== 'action') return;
     if (discardMode) {
       discardMode = false;
       act({ type: 'discard', player: ME, uid });
@@ -311,7 +344,7 @@ export function ffaScreen(): Screen {
   };
 
   const onUltimate = (view: PlayerView): void => {
-    if (!state || mover(state) !== ME) return;
+    if (mover(view) !== ME) return;
     if (needsAim(view, effectsNeedTarget(getHero(view.players[ME]!.hero).ultimate))) {
       aiming = { kind: 'ultimate' };
       render();
@@ -361,9 +394,9 @@ export function ffaScreen(): Screen {
   };
 
   const render = (): void => {
-    if (!state) return;
-    const view = getPlayerView(state, ME);
-    const myTurn = mover(state) === ME && state.phase !== 'finished';
+    if (!current) return;
+    const view = current;
+    const myTurn = mover(view) === ME && view.phase !== 'finished';
     const me = view.players[ME]!;
 
     const event = getBattleEvent(view.activeEvent?.id ?? view.upcomingEvent.id);
@@ -371,21 +404,21 @@ export function ffaScreen(): Screen {
       ? tx(`Evento en curso: ${L(event.name)} (${view.activeEvent.turnsLeft})`, `Running event: ${L(event.name)} (${view.activeEvent.turnsLeft})`)
       : tx(`Próximo evento en el turno ${view.upcomingEvent.turn}: ${L(event.name)}`, `Next event on turn ${view.upcomingEvent.turn}: ${L(event.name)}`);
 
-    const status = state.result
-      ? state.result.winner === ME
+    const status = view.result
+      ? view.result.winner === ME
         ? tx('¡Has ganado!', 'You win!')
-        : state.result.winner === null
+        : view.result.winner === null
           ? tx('Empate', 'Draw')
-          : tx(`Gana ${names[state.result.winner]}`, `${names[state.result.winner]} wins`)
+          : tx(`Gana ${names[view.result.winner]}`, `${names[view.result.winner]} wins`)
       : me.eliminated
-        ? tx(`Tu castillo ha caído. Turno de ${names[state.active]}…`, `Your castle fell. ${names[state.active]}'s turn…`)
+        ? tx(`Tu castillo ha caído. Turno de ${names[view.active]}…`, `Your castle fell. ${names[view.active]}'s turn…`)
         : aiming
         ? tx('Elige a qué rival apuntas', 'Pick the rival to target')
         : myTurn
           ? discardMode
             ? tx('Toca una carta para descartarla', 'Tap a card to discard it')
             : tx('Tu turno: juega una carta', 'Your turn: play a card')
-          : tx(`Turno de ${names[state.active]}…`, `${names[state.active]}'s turn…`);
+          : tx(`Turno de ${names[view.active]}…`, `${names[view.active]}'s turn…`);
 
     const hand = h(
       'div.ffa-hand',
@@ -396,20 +429,29 @@ export function ffaScreen(): Screen {
         const face = cardFace(c.cardId, {
           cost: effectiveCost(view, ME, c.cardId),
           calm: true,
-          className: myTurn && !discardMode ? (blocked ? 'blocked' : 'playable') : '',
+          className:
+            myTurn && view.phase === 'action' && !discardMode
+              ? blocked
+                ? 'blocked'
+                : 'playable'
+              : view.pending?.kind === 'discardOwn' && view.pending.player === ME && view.pending.options.includes(String(c.uid))
+                ? 'playable'
+                : '',
         });
         face.addEventListener('click', () => onCard(view, c.uid, c.cardId!));
         return face;
       }),
     );
 
-    const controls = state.result
+    const controls = view.result
       ? h(
           'div.ffa-controls',
           null,
-          h('button.btn.primary', { type: 'button', onclick: () => start() }, tx('Otra partida', 'Play again')),
-          h('button.btn', { type: 'button', onclick: () => (state = null, setup()) }, tx('Cambiar regla', 'Change rule')),
-          h('button.btn', { type: 'button', onclick: () => flow.menu() }, tx('Menú', 'Menu')),
+          ...(net ? onlineEndButtons() : [
+            h('button.btn.primary', { type: 'button', onclick: () => start() }, tx('Otra partida', 'Play again')),
+            h('button.btn', { type: 'button', onclick: () => ((state = null), (current = null), setup()) }, tx('Cambiar regla', 'Change rule')),
+            h('button.btn', { type: 'button', onclick: () => flow.menu() }, tx('Menú', 'Menu')),
+          ]),
         )
       : h(
           'div.ffa-controls',
@@ -418,7 +460,7 @@ export function ffaScreen(): Screen {
             'button.btn',
             {
               type: 'button',
-              disabled: !myTurn || state.phase !== 'action',
+              disabled: !myTurn || view.phase !== 'action',
               class: discardMode ? 'primary' : '',
               onclick: () => {
                 discardMode = !discardMode;
@@ -432,7 +474,7 @@ export function ffaScreen(): Screen {
             'button.btn',
             {
               type: 'button',
-              disabled: !myTurn || state.phase !== 'action' || !isUltimateReady(view, ME),
+              disabled: !myTurn || view.phase !== 'action' || !isUltimateReady(view, ME),
               onclick: () => onUltimate(view),
             },
             L(TERMS.ultimate),
@@ -441,14 +483,16 @@ export function ffaScreen(): Screen {
             ? h('button.btn', { type: 'button', onclick: () => ((aiming = null), render()) }, tx('Cancelar', 'Cancel'))
             : null,
           h('button.btn.ghost', { type: 'button', onclick: () => act({ type: 'concede', player: ME }) }, tx('Rendirse', 'Concede')),
+          net ? h('button.btn.ghost', { type: 'button', onclick: () => leaveOnline() }, tx('Salir', 'Leave')) : null,
         );
 
     el.replaceChildren(
-      h('div.ffa-rivals', null, castlePanel(view, 1), castlePanel(view, 2)),
+      // Rivals in turn order after you: the next to play on the left.
+      h('div.ffa-rivals', null, view.players.map((_, k) => (ME + 1 + k) % view.players.length).filter((s) => s !== ME).map((s) => castlePanel(view, s))),
       h(
         'div.ffa-middle',
         null,
-        h('div.ffa-turn', null, h('strong', null, status), h('small', null, `${variant.name()} · ${eventLine}`)),
+        h('div.ffa-turn', null, h('strong', null, status), net ? h('span.ffa-clock', null, clockText()) : null, h('small', null, `${net ? '' : `${variant.name()} · `}${eventLine}`)),
         choicePanel(view),
         h('ol.ffa-log.panel', null, log.slice(-8).map((line) => h('li', null, line))),
       ),
@@ -458,19 +502,102 @@ export function ffaScreen(): Screen {
     );
   };
 
+  // ---------------------------------------------------------------------------
+  // Online
+  // ---------------------------------------------------------------------------
+
+  const clockText = (): string => {
+    if (deadline === null) return tx('Sin límite de tiempo', 'No time limit');
+    const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    return tx(`${left} s de turno`, `${left} s left`);
+  };
+
+  const onlineEndButtons = (): HTMLElement[] => {
+    const room = net!.room;
+    const mine = room?.seats[ME]?.rematch ?? false;
+    const gone = room?.seats.some((seatInfo, i) => i !== ME && (!seatInfo || seatInfo.left)) ?? true;
+    const waiting = room?.seats.filter((seatInfo, i) => i !== ME && seatInfo?.rematch).length ?? 0;
+    return [
+      h(
+        'button.btn.primary',
+        { type: 'button', disabled: mine || gone, onclick: () => (audio.play('uiClick'), net!.rematch()) },
+        gone
+          ? tx('Alguien se ha ido', 'Someone left')
+          : mine
+            ? tx(`Revancha pedida (${waiting + 1}/${room?.seats.length ?? 3})`, `Rematch asked (${waiting + 1}/${room?.seats.length ?? 3})`)
+            : tx(`Revancha (${waiting}/${room?.seats.length ?? 3})`, `Rematch (${waiting}/${room?.seats.length ?? 3})`),
+      ),
+      h('button.btn', { type: 'button', onclick: () => leaveOnline() }, tx('Salir al lobby', 'Back to lobby')),
+    ];
+  };
+
+  const leaveOnline = (): void => {
+    audio.play('uiBack');
+    net?.leave();
+    flow.lobby();
+  };
+
+  const startOnline = (s: OnlineSession): void => {
+    offSession = s.subscribe((event) => {
+      switch (event.type) {
+        case 'state': {
+          const fresh = !current || event.view.seq < current.seq || event.view.turn < current.turn;
+          if (fresh) log = [];
+          ME = event.view.viewer;
+          current = event.view;
+          deadline = event.deadline;
+          names = onlineNames(event.view);
+          record(event.events);
+          aiming = null;
+          if (mover(event.view) !== ME) discardMode = false;
+          render();
+          break;
+        }
+        case 'clock':
+          deadline = event.deadline;
+          break;
+        case 'presence':
+          if (current) {
+            names = onlineNames(current);
+            render();
+          }
+          break;
+        case 'error':
+          toast(event.message, 'warn');
+          break;
+        case 'status':
+          if (event.status === 'closed') {
+            toast(event.message || tx('Se cerró la sala', 'The room closed'), 'warn', 4000);
+            flow.lobby();
+          }
+          break;
+        default:
+          break;
+      }
+    });
+    // Only the clock line changes every second.
+    tickTimer = setInterval(() => {
+      const clock = el.querySelector('.ffa-clock');
+      if (clock) clock.textContent = clockText();
+    }, 1000);
+  };
+
   return {
     el,
     mount() {
       audio.music('menu');
-      setup();
+      if (net) startOnline(net);
+      else setup();
     },
     unmount() {
       closed = true;
+      offSession();
       if (aiTimer) clearTimeout(aiTimer);
+      if (tickTimer) clearInterval(tickTimer);
     },
     relocalize() {
-      if (state) render();
-      else setup();
+      if (current) render();
+      else if (!net) setup();
     },
   };
 }
