@@ -23,13 +23,16 @@ function presenceOf(room: RoomInfo): Presence {
     seats: room.seats.map((s) =>
       s ? { connected: s.connected, reconnectBy: s.reconnectBy, left: s.left, wantsRematch: s.rematch } : null,
     ) as Presence['seats'],
-    score: room.score,
+    // Free-for-all rooms have 3 seats; the duel board only reads the first two.
+    score: room.score as Presence['score'],
   };
 }
 
 function seatsOf(room: RoomInfo | null, fallback: [Seat, Seat]): [Seat, Seat] {
   if (!room) return fallback;
-  return room.seats.map((s, i) => (s ? { nickname: s.nickname, pid: s.pid ?? null, hero: s.hero ?? fallback[i].hero } : fallback[i])) as [Seat, Seat];
+  return room.seats
+    .slice(0, 2)
+    .map((s, i) => (s ? { nickname: s.nickname, pid: s.pid ?? null, hero: s.hero ?? fallback[i]!.hero } : fallback[i]!)) as [Seat, Seat];
 }
 
 /** One online match, wrapping a room connection of the SDK. */
@@ -51,8 +54,8 @@ export class OnlineSession extends BaseSession implements MatchSession {
       c.on('state', ({ view, events, deadline, resumed }) => {
         // Heroes are only known once the game starts; take them from the view.
         this.seats = [
-          { ...this.seats[0], hero: view.players[0].hero },
-          { ...this.seats[1], hero: view.players[1].hero },
+          { ...this.seats[0], hero: view.players[0]!.hero },
+          { ...this.seats[1], hero: view.players[1]!.hero },
         ];
         this.emit({ type: 'state', view, events: resumed ? [] : events, deadline, resumed });
       }),

@@ -137,8 +137,8 @@ export function isConditionMet(state: Board, player: PlayerId, cardId: CardId): 
 /** The decision an op needs, or null when it needs none. */
 function choiceFor(state: GameState, ctx: EffectContext, op: EffectOp): Choice | null {
   // When a card hits every rival at once, rival choices take their default for each one.
-  if (RIVAL_OPS.has(op.op) && hitsAll(state, ctx.player)) return null;
-  const opp = state.players[primaryTarget(state, ctx)]!;
+  if (state.players.length > 2 && RIVAL_OPS.has(op.op) && hitsAll(state, ctx.player)) return null;
+  const opp = state.players[state.players.length === 2 ? other(ctx.player) : primaryTarget(state, ctx)]!;
   switch (op.op) {
     case 'frost': {
       if (op.scope !== 'choice') return null;
@@ -215,8 +215,10 @@ function applyOp(
 ): { ops: EffectOp[]; ctx: EffectContext } | null {
   const me = ctx.player;
   const self = state.players[me]!;
-  const targets = victims(state, ctx);
-  const them = primaryTarget(state, ctx);
+  // Who the op reaches. Duels skip the free-for-all lookups: this runs for every op the AI tries.
+  const duel = state.players.length === 2;
+  const them = duel ? other(me) : primaryTarget(state, ctx);
+  const targets = duel ? [them] : victims(state, ctx);
   const opp = state.players[them]!;
   const reason = ctx.source;
 
@@ -385,7 +387,8 @@ function applyOp(
       for (const target of targets) {
         const t = state.players[target]!;
         t.handRevealed = true;
-        t.revealedBy = me;
+        // Only free-for-all needs to know who revealed it; duels keep the player objects' shape stable (speed).
+        if (!duel) t.revealedBy = me;
         events.push({ type: 'handRevealed', player: target, cards: t.hand.map((c) => ({ ...c })) });
       }
       return null;

@@ -33,7 +33,8 @@ function sameSummary(a: RoomSummary, b: RoomSummary): boolean {
     a.players === b.players &&
     a.private === b.private &&
     a.createdAt === b.createdAt &&
-    a.turnSeconds === b.turnSeconds
+    a.turnSeconds === b.turnSeconds &&
+    a.size === b.size
   );
 }
 
@@ -112,7 +113,8 @@ export class LobbyBook {
   pickOpen(clientId: string | null, now: number): RoomSummary | null {
     let best: LobbyEntry | null = null;
     for (const entry of this.entries.values()) {
-      if (!entry.open || entry.summary.private) continue;
+      // Quick join is for duels; free-for-all rooms are joined from the list.
+      if (!entry.open || entry.summary.private || (entry.summary.size ?? 2) !== 2) continue;
       if (clientId !== null && entry.hostClientId === clientId) continue;
       if ((this.reserved.get(entry.summary.id) ?? 0) > now) continue;
       if (!best || entry.summary.createdAt < best.summary.createdAt) best = entry;

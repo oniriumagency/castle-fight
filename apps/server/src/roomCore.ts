@@ -24,7 +24,6 @@ import {
   CLOSE_CODES,
   PROTOCOL_VERSION,
   cleanNickname,
-  otherSeat,
   parseRoomClientMessage,
   type ActionIntent,
   type Emote,
@@ -85,8 +84,9 @@ export interface RoomRecord {
   private: boolean;
   createdAt: number;
   status: RoomStatus;
-  seats: [SeatRecord | null, SeatRecord | null];
-  score: [number, number];
+  /** One entry per seat: 2 for a duel, 3 for free-for-all. */
+  seats: (SeatRecord | null)[];
+  score: number[];
   games: number;
   game: GameState | null;
   /** The turn the clock is running for and when it runs out. */
@@ -126,16 +126,19 @@ export interface NewRoom {
   host: string;
   private: boolean;
   timings: RoomTimings;
+  /** Seats: 2 (default) or 3 for free-for-all. */
+  size?: number;
 }
 
 export function newRoomRecord(room: NewRoom, now: number): RoomRecord {
+  const { size = 2, ...rest } = room;
   return {
     version: 1,
-    ...room,
+    ...rest,
     createdAt: now,
     status: 'waiting',
-    seats: [null, null],
-    score: [0, 0],
+    seats: Array.from({ length: size }, () => null),
+    score: Array.from({ length: size }, () => 0),
     games: 0,
     game: null,
     clock: null,
@@ -143,8 +146,6 @@ export function newRoomRecord(room: NewRoom, now: number): RoomRecord {
     endedAt: null,
   };
 }
-
-const SEATS: readonly PlayerId[] = [0, 1];
 
 export class RoomCore<S> {
   /** True once the room has closed for good: the host deletes it. */
@@ -251,7 +252,7 @@ export class RoomCore<S> {
     }
 
     // Reconnection windows.
-    for (const seat of SEATS) {
+    for (const seat of this.seatIds()) {
       const record = room.seats[seat];
       if (!record || record.reconnectBy === null || record.reconnectBy > now) continue;
       record.reconnectBy = null;
@@ -319,8 +320,8 @@ export class RoomCore<S> {
       name: room.name,
       private: room.private,
       status: room.status,
-      seats: [seat(0), seat(1)],
-      score: [room.score[0], room.score[1]],
+      seats: this.seatIds().map(seat),
+      score: room.score.slice(),
       games: room.games,
       ending: room.ending,
       timings: room.timings,
@@ -338,6 +339,7 @@ export class RoomCore<S> {
       private: room.private,
       createdAt: room.createdAt,
       turnSeconds: room.timings.turnSeconds,
+      size: room.seats.length,
     };
   }
 
@@ -345,8 +347,9 @@ export class RoomCore<S> {
     const summary = this.summary();
     const open =
       summary.status === 'waiting' &&
-      summary.players === 1 &&
-      SEATS.some((seat) => this.record.seats[seat] !== null && this.isConnected(seat));
+      summary.players >= 1 &&
+      summary.players < this.record.seats.length &&
+      this.seatIds().some((seat) => this.record.seats[seat] !== null && this.isConnected(seat));
     return { summary, open };
   }
 
@@ -379,14 +382,14 @@ export class RoomCore<S> {
     this.dirty = true;
     this.host.setSeat(socket, seat);
     this.welcome(socket, seat);
-    if (room.seats[0] && room.seats[1]) this.startGame();
+    if (room.seats.every((s) => s !== null)) this.startGame();
     else this.broadcastRoom();
   }
 
   private resume(socket: S, version: number, token: string): void {
     if (!this.checkVersion(socket, version)) return;
     const room = this.record;
-    const seat = token.length >= 16 ? SEATS.find((i) => room.seats[i]?.token === token) : undefined;
+    const seat = token.length >= 16 ? this.seatIds().find((i) => room.seats[i]?.token === token) : undefined;
     const record = seat === undefined ? null : room.seats[seat];
     if (seat === undefined || !record || record.left) {
       return this.error(socket, 'badToken', 'That seat is no longer yours');
@@ -433,14 +436,14 @@ export class RoomCore<S> {
     if (seat === null) return this.error(socket, 'notSeated', 'Take a seat first');
     const room = this.record;
     const me = room.seats[seat]!;
-    const them = room.seats[otherSeat(seat)];
-    if (room.status !== 'finished' || !them || them.left) {
+    const others = room.seats.filter((_, i) => i !== seat);
+    if (room.status !== 'finished' || others.some((s) => !s || s.left)) {
       return this.error(socket, 'rematchUnavailable', 'A rematch is not possible now');
     }
     me.rematch = true;
     if (hero !== undefined) me.choice = hero;
     this.dirty = true;
-    if (them.rematch) this.startGame();
+    if (others.every((s) => s!.rematch)) this.startGame();
     else this.broadcastRoom();
   }
 
@@ -497,16 +500,16 @@ export class RoomCore<S> {
   private startGame(): void {
     const room = this.record;
     const now = this.host.now();
-    const seats = room.seats as [SeatRecord, SeatRecord];
-    const heroes = seats.map((s) =>
+    const seats = room.seats as SeatRecord[];
+    const heroes: HeroId[] = seats.map((s) =>
       s.choice === 'random' ? HEROES[this.host.randomIndex(HEROES.length)]!.id : s.choice,
-    ) as [HeroId, HeroId];
-    // In a rematch the loser starts.
+    );
+    // In a rematch the player after the winner starts (the loser, in a duel).
     const winner = room.ending?.winner ?? null;
     const { state, events } = createGame({
       seed: this.host.randomSeed(),
       heroes,
-      ...(winner === null ? {} : { firstPlayer: otherSeat(winner) }),
+      ...(winner === null ? {} : { firstPlayer: (winner + 1) % seats.length }),
       rules: { turnSeconds: room.timings.turnSeconds },
     });
     seats.forEach((s, i) => {
@@ -592,6 +595,10 @@ export class RoomCore<S> {
     for (const socket of this.host.sockets()) {
       this.host.close(socket, CLOSE_CODES.roomClosed, 'The room was closed');
     }
+  }
+
+  private seatIds(): PlayerId[] {
+    return this.record.seats.map((_, i) => i);
   }
 
   private isConnected(seat: PlayerId): boolean {

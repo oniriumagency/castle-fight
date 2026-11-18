@@ -7,6 +7,7 @@ import { settings } from '../app/settings';
 import type { Difficulty } from '../game/ai';
 import { LocalSession } from '../game/localSession';
 import type { MatchSession } from '../game/session';
+import type { OnlineSession } from '../net/online';
 import { boardScreen } from './board/board';
 import { ffaScreen } from './ffa';
 import { heroSelectScreen, type HeroSelectMode } from './heroSelect';
@@ -81,6 +82,11 @@ export const flow = {
   ffa(): void {
     setRoomInUrl(null);
     show(ffaScreen());
+  },
+
+  /** A free-for-all game in an online room. */
+  ffaOnline(session: OnlineSession): void {
+    show(ffaScreen(session));
   },
 
   /** Back into the unfinished game saved on this device. False when there is none. */
