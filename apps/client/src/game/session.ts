@@ -12,6 +12,8 @@ export interface Seat {
   hero: HeroId;
   /** Shown on the board for AI seats. */
   isAi?: boolean;
+  /** Online: the player's public browser id, for the head-to-head record. */
+  pid?: string | null;
 }
 
 export type SessionKind = 'ai' | 'local' | 'online';
@@ -65,6 +67,8 @@ export interface MatchSession {
    * reload (online games resume mid-match). Null when there is nothing to keep.
    */
   statsKey?(): string | null;
+  /** Online: an id for the current game, unique across rooms, so the win/loss record counts it once. */
+  gameId?(): string | null;
   /** Quick reactions; only present when the session supports them. */
   emote?(emote: string): void;
   leave(): void;

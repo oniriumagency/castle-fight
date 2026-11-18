@@ -2204,6 +2204,99 @@
   line-height: 1.06;
 }
 
+/* ---------- Head-to-head on the results screen ---------- */
+
+.results-h2h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(227 182 86 / 6%);
+}
+
+.results-h2h.nemesis {
+  border-color: rgb(227 107 90 / 70%);
+  background: linear-gradient(90deg, rgb(227 107 90 / 14%), rgb(227 182 86 / 8%));
+  box-shadow: 0 0 18px rgb(227 107 90 / 25%);
+}
+
+.results-h2h .h2h-label {
+  font-family: var(--display);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.results-h2h small {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+
+.h2h-score,
+.record-nemesis-score {
+  font-family: var(--numeral);
+  font-weight: 800;
+  font-size: 1.6rem;
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.h2h-score .win,
+.record-nemesis-score .win {
+  color: var(--ok);
+}
+
+.h2h-score .loss,
+.record-nemesis-score .loss {
+  color: var(--danger);
+}
+
+.h2h-score .sep,
+.record-nemesis-score .sep {
+  color: var(--muted);
+}
+
+.nemesis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e36b5a, #8f2e22);
+  color: #fff2e8;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nemesis-badge svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+@media (max-height: 520px) {
+  .results-h2h {
+    padding: 4px 10px;
+  }
+
+  .results-h2h small {
+    display: none;
+  }
+
+  .h2h-score {
+    font-size: 1.2rem;
+  }
+}
+
 /* The hero's own bonus in the ultimate button (dark background). */
 .ult-btn-effect .hero-buff {
   color: #f59ae0;
