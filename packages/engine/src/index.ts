@@ -31,7 +31,7 @@ export {
   costResource,
   attackBonus,
   enchantmentLife,
-  twilightDeadline,
+  roundOf,
   twilightLevel,
   wallDamageReduction,
   isSchoolBanned,

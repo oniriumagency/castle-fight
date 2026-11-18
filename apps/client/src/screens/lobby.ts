@@ -276,7 +276,7 @@ export function lobbyScreen(): Screen {
             'label.check.twilight-toggle',
             null,
             twilightToggle,
-            h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightTurn }))),
+            h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightRound }))),
           ),
           h(
             'button.help-btn',

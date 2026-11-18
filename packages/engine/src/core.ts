@@ -169,21 +169,19 @@ function spendCharges(
   }
 }
 
-/**
- * Twilight Fury level on the current turn: 0 before it starts (or when the
- * rules turn it off), then 1, 2, 3... rising every `twilightEvery` turns.
- */
-export function twilightLevel(board: { rules: Rules; turn: number }, turn = board.turn): number {
-  const start = board.rules.twilightTurn ?? 0;
-  if (start <= 0 || turn < start) return 0;
-  return 1 + Math.floor((turn - start) / Math.max(1, board.rules.twilightEvery ?? 1));
+/** Current round; saves from before rounds were counted derive it from the turn. */
+export function roundOf(board: { turn: number; round?: number; players: readonly unknown[] }): number {
+  return board.round ?? Math.ceil(board.turn / board.players.length);
 }
 
-/** Turn at whose end the Twilight Fury decides the game, or 0 if there is none. */
-export function twilightDeadline(rules: Rules): number {
-  const start = rules.twilightTurn ?? 0;
-  const turns = rules.twilightTurns ?? 0;
-  return start > 0 && turns > 0 ? start + turns - 1 : 0;
+/**
+ * Twilight Fury level in a round: 0 before it starts (or when the rules turn
+ * it off), then 1, 2, 3... rising every `twilightEvery` rounds.
+ */
+export function twilightLevel(board: { rules: Rules; turn: number; round?: number; players: readonly unknown[] }, round = roundOf(board)): number {
+  const start = board.rules.twilightRound ?? 0;
+  if (start <= 0 || round < start) return 0;
+  return 1 + Math.floor((round - start) / Math.max(1, board.rules.twilightEvery ?? 1));
 }
 
 /** Damage removed from each attack that hits the Wall of `player`. */

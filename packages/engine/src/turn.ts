@@ -11,7 +11,7 @@ import {
   loseStructure,
   nextAlive,
   opponents,
-  twilightDeadline,
+  roundOf,
   twilightLevel,
 } from './core';
 import { runOps } from './effects';
@@ -77,16 +77,31 @@ function fireBattleEvent(state: GameState, events: GameEvent[]): void {
 }
 
 /**
- * Twilight Fury: once a game runs long, every attack hits harder and the
- * Walls crumble a little more each turn, until the deadline decides it.
+ * A new round starts when play comes back round to the first seat (or passes
+ * it, when seats are skipped). Extra turns never start one.
  */
-function twilight(state: GameState, events: GameEvent[], player: PlayerId): void {
+function advanceRound(state: GameState, player: PlayerId, extraTurn: boolean): void {
+  const n = state.players.length;
+  if (state.round === undefined) {
+    // First turn of the game, or a save from before rounds were counted.
+    state.firstSeat = state.turn === 0 ? player : (state.firstSeat ?? 0);
+    state.round = state.turn === 0 ? 0 : roundOf(state);
+  }
+  if (extraTurn && state.round > 0) return;
+  const first = state.firstSeat ?? 0;
+  const pos = (seat: PlayerId): number => (seat - first + n) % n;
+  if (state.round === 0 || pos(player) <= pos(state.active)) state.round += 1;
+}
+
+/**
+ * Twilight Fury: once a game runs long, every attack hits harder and the
+ * Walls crumble a little more each turn, until someone wins.
+ */
+function twilight(state: GameState, events: GameEvent[], player: PlayerId, before: number): void {
   const level = twilightLevel(state);
   if (level === 0) return;
   const rules = state.rules;
-  if ((state.turn - rules.twilightTurn) % Math.max(1, rules.twilightEvery) === 0) {
-    events.push({ type: 'twilightRose', level, deadline: twilightDeadline(rules) });
-  }
+  if (level > before) events.push({ type: 'twilightRose', level });
   // Like a battle event: not an attack, ignores Shield and does not charge the ultimate.
   const reason = { kind: 'twilight' as const, id: 'twilight' };
   loseStructure(state, events, player, 'wall', level * (rules.twilightErosion ?? 0), 0, reason);
@@ -94,7 +109,7 @@ function twilight(state: GameState, events: GameEvent[], player: PlayerId): void
 }
 
 /** The game is decided on points: highest Keep, then Wall, among the castles standing; a tie is a draw. */
-function decideOnPoints(state: GameState, events: GameEvent[], reason: 'turnLimit' | 'twilight'): void {
+function decideOnPoints(state: GameState, events: GameEvent[], reason: 'turnLimit'): void {
   const ranked = alivePlayers(state).sort(
     (x, y) =>
       state.players[y]!.keep - state.players[x]!.keep || state.players[y]!.wall - state.players[x]!.wall,
@@ -117,6 +132,8 @@ function decideOnPoints(state: GameState, events: GameEvent[], reason: 'turnLimi
 export function startTurn(state: GameState, events: GameEvent[], player: PlayerId, extraTurn: boolean): void {
   const self = state.players[player]!;
 
+  const furyBefore = state.turn === 0 ? 0 : twilightLevel(state);
+  advanceRound(state, player, extraTurn);
   state.turn += 1;
   state.active = player;
   state.extraTurn = extraTurn;
@@ -148,7 +165,7 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
 
   // 2. Battle event, then the Twilight Fury.
   if (state.turn >= state.upcomingEvent.turn) fireBattleEvent(state, events);
-  twilight(state, events, player);
+  twilight(state, events, player, furyBefore);
 
   // 3. Burn. It is not an attack: no bonuses, and Shield does not stop it.
   if (self.burn > 0) {
@@ -245,11 +262,6 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
   self.schoolsThisTurn = [];
   events.push({ type: 'turnEnded', player, turn: state.turn });
 
-  const deadline = twilightDeadline(state.rules);
-  if (deadline > 0 && state.turn >= deadline) {
-    decideOnPoints(state, events, 'twilight');
-    return;
-  }
   if (state.rules.turnLimit > 0 && state.turn >= state.rules.turnLimit) {
     decideOnPoints(state, events, 'turnLimit');
     return;

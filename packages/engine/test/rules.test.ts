@@ -373,7 +373,7 @@ describe('enchantments', () => {
 
   it('an enchantment counted in attacks does not wear off with turns', () => {
     let state = playCard(
-      scenario({ hand: ['contrafuertes'], keepTurn: false, rules: { eventEveryTurns: 1000, twilightTurn: 0 } }),
+      scenario({ hand: ['contrafuertes'], keepTurn: false, rules: { eventEveryTurns: 1000, twilightRound: 0 } }),
       'contrafuertes',
     ).state;
     for (let i = 0; i < 8; i++) state = pass(pass(state));

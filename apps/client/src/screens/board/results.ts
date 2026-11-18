@@ -83,8 +83,6 @@ export function showResults(o: ResultsOptions): void {
         return loser !== null ? t('reasonConcede', { who: o.name(loser) }) : '';
       case 'turnLimit':
         return t('reasonTurnLimit');
-      case 'twilight':
-        return t('reasonTwilight');
     }
   })();
 

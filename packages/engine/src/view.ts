@@ -1,5 +1,5 @@
 import { isUltimateReady } from './actions';
-import { ultimateThreshold } from './core';
+import { roundOf, ultimateThreshold } from './core';
 import type {
   GameEvent,
   GameState,
@@ -66,6 +66,8 @@ export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
     rules: state.rules,
     seq: state.seq,
     turn: state.turn,
+    round: roundOf(state),
+    firstSeat: state.firstSeat ?? 0,
     active: state.active,
     phase: state.phase,
     actionsLeft: state.actionsLeft,

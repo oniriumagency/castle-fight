@@ -1,4 +1,4 @@
-import { TERMS, twilightDeadline, twilightLevel, type Rules } from '@cardcraft-castles/engine';
+import { TERMS, roundOf, twilightLevel, type Rules } from '@cardcraft-castles/engine';
 import { h, html } from '../app/dom';
 import { L, t, type StringKey } from '../app/i18n';
 import { modal } from '../app/router';
@@ -8,51 +8,53 @@ import { twilightCard, type CardOptions } from '../ui/card';
 /** Twilight Fury helpers for the interface. Rules from older saves may lack its fields: then it is off. */
 
 export function twilightOn(rules: Rules): boolean {
-  return (rules.twilightTurn ?? 0) > 0;
+  return (rules.twilightRound ?? 0) > 0;
 }
 
 /** Placeholder values for the rule texts. */
-export function twilightValues(rules: Rules): { start: number; step: number; atk: number; build: number; wall: number; keep: number; end: number } {
-  const level = (n: number | undefined): number => n ?? 0;
+export function twilightValues(rules: Rules): { start: number; step: number; atk: number; build: number; wall: number; keep: number; before: number; duelTurn: number } {
+  const n = (v: number | undefined): number => v ?? 0;
+  const start = n(rules.twilightRound);
   return {
-    start: level(rules.twilightTurn),
-    step: level(rules.twilightEvery),
-    atk: level(rules.twilightAttackBonus),
-    build: level(rules.twilightBuildBonus),
-    wall: level(rules.twilightErosion),
-    keep: level(rules.twilightKeepErosion),
-    end: twilightDeadline(rules),
+    start,
+    step: n(rules.twilightEvery),
+    atk: n(rules.twilightAttackBonus),
+    build: n(rules.twilightBuildBonus),
+    wall: n(rules.twilightErosion),
+    keep: n(rules.twilightKeepErosion),
+    before: Math.max(0, start - 1),
+    duelTurn: Math.max(1, start * 2 - 1),
   };
 }
 
-/** Turns before it starts, its level and the turns left, or null when it is off or still far away. */
+type FuryBoard = { rules: Rules; turn: number; round?: number; players: readonly unknown[] };
+
+/** Its level and the rounds until it falls or rises again, or null when it is off or still far away. */
 export interface TwilightStatus {
   level: number;
-  /** Turns until it falls (level 0) or until the game is decided (level 1+; 0 means this is the last turn). */
-  turns: number;
-  /** Turns until the next level. */
+  round: number;
+  /** Rounds until it falls (level 0) or rises again (level 1+). */
   next: number;
 }
 
-export function twilightStatus(board: { rules: Rules; turn: number }, warnAhead = 6): TwilightStatus | null {
+export function twilightStatus(board: FuryBoard, warnAhead = 3): TwilightStatus | null {
   if (!twilightOn(board.rules)) return null;
+  const round = roundOf(board);
   const level = twilightLevel(board);
+  const start = board.rules.twilightRound;
   if (level === 0) {
-    const turns = board.rules.twilightTurn - board.turn;
-    return turns <= warnAhead ? { level, turns, next: turns } : null;
+    const next = start - round;
+    return next <= warnAhead ? { level, round, next } : null;
   }
-  const end = twilightDeadline(board.rules);
   const every = Math.max(1, board.rules.twilightEvery ?? 1);
-  const next = every - ((board.turn - board.rules.twilightTurn) % every);
-  return { level, turns: end > 0 ? Math.max(0, end - board.turn) : -1, next };
+  return { level, round, next: every - ((round - start) % every) };
 }
 
-/** Short line for the chip: when it falls, or its level and how long is left. */
+/** Short line for the chip: the round, when it falls or when it rises next. */
 export function twilightLine(status: TwilightStatus): string {
-  if (status.level === 0) return t('twilightSoon', { n: status.turns });
-  if (status.turns === 0) return t('twilightLast', { level: status.level });
-  if (status.turns < 0) return t('twilightLevel', { level: status.level, n: status.next });
-  return t('twilightNow', { level: status.level, n: status.turns });
+  const values = { level: status.level, round: status.round, n: status.next };
+  if (status.level === 0) return t(status.next <= 1 ? 'twilightSoonNext' : 'twilightSoon', values);
+  return t(status.next <= 1 ? 'twilightLevelNext' : 'twilightLevel', values);
 }
 
 /** The Fury as a card, with this match's numbers. */
