@@ -17,6 +17,11 @@ function play(cardId: string, options: ScenarioOptions = {}): { state: GameState
   return playCard(scenario({ hand: [cardId, 'cimientos'], ...options }), cardId);
 }
 
+/** The uid (as a choice option) of a card in my hand. */
+function uidOf(state: GameState, cardId: string): string {
+  return String(state.players[ME].hand.find((c) => c.cardId === cardId)!.uid);
+}
+
 /** The active player ends the turn by discarding a card. */
 function pass(state: GameState): GameState {
   return discardCard(state).state;
@@ -99,7 +104,8 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[ME].keep).toBe(40);
   },
   'fortaleza-viva': () => {
-    let { state } = play('fortaleza-viva', { keepTurn: false });
+    // No battle event in the way: one landing on turn 9 would change the Keep.
+    let { state } = play('fortaleza-viva', { keepTurn: false, rules: { eventEveryTurns: 1000 } });
     expect(state.players[ME].keep).toBe(50);
     // +5 Keep at the start of each of my next 5 turns, then it expires.
     for (let i = 1; i <= 5; i++) {
@@ -472,6 +478,105 @@ const CARD_TESTS: Record<string, () => void> = {
   'cometa-del-ocaso': () => {
     const target = play('cometa-del-ocaso').state.players[OPP];
     expect([target.wall, target.keep]).toEqual([0, 33]);
+  },
+
+  // ----- Descartes ---------------------------------------------------------
+  'escombros-utiles': () => {
+    let { state } = playCard(scenario({ hand: ['escombros-utiles', 'escaramuza', 'parapeto', 'catapulta'] }), 'escombros-utiles');
+    // Up to three discards, one at a time; stopping early is the default.
+    expect(state.pending!.kind).toBe('discardOwn');
+    expect(state.pending!.options[0]).toBe('done');
+    expect(state.pending!.progress).toEqual({ done: 0, left: 3 });
+    state = choose(state, uidOf(state, 'escaramuza')).state;
+    expect(state.pending!.progress).toEqual({ done: 1, left: 2 });
+    state = choose(state, uidOf(state, 'parapeto')).state;
+    state = choose(state, 'done').state;
+    expect(state.phase).toBe('action');
+    expect(state.players[ME].wall).toBe(23);
+    expect(state.players[ME].hand.map((c) => c.cardId)).toEqual(['catapulta']);
+    expect(state.players[ME].discard).toEqual(expect.arrayContaining(['escaramuza', 'parapeto']));
+    // Discarding nothing builds nothing.
+    const none = choose(playCard(scenario({ hand: ['escombros-utiles', 'escaramuza'] }), 'escombros-utiles').state, 'done');
+    expect(none.state.players[ME].wall).toBe(15);
+    expect(eventsOf(none.events, 'built')).toEqual([]);
+  },
+  'planos-revisados': () => {
+    let { state } = playCard(scenario({ hand: ['planos-revisados', 'escaramuza', 'parapeto'] }), 'planos-revisados');
+    // The discard is mandatory: no "done", the cheapest card is the default.
+    expect(state.pending!.options).toEqual([uidOf(state, 'escaramuza'), uidOf(state, 'parapeto')]);
+    const result = choose(state, uidOf(state, 'escaramuza'));
+    state = result.state;
+    expect(state.players[ME].hand).toHaveLength(3);
+    expect(eventsOf(result.events, 'cardsDrawn')[0]!.cards).toHaveLength(2);
+    expect(state.actionsLeft).toBe(2);
+    expect(state.active).toBe(ME);
+  },
+  'sillares-reciclados': () => {
+    let { state } = playCard(scenario({ hand: ['sillares-reciclados', 'escaramuza', 'parapeto', 'catapulta'] }), 'sillares-reciclados');
+    for (const id of ['escaramuza', 'parapeto', 'catapulta']) state = choose(state, uidOf(state, id)).state;
+    // After the third card the effect stops asking.
+    expect(state.pending).toBeNull();
+    expect(state.players[ME].keep).toBe(62);
+  },
+  'tierra-quemada': () => {
+    let { state, events } = playCard(scenario({ hand: ['tierra-quemada', 'escaramuza', 'parapeto', 'catapulta'] }), 'tierra-quemada');
+    state = choose(state, uidOf(state, 'escaramuza')).state;
+    const result = choose(state, uidOf(state, 'parapeto'));
+    state = choose(result.state, 'done').state;
+    // One hit of 8, not two of 4.
+    expect(state.players[OPP].wall).toBe(7);
+    expect(eventsOf(events, 'damage')).toEqual([]);
+  },
+  'relevo-de-tropas': () => {
+    let { state } = playCard(scenario({ hand: ['relevo-de-tropas', 'escaramuza', 'parapeto'] }), 'relevo-de-tropas');
+    expect(state.players[OPP].wall).toBe(10);
+    state = choose(state, uidOf(state, 'parapeto')).state;
+    expect(state.players[ME].hand.map((c) => c.cardId)).toContain('escaramuza');
+    expect(state.players[ME].hand).toHaveLength(2);
+    expect(state.actionsLeft).toBe(2);
+    // With a single card left the discard needs no choice.
+    const single = play('relevo-de-tropas');
+    expect(single.state.pending).toBeNull();
+    expect(single.state.players[ME].discard).toContain('cimientos');
+  },
+  'todo-o-nada': () => {
+    const { state, events } = playCard(
+      scenario({ hand: ['todo-o-nada', 'escaramuza', 'parapeto', 'catapulta', 'cimientos'], keepTurn: false }),
+      'todo-o-nada',
+    );
+    // Four cards gone with no choice, 24 damage in one hit, and the turn ends.
+    expect(eventsOf(events, 'cardDiscarded')).toHaveLength(4);
+    expect(eventsOf(events, 'choiceRequested')).toEqual([]);
+    const hits = eventsOf(events, 'damage').filter((e) => e.target === OPP);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.wallLoss + hits[0]!.keepLoss).toBe(24);
+    expect(state.active).toBe(OPP);
+    expect(state.players[ME].hand).toHaveLength(6);
+  },
+  'ofrenda-arcana': () => {
+    let { state } = playCard(scenario({ hand: ['ofrenda-arcana', 'escaramuza', 'parapeto', 'catapulta'] }), 'ofrenda-arcana');
+    expect(state.pending!.options).not.toContain('done');
+    state = choose(state, uidOf(state, 'escaramuza')).state;
+    // The second discard is not optional either.
+    expect(state.pending!.options).not.toContain('done');
+    state = choose(state, uidOf(state, 'catapulta')).state;
+    expect(state.phase).toBe('action');
+    expect(state.players[ME].hand).toHaveLength(2);
+    expect(state.players[ME].hand[0]!.cardId).toBe('parapeto');
+    expect(state.actionsLeft).toBe(2);
+    expect(state.players[ME].resources.mana).toBe(49);
+  },
+  'grimorio-en-llamas': () => {
+    let { state } = playCard(scenario({ hand: ['grimorio-en-llamas', 'escaramuza', 'parapeto', 'catapulta'] }), 'grimorio-en-llamas');
+    for (const id of ['escaramuza', 'parapeto', 'catapulta']) state = choose(state, uidOf(state, id)).state;
+    expect(state.players[OPP].wall).toBe(15);
+    expect(state.players[OPP].keep).toBe(38);
+  },
+  'quema-de-pergaminos': () => {
+    const { state } = play('quema-de-pergaminos', { opponentHand: ['escaramuza', 'parapeto', 'catapulta'] });
+    expect(state.players[OPP].hand).toHaveLength(1);
+    expect(state.players[OPP].discard).toHaveLength(2);
+    expect(state.players[OPP].keep).toBe(44);
   },
 };
 

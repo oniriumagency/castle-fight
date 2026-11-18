@@ -132,16 +132,19 @@ function sum(ops: readonly EffectOp[], w: Weights): number {
   return value;
 }
 
+/** Cards a "for each card discarded" effect is worth counting on. */
+const DISCARDS_EXPECTED = 2.5;
+
 function opNominal(op: EffectOp, w: Weights): number {
   switch (op.op) {
     case 'wall':
-      return (op.amount + (op.comboBonus ?? 0) * 0.35) * w.wall * 0.7;
+      return (op.amount + (op.comboBonus ?? 0) * 0.35 + (op.perDiscard ?? 0) * DISCARDS_EXPECTED) * w.wall * 0.7;
     case 'keep':
-      return (op.amount + (op.comboBonus ?? 0) * 0.35) * w.keep * 1.15;
+      return (op.amount + (op.comboBonus ?? 0) * 0.35 + (op.perDiscard ?? 0) * DISCARDS_EXPECTED) * w.keep * 1.15;
     case 'damage': {
       const kind = op.kind ?? 'normal';
       const perPoint = kind === 'piercing' ? 1.2 : kind === 'wallOnly' ? 0.5 : 0.95;
-      const amount = op.amount + (op.comboBonus ?? 0) * 0.35;
+      const amount = op.amount + (op.comboBonus ?? 0) * 0.35 + (op.perDiscard ?? 0) * DISCARDS_EXPECTED;
       return amount * (op.times ?? 1) * perPoint * (op.wallMultiplier ? 1.15 : 1);
     }
     case 'gainResource':
@@ -176,6 +179,11 @@ function opNominal(op: EffectOp, w: Weights): number {
       return 6;
     case 'discardRandom':
       return 5 * op.count;
+    case 'discardOwn':
+      // The hand refills at the end of the turn, so a discard only costs card quality.
+      return op.upTo ? 0 : -(op.count === 'hand' ? 4 : op.count);
+    case 'draw':
+      return op.count;
     case 'swapWalls':
       return 7;
     case 'copyLast':

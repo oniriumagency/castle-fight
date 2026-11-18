@@ -142,6 +142,8 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
     <div class="cost ${costClass}"><span>${cost}</span>${emblemSvg(SCHOOL_EMBLEM[card.school])}</div>
     <div class="gem"></div>
     <div class="holo"></div>`;
+  // Cards whose illustration is not painted yet show a plain school-coloured panel.
+  el.querySelector('.art img')?.addEventListener('error', () => el.classList.add('no-art'), { once: true });
   el.setAttribute('aria-label', `${L(card.name)}. ${cost}. ${L(card.text)}`);
   fitName(el);
   return el;

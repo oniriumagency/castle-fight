@@ -2061,6 +2061,7 @@
 
 .event-close {
   min-width: 140px;
+  order: 1;
 }
 
 .board.touch .event-hold .card.event-reveal {
@@ -2139,9 +2140,20 @@
 
 .discard-actions .btn {
   min-width: 140px;
+  order: 1;
 }
 
 .board.touch .discard-option .card,
 .board.short .discard-option .card {
   --w: clamp(84px, 26vw, 130px);
+}
+
+/* "Done" button of an up-to-N discard: it sits after the cards, on its own line on narrow screens. */
+.choice-done {
+  align-self: center;
+  min-width: 140px;
+  order: 1;
+}
+.kind-discardOwn {
+  align-items: center;
 }

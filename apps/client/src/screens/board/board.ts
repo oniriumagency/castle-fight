@@ -102,6 +102,7 @@ class BoardScreen implements Screen {
   private unsubscribe: () => void = () => {};
   private unsubscribeSettings: () => void = () => {};
   private raf = 0;
+  private backgroundTimer = 0;
   private playedCard: HTMLElement | null = null;
   private closeInspect: (() => void) | null = null;
   private resultsShown = false;
@@ -198,6 +199,12 @@ class BoardScreen implements Screen {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+    // No frames in a background tab: keep the turn clock (and its ticks) going.
+    this.backgroundTimer = window.setInterval(() => {
+      if (!document.hidden) return;
+      this.tickTimer();
+      this.tickPresence();
+    }, 250);
   }
 
   unmount(): void {
@@ -205,6 +212,7 @@ class BoardScreen implements Screen {
     this.unsubscribe();
     this.unsubscribeSettings();
     cancelAnimationFrame(this.raf);
+    window.clearInterval(this.backgroundTimer);
     window.removeEventListener('keydown', this.onKey);
     this.closeInspect?.();
     this.session.leave();
@@ -1484,13 +1492,28 @@ class BoardScreen implements Screen {
     const pending = view.pending;
     if (view.phase !== 'choice' || !pending || pending.player !== view.viewer || !this.session.isLocal(view.viewer)) return;
     if (!pending.options.length) return;
-    const titleKey = pending.kind === 'frostResource' ? 'chooseFrost' : pending.kind === 'discardFromHand' ? 'chooseDiscard' : 'chooseEnchantment';
+    const titles = {
+      frostResource: t('chooseFrost'),
+      discardFromHand: t('chooseDiscard'),
+      destroyEnchantment: t('chooseEnchantment'),
+      discardOwn: pending.options.includes('done')
+        ? t('chooseDiscardOwnUpTo', { n: pending.progress?.left ?? 1 })
+        : t('chooseDiscardOwn', { n: pending.progress?.left ?? 1 }),
+    } satisfies Record<typeof pending.kind, string>;
     const choose = (option: string): void => {
       audio.play('uiClick');
       close();
       this.act({ type: 'choose', player: view.viewer, option });
     };
     const options = pending.options.map((option) => {
+      if (pending.kind === 'discardOwn') {
+        if (option === 'done') {
+          return h('button.btn.primary.choice-done', { type: 'button', onclick: () => choose(option) }, t('discardDone'));
+        }
+        const card = view.players[view.viewer].hand.find((c) => String(c.uid) === option);
+        const face = card?.cardId ? cardFace(card.cardId, { calm: true }) : cardBack();
+        return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, face);
+      }
       if (pending.kind === 'frostResource') {
         const opp = view.players[other(view.viewer)];
         const res = option as (typeof RESOURCES)[number];
@@ -1504,7 +1527,7 @@ class BoardScreen implements Screen {
       }
       return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, cardFace(option, { calm: true }));
     });
-    const box = h('div.choice-box.panel', null, h('h2', null, t(titleKey)), h('div.choice-options', { class: `kind-${pending.kind}` }, options));
+    const box = h('div.choice-box.panel', null, h('h2', null, titles[pending.kind]), h('div.choice-options', { class: `kind-${pending.kind}` }, options));
     const wrap = h('div.choice', null, box);
     this.layer.appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add('in'));

@@ -65,7 +65,6 @@ export class MusicPlayer {
   private current: Deck | null = null;
   private wanted: MusicTrack = null;
   private tension = 0;
-  private hidden = false;
   private unlocked = false;
 
   constructor(
@@ -135,7 +134,7 @@ export class MusicPlayer {
     deck.out.gain.setValueAtTime(0, now);
     deck.out.gain.linearRampToValueAtTime(this.level(), now + info.fadeIn);
     this.current = deck;
-    if (!this.hidden) void deck.el.play().catch(() => undefined);
+    void deck.el.play().catch(() => undefined);
   }
 
   /** 0..1: the battle music swells a little as the end gets close. */
@@ -144,21 +143,10 @@ export class MusicPlayer {
     if (this.current && this.wanted === 'battle') this.ramp(this.current, this.level(), 1.2);
   }
 
-  /** Tab hidden: stop streaming. */
-  hide(): void {
-    this.hidden = true;
-    for (const deck of this.decks) deck.el.pause();
-  }
-
-  /** Tab shown again. */
-  show(): void {
-    this.hidden = false;
-    this.resume();
-  }
-
-  private resume(): void {
+  /** Starts the current track again if the browser paused it (refused autoplay, phone in the background). */
+  resume(): void {
     const deck = this.current;
-    if (deck && !this.hidden && deck.el.paused) void deck.el.play().catch(() => undefined);
+    if (deck && deck.el.paused) void deck.el.play().catch(() => undefined);
   }
 
   private level(): number {

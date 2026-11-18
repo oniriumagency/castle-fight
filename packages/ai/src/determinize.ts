@@ -86,6 +86,8 @@ function isChoiceOp(op: EffectOp, kind: PendingChoiceView['kind']): boolean {
       return op.op === 'peekAndDiscard';
     case 'destroyEnchantment':
       return op.op === 'destroyEnchantment';
+    case 'discardOwn':
+      return op.op === 'discardOwn';
   }
 }
 
@@ -103,13 +105,23 @@ function guessPending(view: PlayerView): PendingChoice | null {
   const effects = getCard(cardId).effects;
   const index = effects.findIndex((op) => isChoiceOp(op, pending.kind));
   if (index < 0) return null;
+  // A multi-card discard parks a copy of its op with the discards still allowed.
+  const progress = pending.progress;
+  const base = effects[index]!;
+  const op = progress && base.op === 'discardOwn' ? { ...base, count: progress.left } : base;
   return {
     player: pending.player,
     kind: pending.kind,
     options: pending.options.slice(),
     ...(pending.revealed ? { revealed: pending.revealed.map((c) => ({ ...c })) } : {}),
-    ctx: { player: pending.player, source: { kind: 'card', id: cardId }, combo: false },
-    op: effects[index]!,
+    ctx: {
+      player: pending.player,
+      source: { kind: 'card', id: cardId },
+      combo: false,
+      ...(progress ? { discarded: progress.done } : {}),
+    },
+    ...(progress ? { progress: { ...progress } } : {}),
+    op,
     rest: effects.slice(index + 1),
   };
 }

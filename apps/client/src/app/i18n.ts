@@ -148,6 +148,9 @@ const STRINGS = {
   discardN: { es: 'Descartar ({n})', en: 'Discard ({n})' },
   chooseDiscard: { es: 'Elige la carta del rival que se descarta', en: "Choose the opponent's card to discard" },
   chooseEnchantment: { es: 'Elige el encantamiento rival que se destruye', en: 'Choose the enemy enchantment to destroy' },
+  chooseDiscardOwn: { es: 'Elige una carta de tu mano para descartar (faltan {n})', en: 'Choose a card from your hand to discard ({n} to go)' },
+  chooseDiscardOwnUpTo: { es: 'Puedes descartar hasta {n} cartas más', en: 'You may discard up to {n} more cards' },
+  discardDone: { es: 'Terminar', en: 'Done' },
   opponentChoosing: { es: '{who} está eligiendo…', en: '{who} is choosing…' },
 
   // Log lines

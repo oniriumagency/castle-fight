@@ -56,6 +56,7 @@ export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
       ...(mine && state.pending.revealed
         ? { revealed: state.pending.revealed.map((c) => ({ ...c })) }
         : {}),
+      ...(state.pending.progress ? { progress: { ...state.pending.progress } } : {}),
     };
   }
   return {
