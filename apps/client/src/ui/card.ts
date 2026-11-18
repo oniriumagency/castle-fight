@@ -279,6 +279,24 @@ export function eventCard(eventId: BattleEventId, opts: CardOptions = {}): HTMLD
   return el;
 }
 
+/**
+ * The Twilight Fury as a card, in the battle event frame. `name` and `text`
+ * come from the interface strings (it is a match rule, not a catalog entry).
+ */
+export function twilightCard(name: string, kind: string, text: string, opts: CardOptions = {}): HTMLDivElement {
+  const el = frame('face s-evento event-card twilight-card', opts);
+  el.innerHTML = `
+    <div class="trim"><div class="body">
+      <div class="art"><img alt="" draggable="false" src="${artUrl('events/ocaso.jpg')}"></div>
+      <div class="type">${escapeHtml(kind)}</div>
+      <div class="rules"><span>${rulesHtml(text)}</span></div>
+    </div></div>
+    <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(name)}</b></div>
+    <div class="holo"></div>`;
+  fitName(el);
+  return el;
+}
+
 const EMBLEM = `<svg class="emblem" viewBox="0 0 120 150" fill="none" stroke="#e3b656" stroke-width="2.5" stroke-linejoin="round"><path d="M60 4l52 71-52 71L8 75z"/><path d="M60 22l38 53-38 53-38-53z" stroke-width="1.2"/><path d="M42 104V62h-5V46h8v6h7v-6h16v6h7v-6h8v16h-5v42z" fill="#e3b656" fill-opacity=".18"/><path d="M54 104V88a6 6 0 0112 0v16"/><path d="M60 46V30l12 5-12 5"/></svg>`;
 
 export function cardBack(opts: CardOptions = {}): HTMLDivElement {

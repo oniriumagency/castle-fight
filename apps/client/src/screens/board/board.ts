@@ -23,7 +23,7 @@ import { battlefield } from '../../app/stage';
 import { audio } from '../../fx/audio';
 import { fx, type FxContext } from '../../fx/director';
 import { describeEvent } from '../../game/describe';
-import { twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
+import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
@@ -176,8 +176,7 @@ class BoardScreen implements Screen {
     this.eventChip.addEventListener('click', () => this.inspectEvent());
     this.twilightChip.addEventListener('click', () => {
       if (!this.view) return;
-      audio.play('uiClick');
-      toast(t('rulesTwilight', twilightValues(this.view.rules)).replace(/<[^>]+>/g, ''), 'info', 9000);
+      openTwilightInfo(this.view.rules, twilightLevel(this.view));
     });
 
     this.el = h(
@@ -843,9 +842,12 @@ class BoardScreen implements Screen {
         break;
       case 'twilightRose': {
         const values = this.view ? twilightValues(this.view.rules) : { atk: 0, wall: 0 };
-        this.showBanner(t('twilightName'), t('twilightRose', { level: e.level, atk: values.atk! * e.level, wall: values.wall! * e.level }));
         if (this.view) this.renderTwilightChip(this.view);
-        await fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
+        const rising = fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
+        // When it falls, its card is shown like a battle event; later levels get a banner.
+        if (e.level === 1 && this.view) await this.revealCard(twilightCardFor(this.view.rules, { className: 'event-reveal' }), `${t('twilightName')} · ${t('twilightTableLevel')} 1`);
+        else this.showBanner(t('twilightName'), t('twilightRose', { level: e.level, atk: values.atk * e.level, wall: values.wall * e.level }));
+        await rising;
         if (this.view?.activeEvent) void ctx.field.setMood(skyFor(this.view.activeEvent.id), 400);
         break;
       }
@@ -1335,13 +1337,18 @@ class BoardScreen implements Screen {
    * A new battle event: its card appears in the middle and stays there until
    * the player clicks it or presses Close (or Escape). The game goes on meanwhile.
    */
-  private async showEventReveal(eventId: string): Promise<void> {
+  private showEventReveal(eventId: string): Promise<void> {
+    const title = L({ es: 'Evento de batalla', en: 'Battle event' });
+    return this.revealCard(eventCard(eventId, { className: 'event-reveal' }), title);
+  }
+
+  /** A big card in the middle of the board (battle events, the Twilight Fury) until clicked away. */
+  private async revealCard(card: HTMLElement, title: string): Promise<void> {
     this.closeEvent?.();
-    const card = eventCard(eventId, { className: 'event-reveal' });
     const box = h(
       'div.event-reveal-box.event-hold',
-      { role: 'dialog', 'aria-modal': 'true', 'aria-label': L({ es: 'Evento de batalla', en: 'Battle event' }) },
-      h('div.event-reveal-title', null, L({ es: 'Evento de batalla', en: 'Battle event' })),
+      { role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+      h('div.event-reveal-title', null, title),
       h('div.x-anchor', null, card, closeX(() => close(), true)),
     );
     // The rest of the screen darkens; a click anywhere outside the card closes it.

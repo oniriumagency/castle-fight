@@ -10,6 +10,7 @@ import { audio } from '../fx/audio';
 import { online } from '../net/online';
 import { iconSvg } from '../ui/assets';
 import { flow } from './flow';
+import { openTwilightInfo } from '../game/twilight';
 
 /** Nickname for online play; asks for one if it is empty. */
 export function requireNickname(input: HTMLInputElement): string | null {
@@ -269,10 +270,24 @@ export function lobbyScreen(): Screen {
         h('div.field', null, h('span', null, t('roomSize')), sizePicker),
         h('div.field', null, h('span', null, t('turnTime')), turnPicker),
         h(
-          'label.check.twilight-toggle',
-          { title: t('twilightToggleHint', { start: DEFAULT_RULES.twilightTurn }) },
-          twilightToggle,
-          h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightTurn }))),
+          'div.twilight-row',
+          null,
+          h(
+            'label.check.twilight-toggle',
+            null,
+            twilightToggle,
+            h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightTurn }))),
+          ),
+          h(
+            'button.help-btn',
+            {
+              type: 'button',
+              'aria-label': t('twilightHelp'),
+              title: t('twilightHelp'),
+              onclick: () => openTwilightInfo(DEFAULT_RULES),
+            },
+            '?',
+          ),
         ),
         h('label.check', null, privateToggle, h('span', null, t('privateRoom'))),
         h('button.btn.big', { type: 'button', onclick: () => void create() }, t('createRoom')),
