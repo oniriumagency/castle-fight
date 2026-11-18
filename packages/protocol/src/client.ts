@@ -229,6 +229,8 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastHeard = 0;
+  /** When the last ping went out still unanswered, or 0. */
+  private pingSentAt = 0;
   private detachWindow: (() => void) | null = null;
   private currentStatus: ConnectionStatus = 'connecting';
   protected stopped = false;
@@ -307,6 +309,7 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
       if (this.socket !== socket) return;
       this.attempts = 0;
       this.lastHeard = Date.now();
+      this.pingSentAt = 0;
       this.startHeartbeat();
       this.setStatus('open');
       this.onOpen();
@@ -370,7 +373,12 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
     this.heartbeatTimer = setInterval(() => {
       const socket = this.socket;
       if (!socket) return;
-      if (Date.now() - this.lastHeard > every * 2) {
+      // Dead only if a ping went unanswered for a whole beat. Comparing with the
+      // last message alone misfired in background tabs, whose timers the browser
+      // slows to about once a minute: the tab dropped a healthy connection and
+      // opened a new one every minute.
+      const now = Date.now();
+      if (this.pingSentAt > this.lastHeard && now - this.pingSentAt > every) {
         // Nothing heard for two beats: the connection is dead even if the browser has not noticed.
         socket.onclose = socket.onmessage = socket.onopen = socket.onerror = null;
         try {
@@ -381,7 +389,7 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
         this.dropped(1006, 'heartbeat');
         return;
       }
-      this.sendRaw(PING);
+      if (this.sendRaw(PING) && this.pingSentAt <= this.lastHeard) this.pingSentAt = now;
     }, every);
   }
 
