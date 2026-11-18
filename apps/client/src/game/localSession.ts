@@ -14,8 +14,9 @@ import { BaseSession, type MatchSession, type Seat, type SessionKind } from './s
 
 export interface LocalOptions {
   kind: Extract<SessionKind, 'ai' | 'local'>;
-  seats: [Seat, Seat];
-  /** For `ai`: seat 1 is the AI. */
+  /** Two seats, or three for a free-for-all against two AIs. */
+  seats: Seat[];
+  /** For `ai`: every seat but 0 is an AI. */
   difficulty?: Difficulty;
 }
 
@@ -23,7 +24,7 @@ export interface LocalOptions {
 interface SavedGame {
   v: 1;
   kind: 'ai' | 'local';
-  seats: [Seat, Seat];
+  seats: Seat[];
   difficulty: Difficulty;
   state: GameState;
   viewer: PlayerId;
@@ -67,12 +68,12 @@ function randomSeed(): string {
 
 /**
  * A game that runs entirely in this browser with the rules engine: against
- * the AI (seat 1) or between two people sharing the device. It plays the
+ * the AI (every seat but 0: one rival, or two in a free-for-all) or between two people sharing the device. It plays the
  * server's role, including the turn clock.
  */
 export class LocalSession extends BaseSession implements MatchSession {
   readonly kind: 'ai' | 'local';
-  readonly seats: [Seat, Seat];
+  readonly seats: Seat[];
   private readonly difficulty: Difficulty;
   private state!: GameState;
   private viewer: PlayerId = 0;
@@ -134,7 +135,7 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.stopTimers();
     this.deadline = null;
     this.clockTurn = -1;
-    const { state, events } = createGame({ seed: randomSeed(), heroes: [this.seats[0].hero, this.seats[1].hero] });
+    const { state, events } = createGame({ seed: randomSeed(), heroes: this.seats.map((s) => s.hero) });
     this.state = state;
     this.publish(events);
   }
@@ -186,7 +187,7 @@ export class LocalSession extends BaseSession implements MatchSession {
   idle(): void {
     if (this.closed || this.state.phase === 'finished') return;
     const mover = this.state.pending?.player ?? this.state.active;
-    if (this.kind === 'ai' && mover === 1) {
+    if (this.kind === 'ai' && mover !== 0) {
       if (this.aiTimer) return;
       const think = 650 + Math.random() * 600;
       const scale = settings.get().animationSpeed === 'fast' ? 0.5 : 1;

@@ -15,8 +15,8 @@ import { audio, type Cue } from './audio';
 
 export interface FxContext {
   field: Battlefield;
-  /** Castle index on screen (0 left, 1 right) for a seat. */
-  side(seat: PlayerId): 0 | 1;
+  /** Castle index on screen for a seat: 0 left (the player), 1 right, 2 middle (free-for-all). */
+  side(seat: PlayerId): number;
   /** Floating text over the scene, in CSS px. */
   float(text: string, x: number, y: number, kind: 'damage' | 'build' | 'blocked' | 'info'): void;
 }
@@ -78,7 +78,9 @@ let currentCard: string | null = null;
 /** Seat of the last ultimate, for its projectile colour. */
 let ultimateHero: HeroId | null = null;
 
-const pan = (ctx: FxContext, seat: PlayerId): number => (ctx.side(seat) === 0 ? -0.55 : 0.55);
+/** Stereo position of each castle on screen: left, right, middle. */
+const SIDE_PAN = [-0.55, 0.55, 0.1];
+const pan = (ctx: FxContext, seat: PlayerId): number => SIDE_PAN[ctx.side(seat)] ?? 0;
 
 function attackStyle(e: Damage): ProjectileStyle | 'lightning' | 'flames' {
   if (e.cause === 'burn') return 'flames';
@@ -268,14 +270,15 @@ export const fx = {
     await grow;
   },
 
-  async wallsSwapped(walls: [number, number], keeps: [number, number], ctx: FxContext): Promise<void> {
+  /** `walls` and `keeps`: every seat's heights after the swap (only the seats in `seats` changed). */
+  async wallsSwapped(walls: number[], keeps: number[], ctx: FxContext, seats: PlayerId[] = walls.map((_, i) => i)): Promise<void> {
     audio.play('wallSwap');
-    for (const seat of [0, 1] as const) {
+    for (const seat of seats) {
       const at = ctx.field.anchor(ctx.side(seat), 'wall');
       ctx.field.burst(at.x, at.y, { count: 26, texture: 'crystal', color: [0xc77dff, 0x7fdcf5], speed: 3, gravity: 0, size: 14, life: 1000 });
       ctx.field.ring(at.x, at.y, 0xc77dff, 140, 800, 0.8);
     }
-    await Promise.all(([0, 1] as const).map((seat) => ctx.field.animateCastle(ctx.side(seat), keeps[seat], walls[seat], ms(800))));
+    await Promise.all(seats.map((seat) => ctx.field.animateCastle(ctx.side(seat), keeps[seat], walls[seat], ms(800))));
   },
 
   async status(kind: 'burn' | 'frost' | 'shield' | 'cleanse', seat: PlayerId, ctx: FxContext, shield = 0): Promise<void> {
@@ -415,7 +418,7 @@ export const fx = {
     audio.duck(0.45, 2000);
     void field.setMood(skyFor(eventId), ms(1600));
     const { width, height } = field.size;
-    const sides = [0, 1] as const;
+    const sides = Array.from({ length: field.castleCount }, (_, i) => i);
     switch (eventId) {
       case 'terremoto':
         for (let i = 0; i < 6; i++) setTimeout(() => field.shake(14), i * 220);
@@ -464,20 +467,22 @@ export const fx = {
     audio.play(secondsLeft <= 3 ? 'tickUrgent' : 'tick');
   },
 
-  gameOver(winnerIsMe: boolean | null, winnerSide: 0 | 1 | null, ctx: FxContext): void {
+  gameOver(winnerIsMe: boolean | null, winnerSide: number | null, ctx: FxContext): void {
     audio.play(winnerIsMe === false ? 'defeat' : 'victory');
     audio.music(winnerIsMe === false ? 'defeat' : 'victory');
     audio.setTension(0);
     const field = ctx.field;
     if (winnerSide === null) return;
-    const loser = (1 - winnerSide) as 0 | 1;
     const top = field.anchor(winnerSide, 'keep');
     const colors = [[0xffd27a, 0xffffff], [0xff6a50, 0xffe0a0], [0x7fd6f2, 0xffffff], [0xb06cff, 0xffd0ff]];
     for (let i = 0; i < 6; i++) {
       setTimeout(() => field.firework(top.x + (Math.random() - 0.5) * 260, top.y - 80 - Math.random() * 120, colors[i % colors.length]), 300 + i * 420);
     }
     field.rays(top.x, top.y, 0xffe7a0, 600, 2600, 0.35);
-    const base = field.anchor(loser, 'base');
-    field.burst(base.x, base.y - 30, { count: 8, texture: 'smoke', color: 0x4a4440, speed: 1.4, angle: -Math.PI / 2, spread: 0.6, gravity: -0.02, size: 60, life: 3200, alpha: 0.4, area: { w: 70, h: 40 } });
+    for (let loser = 0; loser < field.castleCount; loser++) {
+      if (loser === winnerSide) continue;
+      const base = field.anchor(loser, 'base');
+      field.burst(base.x, base.y - 30, { count: 8, texture: 'smoke', color: 0x4a4440, speed: 1.4, angle: -Math.PI / 2, spread: 0.6, gravity: -0.02, size: 60, life: 3200, alpha: 0.4, area: { w: 70, h: 40 } });
+    }
   },
 };

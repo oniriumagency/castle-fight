@@ -2497,3 +2497,188 @@
   display: inline-flex;
   background: rgb(20 16 30 / 92%);
 }
+
+/* ---------- Free-for-all: three castles ---------- */
+
+.rival-column {
+  position: absolute;
+  top: calc(var(--top-h) + var(--safe-t) + 6px);
+  right: max(8px, var(--safe-r));
+  width: var(--side-w);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+
+.board .rival-column .side {
+  position: relative;
+  inset: auto;
+  width: auto;
+}
+
+.board.short .rival-column {
+  top: calc(var(--top-h) + var(--safe-t) + 2px);
+  gap: 4px;
+}
+
+/* The rivals' panels share the right column, so they are compact:
+   the portrait ring shows the ultimate, resources sit in one row, the last cards in a strip. */
+.board.ffa .side-1 .ult-btn,
+.board.ffa .side-1 .piles-mini {
+  display: none;
+}
+
+.board.ffa .side-1 {
+  gap: 6px;
+  padding: 8px;
+}
+
+.board.ffa .side-1 .portrait {
+  width: 52px;
+  height: 52px;
+}
+
+.board.ffa .side-1 .resources {
+  flex-direction: row;
+  gap: 3px;
+}
+
+.board.ffa .side-1 .res-row {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0 2px;
+  padding: 3px 2px 2px;
+}
+
+.board.ffa .side-1 .res-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.board.ffa .side-1 .res-amount {
+  font-size: 1.15rem;
+}
+
+.board.ffa .side-1 .res-meta {
+  flex: 1 0 100%;
+  flex-direction: row;
+  gap: 4px;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+
+.board.ffa .side-1 .played-history {
+  position: static;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.board.ffa .side-1 .hist-card,
+.board.ffa .side-1 .hist-card.newest {
+  width: 44px;
+}
+
+.board.ffa .pile {
+  --w: calc(var(--card-w) * 0.34);
+}
+
+/* A fallen castle's panel greys out. */
+.side.eliminated {
+  filter: grayscale(0.9) brightness(0.7);
+  opacity: 0.75;
+}
+
+.side.eliminated .player-name::after {
+  content: ' ✝';
+}
+
+.board.ffa .opp-hand .card {
+  --w: calc(var(--card-w) * 0.28);
+  margin: 0 calc(var(--card-w) * -0.06);
+}
+
+/* The piles move between your castle and the middle one. */
+.board.ffa .piles {
+  left: 36.5%;
+}
+
+.board.ffa .side-1 .discard-overlay b {
+  display: none;
+}
+
+/* Phones in landscape: the two rival panels must fit above the hand. */
+.board.ffa.short .side-1 {
+  gap: 3px;
+  padding: 4px 6px;
+}
+
+.board.ffa.short .side-1 .portrait {
+  width: 34px;
+  height: 34px;
+}
+
+.board.ffa.short .side-1 .ult-label,
+.board.ffa.short .side-1 .hero-name,
+.board.ffa.short .side-1 .res-meta,
+.board.ffa.short .side-1 .played-history {
+  display: none;
+}
+
+.board.ffa.short .side-1 .res-row {
+  padding: 1px;
+  flex-wrap: nowrap;
+}
+
+.board.ffa.short .side-1 .res-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.board.ffa.short .side-1 .res-amount {
+  font-size: 0.95rem;
+}
+
+.board.ffa.short .side-1 .enchant {
+  width: 30px;
+  height: 22px;
+}
+
+@media (orientation: portrait) {
+  .board.ffa {
+    --side-w: calc(33.3vw - 10px);
+  }
+
+  .board.ffa .rival-column {
+    top: calc(var(--top-h) + var(--safe-t) + 50px);
+    width: calc(var(--side-w) * 2 + 6px);
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .board.ffa .rival-column .side {
+    flex: 1 1 0;
+    top: auto !important;
+  }
+}
+
+/* Results with three players: the label first, then one column per castle. */
+.results-box.multi .results-stats td {
+  width: 20%;
+  text-align: center;
+}
+
+.results-box.multi .results-stats th {
+  text-align: left;
+}
+
+.results-hero.fallen {
+  filter: grayscale(0.8);
+  opacity: 0.7;
+}

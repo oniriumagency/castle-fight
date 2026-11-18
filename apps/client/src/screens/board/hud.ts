@@ -60,7 +60,7 @@ export class SidePanel {
   /** The mouse is on a card of the history: show it large next to `anchor` (null: hide). */
   onPreview: (cardId: string | null, anchor?: DOMRect) => void = () => {};
 
-  constructor(readonly side: 0 | 1) {
+  constructor(readonly side: number) {
     const ringRadius = 46;
     const circumference = 2 * Math.PI * ringRadius;
     this.portrait = h('button.portrait', { type: 'button' }) as HTMLButtonElement;
@@ -125,7 +125,8 @@ export class SidePanel {
 
     this.el = h(
       'section.side',
-      { class: `side-${side}` },
+      // The middle castle's panel (free-for-all) stands in the right column under the other rival's, so it shares its look.
+      { class: side === 2 ? 'side-2 side-1' : `side-${side}` },
       h('div.who', null, this.portrait, h('div.names', null, this.name, this.heroName), this.bubble),
       this.ultBtn,
       this.presence,
@@ -151,6 +152,8 @@ export class SidePanel {
     this.name.textContent = info.nickname;
     this.heroName.textContent = L(getHero(p.hero).name);
     this.el.classList.toggle('active', info.active);
+    // Free-for-all: a fallen castle stays on the board, greyed out.
+    this.el.classList.toggle('eliminated', !!p.eliminated);
 
     // Ultimate ring.
     const c = Number(this.ring.dataset.c);
@@ -310,7 +313,7 @@ export class CastlePlaque {
   private readonly wall: HTMLElement;
   private readonly bar: HTMLElement;
 
-  constructor(side: 0 | 1, private keepWin: number) {
+  constructor(side: number, private keepWin: number) {
     this.keep = h('span.plaque-num');
     this.wall = h('span.plaque-num');
     this.bar = h('span.plaque-bar-fill');

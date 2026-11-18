@@ -43,15 +43,17 @@ export interface SeatPresence {
 }
 
 export interface Presence {
-  seats: [SeatPresence | null, SeatPresence | null];
-  score: [number, number];
+  /** One entry per seat (two in a duel, three in a free-for-all). */
+  seats: (SeatPresence | null)[];
+  score: number[];
 }
 
 export type SessionListener = (event: SessionEvent) => void;
 
 export interface MatchSession {
   readonly kind: SessionKind;
-  readonly seats: [Seat, Seat];
+  /** One per player: two in a duel, three in a free-for-all. */
+  readonly seats: Seat[];
   /** Whether this device plays that seat (both seats on a shared device). */
   isLocal(seat: PlayerId): boolean;
   /** Receives every event. The latest state is replayed right away to a new listener. */
