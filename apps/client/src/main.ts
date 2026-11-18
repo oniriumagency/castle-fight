@@ -19,10 +19,13 @@ import './styles/board.css';
 import { toast } from './app/dom';
 import { t } from './app/i18n';
 import { settings } from './app/settings';
-import { initStage } from './app/stage';
+import { battlefield, initStage } from './app/stage';
+import { audio } from './fx/audio';
+import { fx } from './fx/director';
 import { online, roomIdFromUrl } from './net/online';
 import { flow } from './screens/flow';
 import { joinOnline } from './screens/online';
+import { toggleMute } from './ui/muteButton';
 
 function applyDocumentSettings(): void {
   const s = settings.get();
@@ -34,6 +37,13 @@ async function boot(): Promise<void> {
   applyDocumentSettings();
   settings.subscribe(applyDocumentSettings);
   await initStage();
+  // Development only: drive effects and sounds from the console.
+  if (import.meta.env.DEV) Object.assign(window, { __dev: { fx, audio, field: battlefield() } });
+  // M mutes everywhere, except while typing.
+  window.addEventListener('keydown', (e) => {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'm') toggleMute();
+  });
 
   // Invite link: open the room straight away.
   const roomId = roomIdFromUrl(location.href);
