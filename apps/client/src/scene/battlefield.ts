@@ -340,6 +340,33 @@ export class Battlefield {
     );
   }
 
+  /** Where an attack from `from` meets the Shield dome (screen px), or null without one. */
+  domePoint(player: PlayerId, from: PlayerId): { x: number; y: number } | null {
+    const d = this.castles[player].dome;
+    if (!d) return null;
+    const dir = from === player ? 0 : player === 1 ? -1 : 1;
+    const a = (dir === 0 ? 90 : 48) * (Math.PI / 180);
+    return { x: d.cx + dir * Math.cos(a) * d.rx + this.world.x, y: d.gy - Math.sin(a) * d.ry + this.world.y };
+  }
+
+  /** A hit stopped by the dome: it lights up. */
+  shieldHit(player: PlayerId): void {
+    this.castles[player].flashShield();
+  }
+
+  /** The dome breaks into shards (last charge spent). */
+  shatterShield(player: PlayerId): void {
+    const d = this.castles[player].dome;
+    if (!d) return;
+    const x = d.cx + this.world.x;
+    const gy = d.gy + this.world.y;
+    for (let i = 0; i < 14; i++) {
+      const t = Math.PI + (Math.random() * 0.9 + 0.05) * Math.PI;
+      this.burst(x + Math.cos(t) * d.rx, gy + Math.sin(t) * d.ry, { count: 3, texture: 'crystal', color: [0xaee8ff, 0xd8c8ff, 0xffffff], speed: 3, angle: t, spread: 0.8, gravity: 0.08, size: 12, life: 900 });
+    }
+    this.flare(x, gy - d.ry * 0.5, 0xaee8ff, d.rx * 2.2, 500, 0.5);
+  }
+
   setShield(player: PlayerId, charges: number): void {
     this.castles[player].setShield(charges);
   }
@@ -742,11 +769,21 @@ export class Battlefield {
     if (settings.get().reducedMotion) return;
     for (const player of [0, 1] as const) {
       const aura = this.auras[player];
-      if (!aura.burn && !aura.danger && !aura.frost) continue;
+      const dome = this.castles[player].dome;
+      if (!aura.burn && !aura.danger && !aura.frost && !dome) continue;
       aura.timer += dt;
       if (aura.timer < (effectsLow() ? 140 : 70)) continue;
       aura.timer = 0;
       const castle = this.castles[player];
+      if (dome && Math.random() < 0.55) {
+        // Arcane motes drift up inside the dome and runes spark on its ring.
+        const t = Math.random() * Math.PI * 2;
+        const onRing = Math.random() < 0.4;
+        const x = dome.cx + this.world.x + (onRing ? Math.cos(t) * dome.rx * 0.98 : (Math.random() - 0.5) * dome.rx * 1.4);
+        const y = dome.gy + this.world.y + (onRing ? Math.sin(t) * dome.rx * 0.09 : -Math.random() * dome.ry * 0.5);
+        this.burst(x, y, { count: 1, texture: onRing ? 'glow' : 'crystal', color: [0xb48cff, 0x7fd6ff, 0xe4f8ff], speed: onRing ? 0.8 : 0.4, angle: -Math.PI / 2, spread: 0.3, gravity: -0.01, size: onRing ? 9 : 8, life: onRing ? 900 : 2200, alpha: 0.85 });
+      }
+      if (!aura.burn && !aura.danger && !aura.frost) continue;
       const keep = this.anchor(player, 'keep');
       const wall = this.anchor(player, 'wall');
       const w = castle.keepWidth;

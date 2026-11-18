@@ -191,6 +191,13 @@ export class Castle extends Container {
   private readonly smoke = new Container();
   private readonly frostCoat = new Graphics();
   readonly shieldBubble = new Graphics();
+  /** The light band that climbs the shield dome. */
+  private readonly shieldSweep = new Graphics();
+  /** Shield dome in scene px while a Shield is up (for ambient sparkles). */
+  dome: { cx: number; gy: number; rx: number; ry: number } | null = null;
+  private shieldRise = 1;
+  private shieldFlash = 0;
+  private sweepPhase = 0;
 
   private keepTower!: Tower;
   private towers: Tower[] = [];
@@ -235,7 +242,9 @@ export class Castle extends Container {
       this.glows,
       this.frostCoat,
       this.shieldBubble,
+      this.shieldSweep,
     );
+    this.shieldSweep.blendMode = 'add';
     this.buildTowers();
   }
 
@@ -310,6 +319,8 @@ export class Castle extends Container {
   }
 
   setShield(charges: number): void {
+    // A new dome rises out of the ground.
+    if (this.shieldCharges <= 0 && charges > 0) this.shieldRise = 0;
     this.shieldCharges = charges;
     this.drawShield();
   }
@@ -371,10 +382,7 @@ export class Castle extends Container {
     this.x = x;
     if (!calm) this.phase += dt * 0.004;
     this.drawAnim(dt, calm);
-    if (this.shieldCharges > 0) {
-      this.shieldPulse += dt * 0.003;
-      this.shieldBubble.alpha = 0.75 + Math.sin(this.shieldPulse) * 0.2;
-    }
+    if (this.shieldCharges > 0) this.tickShield(dt, calm);
   }
 
   // -------------------------------------------------------------------------
@@ -1152,19 +1160,175 @@ export class Castle extends Container {
     g.poly([l.x - r, l.groundY - 3, l.x - r * 0.1, l.groundY - 6, l.x + r * 0.1, l.groundY - 1, l.x - r * 0.8, l.groundY]).fill({ color: darken(this.bannerColor, 0.15) });
   }
 
+  /** Lights the dome up when it stops a hit. */
+  flashShield(): void {
+    this.shieldFlash = 1;
+  }
+
+  /** Breathing glow, the rising dome and the light band climbing it. */
+  private tickShield(dt: number, calm: boolean): void {
+    const d = this.dome;
+    if (!d) return;
+    this.shieldPulse += calm ? 0 : dt * 0.0025;
+    this.shieldFlash = Math.max(0, this.shieldFlash - dt * 0.0025);
+    if (this.shieldRise < 1) this.shieldRise = calm ? 1 : Math.min(1, this.shieldRise + dt / 520);
+    const rise = 1 - (1 - this.shieldRise) ** 3;
+    for (const g of [this.shieldBubble, this.shieldSweep]) {
+      g.pivot.y = d.gy;
+      g.position.y = d.gy;
+      g.scale.y = rise;
+    }
+    this.shieldBubble.alpha = Math.min(1, 0.8 + Math.sin(this.shieldPulse) * 0.12 + this.shieldFlash * 0.4);
+    const sw = this.shieldSweep.clear();
+    if (calm) return;
+    this.sweepPhase = (this.sweepPhase + dt / 2800) % 1;
+    // A ring of light climbs the dome, fading near the top; a fainter one follows.
+    for (const offset of [0, 0.5]) {
+      const h = (this.sweepPhase + offset) % 1;
+      const y = d.gy - d.ry * h;
+      const hw = d.rx * Math.sqrt(Math.max(0, 1 - h * h));
+      if (hw < 4) continue;
+      const fade = Math.sin(Math.PI * h) * (offset ? 0.45 : 1);
+      const pts: number[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const t = (i / 24) * Math.PI;
+        pts.push(d.cx + Math.cos(t) * hw, y + Math.sin(t) * hw * 0.14);
+      }
+      sw.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) sw.lineTo(pts[i], pts[i + 1]);
+      sw.stroke({ width: 6, color: 0x7fd6ff, alpha: 0.12 * fade });
+      sw.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) sw.lineTo(pts[i], pts[i + 1]);
+      sw.stroke({ width: 1.6, color: 0xe4f8ff, alpha: 0.55 * fade });
+    }
+    if (this.shieldFlash > 0) {
+      const dome = (sx: number, sy: number): number[] => {
+        const pts: number[] = [];
+        for (let i = 0; i <= 40; i++) {
+          const t = Math.PI + (i / 40) * Math.PI;
+          pts.push(d.cx + Math.cos(t) * sx, d.gy + Math.sin(t) * sy);
+        }
+        return pts;
+      };
+      sw.poly(dome(d.rx, d.ry)).fill({ color: 0xaee8ff, alpha: 0.18 * this.shieldFlash });
+    }
+  }
+
+  /**
+   * The arcane Shield: a translucent dome rising from the ground over the
+   * whole castle, brighter at its rim, with a lattice of hexagons, meridians,
+   * a rune circle on the ground and a gloss highlight. More charges, more
+   * glow and more runes.
+   */
   private drawShield(): void {
     const l = this.layoutValue;
     const g = this.shieldBubble.clear();
-    if (!l || this.shieldCharges <= 0) return;
-    const far = l.x - this.facing * l.keepWidth * 1.6;
-    const near = this.wallCx() + this.facing * this.wallW() * 0.6;
+    if (!l || this.shieldCharges <= 0) {
+      this.dome = null;
+      this.shieldSweep.clear();
+      return;
+    }
+    const far = l.x - this.facing * l.keepWidth * 1.7;
+    const near = this.wallCx() + this.facing * this.wallW() * 0.9;
     const cx = (far + near) / 2;
-    const rx = Math.abs(near - far) / 2 + l.keepWidth * 0.2;
-    const top = Math.max(this.keepPx() + l.keepWidth * 1.3, this.wallPx());
-    const ry = top + l.unit * 2;
-    g.ellipse(cx, l.groundY, rx, ry).fill({ color: 0x7fd6ff, alpha: 0.08 + this.shieldCharges * 0.03 });
-    g.ellipse(cx, l.groundY, rx, ry).stroke({ width: 2 + this.shieldCharges, color: 0xaee8ff, alpha: 0.55 });
-    g.ellipse(cx - rx * 0.25, l.groundY - ry * 0.55, rx * 0.25, ry * 0.18).fill({ color: 0xffffff, alpha: 0.08 });
+    const rx = Math.abs(near - far) / 2 + l.keepWidth * 0.25;
+    // Tall enough for the roofs and the flag on top of the Keep.
+    const top = Math.max(this.keepPx() + l.keepWidth * 2.25, this.wallPx() + l.unit * 4);
+    const ry = Math.max(top + l.unit * 2, rx * 0.8);
+    const gy = l.groundY + 1;
+    this.dome = { cx, gy, rx, ry };
+    const k = Math.min(3, this.shieldCharges);
+    const CYAN = 0x7fd6ff;
+    const PALE = 0xe4f8ff;
+    const VIOLET = 0xb48cff;
+
+    const domePts = (sx: number, sy: number, from = 0, to = 1, n = 48): number[] => {
+      const pts: number[] = [];
+      for (let i = 0; i <= n; i++) {
+        const t = Math.PI + (from + ((to - from) * i) / n) * Math.PI;
+        pts.push(cx + Math.cos(t) * sx, gy + Math.sin(t) * sy);
+      }
+      return pts;
+    };
+    const path = (pts: number[]): Graphics => {
+      g.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
+      return g;
+    };
+
+    // Body, then a fresnel rim: brighter towards the edge.
+    g.poly(domePts(rx, ry)).fill({ color: CYAN, alpha: 0.04 + k * 0.015 });
+    g.poly(domePts(rx * 0.8, ry * 0.86)).fill({ color: 0x0a1a3a, alpha: 0.05 });
+    // A violet haze rising from the rune circle.
+    g.poly(domePts(rx * 0.97, ry * 0.32)).fill({ color: VIOLET, alpha: 0.07 + k * 0.02 });
+    g.poly(domePts(rx * 0.93, ry * 0.16)).fill({ color: VIOLET, alpha: 0.06 });
+    for (const [w, a] of [
+      [22, 0.04],
+      [12, 0.07],
+      [5, 0.16],
+    ] as const) {
+      path(domePts(rx - w / 2, ry - w / 2)).stroke({ width: w, color: CYAN, alpha: a + k * 0.01 });
+    }
+
+    // Hexagon lattice, fading towards the middle so the castle stays clear.
+    const hex = Math.max(7, rx / 7);
+    const hh = hex * Math.sqrt(3);
+    for (let row = 0; row * hex * 1.5 < ry + hex; row++) {
+      const y = gy - row * hex * 1.5 - hex * 0.5;
+      for (let col = -Math.ceil(rx / hh) - 1; col <= Math.ceil(rx / hh) + 1; col++) {
+        const x = cx + col * hh + (row % 2 ? hh / 2 : 0);
+        const e = ((x - cx) / rx) ** 2 + ((y - gy) / ry) ** 2;
+        if (e > 0.9 || e < 0.35) continue;
+        const pts: number[] = [];
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 6 + (i * Math.PI) / 3;
+          pts.push(x + Math.cos(a) * hex * 0.92, y + Math.sin(a) * hex * 0.92);
+        }
+        g.poly(pts).stroke({ width: 1, color: (row + col) % 5 === 0 ? VIOLET : CYAN, alpha: 0.07 + (e - 0.35) * 0.45 });
+      }
+    }
+
+    // Meridians and parallels give it volume.
+    for (const f of [0.66, 0.3]) path(domePts(rx * f, ry)).stroke({ width: 1, color: CYAN, alpha: 0.16 });
+    for (const h of [0.38, 0.72]) {
+      const y = gy - ry * h;
+      const hw = rx * Math.sqrt(1 - h * h);
+      const pts: number[] = [];
+      for (let i = 0; i <= 32; i++) {
+        const t = (i / 32) * Math.PI;
+        pts.push(cx + Math.cos(t) * hw, y + Math.sin(t) * hw * 0.14);
+      }
+      path(pts).stroke({ width: 1.2, color: VIOLET, alpha: 0.35 });
+    }
+
+    // Rim.
+    path(domePts(rx, ry)).stroke({ width: 1.4 + k * 0.6, color: PALE, alpha: 0.8 });
+
+    // Rune circle on the ground.
+    const gry = Math.max(l.unit * 2.2, rx * 0.085);
+    g.ellipse(cx, gy, rx * 1.04, gry * 1.15).stroke({ width: 2, color: VIOLET, alpha: 0.55 });
+    g.ellipse(cx, gy, rx * 0.92, gry).stroke({ width: 1, color: CYAN, alpha: 0.45 });
+    g.ellipse(cx, gy, rx * 0.98, gry * 1.07).fill({ color: VIOLET, alpha: 0.06 });
+    const runes = 14 + k * 4;
+    for (let i = 0; i < runes; i++) {
+      const t = (i / runes) * Math.PI * 2;
+      const x = cx + Math.cos(t) * rx * 0.98;
+      const y = gy + Math.sin(t) * gry * 1.07;
+      const front = Math.sin(t) > 0;
+      const r = Math.max(2.2, gry * 0.32);
+      const glyph = (i * 7 + 3) % 5;
+      g.moveTo(x - r, y).lineTo(x + r, y);
+      if (glyph === 0) g.moveTo(x, y - r).lineTo(x, y + r * 0.6);
+      else if (glyph === 1) g.moveTo(x - r * 0.6, y - r).lineTo(x + r * 0.6, y + r * 0.6);
+      else if (glyph === 2) g.moveTo(x - r * 0.6, y + r * 0.6).lineTo(x, y - r).lineTo(x + r * 0.6, y + r * 0.6);
+      else if (glyph === 3) g.moveTo(x, y - r).lineTo(x - r * 0.5, y).lineTo(x, y + r * 0.6);
+      else g.moveTo(x + r * 0.5, y - r).lineTo(x - r * 0.5, y + r * 0.6);
+      g.stroke({ width: 1.2, color: front ? 0xe0d0ff : VIOLET, alpha: front ? 0.85 : 0.4 });
+    }
+
+    // Gloss highlight on the upper left.
+    path(domePts(rx * 0.86, ry * 0.9, 0.12, 0.34, 16)).stroke({ width: 3, color: 0xffffff, alpha: 0.28, cap: 'round' });
+    path(domePts(rx * 0.86, ry * 0.9, 0.38, 0.42, 4)).stroke({ width: 3, color: 0xffffff, alpha: 0.2, cap: 'round' });
   }
 
   private drawFrost(): void {
