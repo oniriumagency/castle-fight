@@ -1,220 +1,200 @@
 import { DurableObject } from 'cloudflare:workers';
-import {
-  applyAction,
-  createGame,
-  getPlayerView,
-  isHeroId,
-  redactEvents,
-  type Action,
-  type GameEvent,
-  type GameState,
-  type PlayerId,
-} from '@cardcraft-castles/engine';
-import type {
-  RoomClientMessage,
-  RoomServerMessage,
-  RoomStatus,
-  RoomSummary,
-  SeatInfo,
-} from '@cardcraft-castles/protocol';
+import type { PlayerId } from '@cardcraft-castles/engine';
+import { CLOSE_CODES, PING, PONG, type RoomServerMessage, type RoomSummary } from '@cardcraft-castles/protocol';
 import type { Env } from './env';
 import type { Lobby } from './lobby';
-
-interface RoomMeta {
-  id: string;
-  name: string;
-  host: string;
-  createdAt: number;
-  seats: [SeatInfo | null, SeatInfo | null];
-}
-
-/** The turn the clock is running for and when it runs out. */
-interface Clock {
-  turn: number;
-  deadline: number;
-}
+import { RoomCore, newRoomRecord, type LobbyRoomUpdate, type NewRoom, type RoomHost, type RoomRecord } from './roomCore';
 
 /** What each WebSocket remembers across hibernation. */
 interface Attachment {
-  seat: PlayerId;
+  seat: PlayerId | null;
+}
+
+function base64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 /**
- * One match. It owns the full game state, applies every action with the
- * rules engine and sends each player only their own view. State lives in
- * Durable Object storage, so the object can hibernate between messages.
+ * Answer the client's close frame so its close handshake finishes (runtimes
+ * without automatic close replies leave the client hanging otherwise).
+ */
+export function completeClose(ws: WebSocket, code: number, reason: string): void {
+  const echo = code === 1000 || (code >= 3000 && code < 5000) ? code : 1000;
+  try {
+    ws.close(echo, reason);
+  } catch {
+    // Already closed.
+  }
+}
+
+/**
+ * One room: a thin Durable Object around `RoomCore`. It uses the WebSocket
+ * Hibernation API, so between messages the object can be evicted from memory
+ * at no cost; everything it needs is in storage (one record) and in each
+ * socket's attachment (its seat).
  */
 export class Room extends DurableObject<Env> {
-  /** Called by the Worker when the room is created. */
-  async create(info: { id: string; name: string; host: string }): Promise<RoomSummary> {
-    const meta: RoomMeta = { ...info, createdAt: Date.now(), seats: [null, null] };
-    await this.ctx.storage.put('meta', meta);
-    const summary = this.summary(meta, null);
-    await this.lobby().upsert(summary);
-    return summary;
-  }
+  private core: RoomCore<WebSocket> | null = null;
+  private alarmAt: number | null = null;
+  private lastLobby = '';
+  /** The socket being closed right now, which must not count as connected. */
+  private closing: WebSocket | null = null;
+  private readonly host: RoomHost<WebSocket>;
 
-  override async fetch(): Promise<Response> {
-    const meta = await this.ctx.storage.get<RoomMeta>('meta');
-    if (!meta) return Response.json({ error: 'Room not found' }, { status: 404 });
-    const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1]);
-    return new Response(null, { status: 101, webSocket: pair[0] });
-  }
-
-  override async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
-    let message: RoomClientMessage;
-    try {
-      message = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)) as RoomClientMessage;
-    } catch {
-      return this.send(ws, { type: 'error', code: 'badMessage', message: 'Messages must be JSON' });
-    }
-    if (message.type === 'join') return this.join(ws, message.nickname, message.hero);
-    if (message.type === 'action') return this.act(ws, message.action);
-    this.send(ws, { type: 'error', code: 'badMessage', message: 'Unknown message type' });
-  }
-
-  override async webSocketClose(ws: WebSocket): Promise<void> {
-    ws.close();
-    // Shell behaviour: a player who leaves a running game concedes it.
-    // The server thread replaces this with a 60 s reconnection window.
-    const seat = (ws.deserializeAttachment() as Attachment | null)?.seat;
-    const meta = await this.ctx.storage.get<RoomMeta>('meta');
-    if (seat === undefined || !meta) return;
-    const game = await this.ctx.storage.get<GameState>('game');
-    if (game) {
-      if (game.phase !== 'finished') await this.apply(meta, game, { type: 'concede', player: seat });
-    } else {
-      meta.seats[seat] = null;
-      await this.ctx.storage.put('meta', meta);
-      if (meta.seats.every((s) => s === null)) await this.lobby().remove(meta.id);
-      else await this.lobby().upsert(this.summary(meta, null));
-    }
-  }
-
-  /** The turn clock: when it runs out the engine discards a random card. */
-  override async alarm(): Promise<void> {
-    const meta = await this.ctx.storage.get<RoomMeta>('meta');
-    const game = await this.ctx.storage.get<GameState>('game');
-    const clock = await this.ctx.storage.get<Clock>('clock');
-    if (!meta || !game || !clock || game.phase === 'finished') return;
-    if (clock.turn !== game.turn) return;
-    await this.apply(meta, game, { type: 'timeout' });
-  }
-
-  private async join(ws: WebSocket, nickname: unknown, hero: unknown): Promise<void> {
-    const meta = await this.ctx.storage.get<RoomMeta>('meta');
-    if (!meta) return this.send(ws, { type: 'error', code: 'noRoom', message: 'Room not found' });
-    if (ws.deserializeAttachment()) {
-      return this.send(ws, { type: 'error', code: 'alreadyJoined', message: 'You are already seated' });
-    }
-    if (typeof hero !== 'string' || !isHeroId(hero)) {
-      return this.send(ws, { type: 'error', code: 'badHero', message: 'Unknown hero' });
-    }
-    const free = meta.seats.findIndex((s) => s === null);
-    if (free < 0) return this.send(ws, { type: 'error', code: 'roomFull', message: 'The room is full' });
-    const seat = free as PlayerId;
-
-    const name = typeof nickname === 'string' ? nickname.trim().slice(0, 20) : '';
-    meta.seats[seat] = { nickname: name || `Jugador ${seat + 1}`, hero };
-    ws.serializeAttachment({ seat } satisfies Attachment);
-    await this.ctx.storage.put('meta', meta);
-    this.send(ws, { type: 'joined', seat, seats: meta.seats });
-
-    const [a, b] = meta.seats;
-    if (a && b) {
-      // The seed must be unpredictable: it decides both decks.
-      const seed = Array.from(crypto.getRandomValues(new Uint32Array(4))).join('-');
-      const { state, events } = createGame({ seed, heroes: [a.hero, b.hero] });
-      await this.publish(meta, state, events, null);
-    } else {
-      await this.lobby().upsert(this.summary(meta, null));
-    }
-  }
-
-  private async act(ws: WebSocket, action: Action): Promise<void> {
-    const seat = (ws.deserializeAttachment() as Attachment | null)?.seat;
-    const meta = await this.ctx.storage.get<RoomMeta>('meta');
-    const game = await this.ctx.storage.get<GameState>('game');
-    if (seat === undefined || !meta || !game) {
-      return this.send(ws, { type: 'error', code: 'notPlaying', message: 'The game has not started' });
-    }
-    if (!action || typeof action !== 'object' || action.type === 'timeout') {
-      return this.send(ws, { type: 'error', code: 'invalidAction', message: 'Not a player action' });
-    }
-    // Never trust the client about who it is.
-    const error = await this.apply(meta, game, { ...action, player: seat });
-    if (error) this.send(ws, { type: 'error', ...error });
-  }
-
-  private async apply(
-    meta: RoomMeta,
-    game: GameState,
-    action: Action,
-  ): Promise<{ code: string; message: string } | null> {
-    const result = applyAction(game, action);
-    if (!result.ok) return result.error;
-    await this.publish(meta, result.state, result.events, game);
-    return null;
-  }
-
-  /** Store the new state, restart the clock if the turn changed and tell everyone. */
-  private async publish(
-    meta: RoomMeta,
-    state: GameState,
-    events: GameEvent[],
-    previous: GameState | null,
-  ): Promise<void> {
-    await this.ctx.storage.put('game', state);
-
-    let clock = (await this.ctx.storage.get<Clock>('clock')) ?? null;
-    if (state.phase === 'finished') {
-      clock = null;
-      await this.ctx.storage.delete('clock');
-      await this.ctx.storage.deleteAlarm();
-    } else if (!clock || clock.turn !== state.turn) {
-      clock = { turn: state.turn, deadline: Date.now() + state.rules.turnSeconds * 1000 };
-      await this.ctx.storage.put('clock', clock);
-      await this.ctx.storage.setAlarm(clock.deadline);
-    }
-
-    const seats = meta.seats as [SeatInfo, SeatInfo];
-    for (const ws of this.ctx.getWebSockets()) {
-      const seat = (ws.deserializeAttachment() as Attachment | null)?.seat;
-      if (seat === undefined) continue;
-      this.send(ws, {
-        type: 'state',
-        view: getPlayerView(state, seat),
-        events: redactEvents(events, seat),
-        seats,
-        deadline: clock?.deadline ?? null,
-      });
-    }
-
-    const status: RoomStatus = state.phase === 'finished' ? 'finished' : 'playing';
-    if (!previous || status === 'finished') await this.lobby().upsert(this.summary(meta, status));
-  }
-
-  private summary(meta: RoomMeta, status: RoomStatus | null): RoomSummary {
-    return {
-      id: meta.id,
-      name: meta.name,
-      host: meta.host,
-      status: status ?? 'waiting',
-      players: meta.seats.filter((s) => s !== null).length,
-      createdAt: meta.createdAt,
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.host = {
+      now: () => Date.now(),
+      sockets: () =>
+        this.ctx.getWebSockets().filter((ws) => ws !== this.closing && ws.readyState === WebSocket.OPEN),
+      seatOf: (ws) => (ws.deserializeAttachment() as Attachment | null)?.seat ?? null,
+      setSeat: (ws, seat) => ws.serializeAttachment({ seat } satisfies Attachment),
+      send: (ws, message: RoomServerMessage) => {
+        try {
+          ws.send(JSON.stringify(message));
+        } catch {
+          // The socket is closing.
+        }
+      },
+      close: (ws, code, reason) => {
+        try {
+          ws.close(code, reason);
+        } catch {
+          // Already closed.
+        }
+      },
+      randomToken: () => base64url(crypto.getRandomValues(new Uint8Array(24))),
+      randomSeed: () => Array.from(crypto.getRandomValues(new Uint32Array(4))).join('-'),
+      randomIndex: (n) => crypto.getRandomValues(new Uint32Array(1))[0]! % n,
     };
+    // Heartbeats are answered by the runtime without waking the object.
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
+    void ctx.blockConcurrencyWhile(async () => {
+      const record = await ctx.storage.get<RoomRecord>('room');
+      if (record && record.status !== 'closed') this.core = new RoomCore(record, this.host);
+      this.alarmAt = await ctx.storage.getAlarm();
+    });
+  }
+
+  /** RPC from the lobby when the room is created. */
+  async create(room: NewRoom): Promise<LobbyRoomUpdate> {
+    if (this.core || (await this.ctx.storage.get('room'))) throw new Error(`Room ${room.id} already exists`);
+    this.core = new RoomCore(newRoomRecord(room, Date.now()), this.host);
+    const update = this.core.lobbyUpdate();
+    // The lobby records this first state itself.
+    this.lastLobby = JSON.stringify(update);
+    this.ctx.storage.put('room', this.core.record);
+    await this.commit();
+    return update;
+  }
+
+  /** RPC from the Worker: the room as an invite page shows it, or null if it does not exist. */
+  async summary(): Promise<RoomSummary | null> {
+    return this.core?.summary() ?? null;
+  }
+
+  override async fetch(request: Request): Promise<Response> {
+    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+      return new Response('Expected a WebSocket', { status: 426 });
+    }
+    const { 0: client, 1: server } = new WebSocketPair();
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({ seat: null } satisfies Attachment);
+    if (this.core) {
+      this.core.connected(server);
+      await this.commit();
+    } else {
+      this.host.send(server, { type: 'error', code: 'roomNotFound', message: 'This room does not exist or has closed' });
+      this.host.close(server, CLOSE_CODES.roomNotFound, 'Room not found');
+    }
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (!this.core) {
+      this.host.close(ws, CLOSE_CODES.roomClosed, 'The room is closed');
+      return;
+    }
+    this.core.receive(ws, typeof message === 'string' ? message : '');
+    await this.commit();
+  }
+
+  override async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    completeClose(ws, code, reason);
+    await this.dropped(ws);
+  }
+
+  override async webSocketError(ws: WebSocket): Promise<void> {
+    await this.dropped(ws);
+  }
+
+  override async alarm(): Promise<void> {
+    this.alarmAt = null;
+    this.core?.tick();
+    await this.commit();
+  }
+
+  private async dropped(ws: WebSocket): Promise<void> {
+    this.closing = ws;
+    try {
+      this.core?.disconnected(ws);
+    } finally {
+      this.closing = null;
+    }
+    await this.commit();
+  }
+
+  /** Do what the core asks: save, arm the alarm, tell the lobby, or delete the room. */
+  private async commit(): Promise<void> {
+    const core = this.core;
+    if (!core) return;
+    const { record } = core;
+
+    if (core.closed) {
+      this.core = null;
+      this.alarmAt = null;
+      await this.ctx.storage.deleteAlarm();
+      await this.ctx.storage.deleteAll();
+      if (!record.private) await this.tellLobby(() => this.lobby().remove(record.id));
+      return;
+    }
+
+    // Not awaited: the output gate holds outgoing messages until the write is durable.
+    if (core.takeDirty()) void this.ctx.storage.put('room', record);
+
+    const wake = core.nextWake();
+    if (wake !== this.alarmAt) {
+      this.alarmAt = wake;
+      if (wake === null) await this.ctx.storage.deleteAlarm();
+      else await this.ctx.storage.setAlarm(wake);
+    }
+
+    if (!record.private) {
+      const update = core.lobbyUpdate();
+      const key = JSON.stringify(update);
+      if (key !== this.lastLobby) {
+        this.lastLobby = key;
+        const ok = await this.tellLobby(() => this.lobby().update(update));
+        if (!ok) this.lastLobby = '';
+      }
+    }
+  }
+
+  private async tellLobby(call: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await call();
+      return true;
+    } catch (error) {
+      // The lobby is only a directory; the game goes on without it.
+      console.error('Lobby update failed', error);
+      return false;
+    }
   }
 
   private lobby(): DurableObjectStub<Lobby> {
     return this.env.LOBBY.get(this.env.LOBBY.idFromName('lobby'));
-  }
-
-  private send(ws: WebSocket, message: RoomServerMessage): void {
-    try {
-      ws.send(JSON.stringify(message));
-    } catch {
-      // The socket is closing.
-    }
   }
 }

@@ -1,56 +1,59 @@
 /**
- * End-to-end smoke test of the server shell: creates a room, connects two
- * bots over WebSocket and plays a whole game with random legal moves.
+ * End-to-end smoke test against a running server: two bots meet through
+ * quick join, play a whole game with random legal moves through the SDK and
+ * check the lobby on the way.
  *
  *   pnpm dev            (in another terminal)
  *   pnpm smoke          (or: pnpm smoke http://localhost:8787)
  */
-import { HEROES, legalActions } from '@cardcraft-castles/engine';
-import { ROUTES, type RoomClientMessage, type RoomServerMessage, type RoomSummary } from '@cardcraft-castles/protocol';
+import { HEROES } from '@cardcraft-castles/engine';
+import { OnlineClient, type RoomConnection } from '@cardcraft-castles/protocol/client';
 
 const base = process.argv[2] ?? 'http://localhost:8787';
 const pick = <T>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)]!;
 
-const health = (await (await fetch(base + ROUTES.health)).json()) as { game: string; cards: number };
-console.log(`Server: ${health.game}, ${health.cards} cards`);
+const bots = [0, 1].map(() => new OnlineClient({ baseUrl: base, storage: null }));
+const health = await bots[0]!.health();
+console.log(`Server: ${health.game}, protocol ${health.protocol}, ${health.cards} cards`);
 
-const created = (await (
-  await fetch(base + ROUTES.rooms, { method: 'POST', body: JSON.stringify({ name: 'Smoke test', host: 'bot-0' }) })
-).json()) as { room: RoomSummary };
-console.log(`Room ${created.room.id} created`);
+const lobby = bots[0]!.connectLobby();
+lobby.on('stats', (stats) => console.log(`Lobby: ${stats.online} online, ${stats.waiting} waiting, ${stats.playing} playing`));
 
-let stateMessages = 0;
-const winner = await new Promise<string>((resolve, reject) => {
-  const timer = setTimeout(() => reject(new Error('The game did not finish in 60 s')), 60_000);
-  for (const bot of [0, 1]) {
-    const ws = new WebSocket(base.replace(/^http/, 'ws') + ROUTES.roomSocket(created.room.id));
-    const send = (message: RoomClientMessage): void => ws.send(JSON.stringify(message));
-    ws.addEventListener('open', () => send({ type: 'join', nickname: `bot-${bot}`, hero: pick(HEROES).id }));
-    ws.addEventListener('error', () => reject(new Error(`bot-${bot}: socket error`)));
-    ws.addEventListener('message', (event) => {
-      const message = JSON.parse(String(event.data)) as RoomServerMessage;
-      if (message.type === 'error') return reject(new Error(`bot-${bot}: ${message.code} ${message.message}`));
-      if (message.type !== 'state') return;
-      stateMessages += 1;
-      const { view } = message;
+const first = await bots[0]!.quickJoin({ nickname: 'bot-0' });
+console.log(`bot-0 ${first.created ? 'created' : 'found'} room ${first.room.id}`);
+const rooms: RoomConnection[] = [bots[0]!.joinRoom(first.room.id, { nickname: 'bot-0', hero: 'random' })];
+await new Promise((resolve) => rooms[0]!.on('welcome', resolve));
+
+const second = await bots[1]!.quickJoin({ nickname: 'bot-1' });
+console.log(`bot-1 ${second.created ? 'created' : 'found'} room ${second.room.id}`);
+rooms.push(bots[1]!.joinRoom(second.room.id, { nickname: 'bot-1', hero: pick(HEROES).id }));
+
+let states = 0;
+const summary = await new Promise<string>((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('The game did not finish in 120 s')), 120_000);
+  rooms.forEach((room, bot) => {
+    room.on('error', (error) => console.warn(`bot-${bot}: ${error.code} ${error.message}`));
+    room.on('closed', ({ reason }) => reject(new Error(`bot-${bot} closed: ${reason}`)));
+    room.on('state', ({ view }) => {
+      states += 1;
       if (view.result) {
         clearTimeout(timer);
-        ws.close();
         if (bot === 0) {
-          const name = view.result.winner === null ? 'nobody' : message.seats[view.result.winner].nickname;
+          const seats = room.room?.seats;
+          const name = view.result.winner === null ? 'nobody' : seats?.[view.result.winner]?.nickname;
           resolve(`${name} wins by ${view.result.reason} on turn ${view.turn}`);
         }
         return;
       }
-      const legal = legalActions(view);
+      const legal = room.legalActions();
       if (legal.length === 0) return;
       const plays = legal.filter((a) => a.type !== 'discard');
-      const action = pick(plays.length > 0 ? plays : legal);
-      if (action.type !== 'timeout') send({ type: 'action', action });
+      // A short pause, like a (very fast) human; the server throttles floods.
+      setTimeout(() => room.act(pick(plays.length > 0 ? plays : legal)), 150);
     });
-  }
+  });
 });
 
-console.log(`Game over: ${winner} (${stateMessages} state messages)`);
-const rooms = (await (await fetch(base + ROUTES.rooms)).json()) as { rooms: RoomSummary[] };
-console.log(`Open rooms after the game: ${rooms.rooms.length}`);
+console.log(`Game over: ${summary} (${states} state messages)`);
+for (const room of rooms) room.leave();
+lobby.close();
