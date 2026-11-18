@@ -651,6 +651,8 @@ class BoardScreen implements Screen {
     const status = view.phase === 'finished' ? null : twilightStatus(view);
     this.twilightChip.hidden = !status;
     this.el.classList.toggle('twilight', !!status && status.level > 0);
+    // Twilight Fury has its own music: it crossfades in when the Fury falls.
+    if (view.phase !== 'finished') audio.music(status && status.level > 0 ? 'twilight' : 'battle');
     if (!status) return;
     this.twilightChip.classList.toggle('active', status.level > 0);
     this.twilightChip.classList.toggle('last', status.level > 0 && status.turns === 0);
