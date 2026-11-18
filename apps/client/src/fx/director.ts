@@ -349,6 +349,20 @@ export const fx = {
     ctx.field.burst(at.x, at.y, { count: 16, color: [0xffe066, 0xffffff], speed: 1.4, angle: -Math.PI / 2, spread: 1.4, gravity: -0.03, size: 10, life: 1200 });
   },
 
+  /** The "Ultimate ready!" call at the start of your turn, centered at (x, y) in CSS px. */
+  ultimateReadyBanner(seat: PlayerId, ctx: FxContext, x: number, y: number): void {
+    const field = ctx.field;
+    audio.play('ultimateReady', 0.8, { gain: 1.3 });
+    audio.play('extraTurn', 0.5, { delay: 120, gain: 0.6 });
+    field.rays(x, y, 0xffd27a, 520, 1800, 0.55);
+    field.flare(x, y, 0xffe0a0, 300, 700, 0.55);
+    field.ring(x, y, 0xffd27a, 260, 900, 0.8);
+    field.burst(x, y, { count: 34, color: [0xffe066, 0xffd27a, 0xffffff], speed: 6, gravity: 0.04, drag: 0.95, size: 14, life: 1300, area: { w: 260, h: 60 } });
+    field.burst(x, y, { count: 18, texture: 'glow', color: [0xffe9a8], speed: 1.2, gravity: -0.04, size: 22, life: 1600, area: { w: 380, h: 80 } });
+    const at = field.anchor(ctx.side(seat), 'keep');
+    field.ring(at.x, at.y, 0xffd27a, 120, 800, 0.7);
+  },
+
   async ultimate(seat: PlayerId, heroId: HeroId, ctx: FxContext): Promise<void> {
     ultimateHero = heroId;
     const field = ctx.field;

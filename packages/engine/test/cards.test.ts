@@ -138,6 +138,11 @@ const CARD_TESTS: Record<string, () => void> = {
   'bastion-ciclopeo': () => {
     expect(play('bastion-ciclopeo').state.players[ME].wall).toBe(52);
   },
+  'gremios-unidos': () => {
+    const { state } = play('gremios-unidos');
+    expect(state.players[ME].workers).toEqual({ piedra: 3, acero: 3, mana: 3 });
+    expect(state.players[ME].resources.piedra).toBe(38);
+  },
   'aguja-celeste': () => {
     expect(play('aguja-celeste').state.players[ME].keep).toBe(83);
   },
@@ -310,7 +315,8 @@ const CARD_TESTS: Record<string, () => void> = {
     expect([target.wall, target.keep]).toEqual([15, 45]);
   },
   'lluvia-de-ascuas': () => {
-    let { state } = play('lluvia-de-ascuas', { keepTurn: false });
+    // No battle event in the way: one landing on turn 9 would change the Wall.
+    let { state } = play('lluvia-de-ascuas', { keepTurn: false, rules: { eventEveryTurns: 1000 } });
     // Burn ticks at the start of the burned player's turn: 4 turns, 3 damage each.
     expect(state.active).toBe(OPP);
     expect(state.players[OPP].wall).toBe(12);
@@ -471,6 +477,10 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.turn).toBe(2);
     expect(state.extraTurn).toBe(true);
     expect(eventsOf(result.events, 'turnStarted')[0]).toMatchObject({ player: ME, extraTurn: true });
+    // The extra turn starts like any other: the workers produce again.
+    const produced = eventsOf(result.events, 'produced');
+    expect(produced).toHaveLength(1);
+    expect(produced[0]).toMatchObject({ player: ME, gained: state.players[ME].workers });
     state = pass(state);
     expect(state.active).toBe(OPP);
     expect(state.extraTurn).toBe(false);

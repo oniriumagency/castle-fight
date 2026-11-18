@@ -27,6 +27,7 @@ import type {
   EngineError,
   ErrorCode,
   GameEvent,
+  GamePhase,
   GameState,
   PlayerId,
 } from './types';
@@ -202,20 +203,40 @@ function useUltimate(state: GameState, events: GameEvent[], player: PlayerId, ta
   );
 }
 
-/** The clock ran out: take default choices, discard a random card and end the turn. */
-function timeOut(state: GameState, events: GameEvent[]): void {
-  const player = state.active;
-  events.push({ type: 'timedOut', player });
-  // Defaults can chain into further choices (Mirage); the guard is only a safety net.
+/** Answer pending choices with their defaults. They can chain (Mirage); the guard is only a safety net. */
+function takeDefaults(state: GameState, events: GameEvent[]): void {
   for (let guard = 0; guard < 20 && state.phase === 'choice' && state.pending; guard++) {
     resolvePending(state, events, state.pending.options[0]!);
   }
+}
+
+/**
+ * The clock ran out: take default choices, then play the cheapest card the
+ * player can pay (a random one among equals), and end the turn. Only when no
+ * card can be played is a random card discarded instead.
+ */
+function timeOut(state: GameState, events: GameEvent[]): void {
+  const player = state.active;
+  events.push({ type: 'timedOut', player });
+  takeDefaults(state, events);
   if (state.phase === 'finished') return;
 
   const self = state.players[player];
-  if (state.actionsLeft > 0 && self.hand.length > 0) {
-    discardFromHand(state, events, player, randomPick(state, self.hand).uid, 'timeout');
-    self.comboSchool = null;
+  if (state.phase === 'action' && state.actionsLeft > 0 && self.hand.length > 0) {
+    const playable = self.hand.filter((c) => playBlocker(state, player, c.cardId) === null);
+    if (playable.length > 0) {
+      const cheapest = Math.min(...playable.map((c) => effectiveCost(state, player, c.cardId)));
+      const pick = randomPick(state, playable.filter((c) => effectiveCost(state, player, c.cardId) === cheapest));
+      playCard(state, events, player, pick.uid, undefined);
+      // A card that asks for a choice gets the default answer too.
+      // (The play can change the phase; TypeScript still thinks it is 'action'.)
+      if ((state.phase as GamePhase) === 'finished') return;
+      takeDefaults(state, events);
+      if ((state.phase as GamePhase) === 'finished') return;
+    } else {
+      discardFromHand(state, events, player, randomPick(state, self.hand).uid, 'timeout');
+      self.comboSchool = null;
+    }
   }
   state.actionsLeft = 0;
 }

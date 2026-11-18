@@ -67,6 +67,8 @@ export interface MatchSession {
    * reload (online games resume mid-match). Null when there is nothing to keep.
    */
   statsKey?(): string | null;
+  /** Ask for the current state again (online: the server resends it). */
+  resync?(): void;
   /** Online: an id for the current game, unique across rooms, so the win/loss record counts it once. */
   gameId?(): string | null;
   /** Quick reactions; only present when the session supports them. */
