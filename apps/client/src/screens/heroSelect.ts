@@ -8,7 +8,7 @@ import { audio } from '../fx/audio';
 import { DIFFICULTIES, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_NAMES, type Difficulty } from '../game/ai';
 import { artUrl, iconSvg } from '../ui/assets';
 import { heroCard, heroParts, rulesHtml } from '../ui/card';
-import { heroColor, heroCss } from '../ui/theme';
+import { heroCss } from '../ui/theme';
 import { flow } from './flow';
 
 export type HeroSelectMode = 'ai' | 'local' | 'online';
@@ -191,7 +191,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
           if (picked === id) return;
           picked = id;
           audio.play('cardSelect');
-          battlefield().castles[0].setBanner(heroColor(id));
+          battlefield().castles[0].setHero(id);
           build();
         };
         card.addEventListener('click', choose);
@@ -214,7 +214,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
     el,
     mount() {
       build();
-      battlefield().castles[0].setBanner(heroColor(picked));
+      battlefield().castles[0].setHero(picked);
       unsubscribe = settings.subscribe((next, prev) => {
         if (next.locale !== prev.locale) build();
       });

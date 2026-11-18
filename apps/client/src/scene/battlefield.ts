@@ -117,7 +117,8 @@ export class Battlefield {
       this.clouds.push(cloud);
     }
     const textures = { keepStone: stoneTexture(KEEP_STONE), wallStone: stoneTexture(WALL_STONE), shade: towerShadeTexture() };
-    this.castles = [new Castle(1, textures, 0xc8963e), new Castle(-1, textures, 0xa8322d)];
+    // Each castle is drawn in its hero's style; the menu shows two contrasting ones.
+    this.castles = [new Castle(1, textures, 0xc8963e, 'arquitecta'), new Castle(-1, textures, 0xa8322d, 'mariscal')];
 
     this.world.addChild(this.skyA, this.skyB, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[0], this.castles[1], this.fxLayer, this.weather);
@@ -242,6 +243,17 @@ export class Battlefield {
     this.castles[1].setBanner(colors[1]);
   }
 
+  /** Draws each castle in its hero's style (towers, roofs, stone) with the hero's banner colour. */
+  setHeroes(heroes: [string, string]): void {
+    this.castles[0].setHero(heroes[0]);
+    this.castles[1].setHero(heroes[1]);
+  }
+
+  /** Scene tops of every standing tower of a castle, Keep first (screen CSS px). */
+  towerTops(player: PlayerId): { x: number; y: number; width: number }[] {
+    return this.castles[player].towerTops().map((t) => ({ ...t, x: t.x + this.world.x, y: t.y + this.world.y }));
+  }
+
   /** Jump straight to these heights (new game, resume, layout). */
   setCastles(values: [{ keep: number; wall: number }, { keep: number; wall: number }]): void {
     this.castleTargets = [{ ...values[0] }, { ...values[1] }];
@@ -341,7 +353,8 @@ export class Battlefield {
 
   private update(dt: number): void {
     const step = dt / 16.67;
-    for (const castle of this.castles) castle.tick(dt);
+    const calm = settings.get().reducedMotion;
+    for (const castle of this.castles) castle.tick(dt, calm);
     // Clouds drift.
     for (const [i, cloud] of this.clouds.entries()) {
       cloud.x += (0.06 + i * 0.02) * step;
