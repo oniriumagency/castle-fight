@@ -12,6 +12,7 @@ import type {
   PlayerState,
   Resource,
   ResourceMap,
+  Rules,
   VisibleCard,
 } from './types';
 
@@ -137,7 +138,24 @@ export function attackBonus(state: Board, player: PlayerId): number {
   const p = state.players[player];
   let bonus = getHero(p.hero).passive.attackBonus ?? 0;
   for (const e of p.enchantments) bonus += getEnchantmentModifiers(e.cardId)?.attackBonus ?? 0;
-  return bonus;
+  return bonus + twilightLevel(state) * (state.rules.twilightAttackBonus ?? 0);
+}
+
+/**
+ * Twilight Fury level on the current turn: 0 before it starts (or when the
+ * rules turn it off), then 1, 2, 3... rising every `twilightEvery` turns.
+ */
+export function twilightLevel(board: { rules: Rules; turn: number }, turn = board.turn): number {
+  const start = board.rules.twilightTurn ?? 0;
+  if (start <= 0 || turn < start) return 0;
+  return 1 + Math.floor((turn - start) / Math.max(1, board.rules.twilightEvery ?? 1));
+}
+
+/** Turn at whose end the Twilight Fury decides the game, or 0 if there is none. */
+export function twilightDeadline(rules: Rules): number {
+  const start = rules.twilightTurn ?? 0;
+  const turns = rules.twilightTurns ?? 0;
+  return start > 0 && turns > 0 ? start + turns - 1 : 0;
 }
 
 /** Damage removed from each attack that hits the Wall of `player`. */

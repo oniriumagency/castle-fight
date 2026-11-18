@@ -61,6 +61,13 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   multiAllScale: 0.6,
   leaderExtraDamage: 0,
   eliminationBounty: 0,
+  twilightTurn: 21,
+  twilightEvery: 3,
+  twilightAttackBonus: 3,
+  twilightErosion: 3,
+  twilightKeepErosion: 2,
+  twilightBuildBonus: 3,
+  twilightTurns: 15,
 });
 
 function assertSameIds(kind: string, designIds: string[], effectIds: string[]): void {

@@ -5,6 +5,7 @@ import {
   getCard,
   getHero,
   other,
+  twilightLevel,
   type GameEvent,
   type HeroId,
   type PlayerId,
@@ -23,6 +24,7 @@ import { battlefield } from '../../app/stage';
 import { audio } from '../../fx/audio';
 import { fx, type FxContext } from '../../fx/director';
 import { describeEvent } from '../../game/describe';
+import { twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
@@ -88,6 +90,7 @@ class BoardScreen implements Screen {
   private readonly turnLabel = h('div.turn-label');
   private readonly timer = h('div.timer', { hidden: true });
   private readonly eventChip = h('button.event-chip', { type: 'button' });
+  private readonly twilightChip = h('button.twilight-chip', { type: 'button', hidden: true });
   private readonly layer = h('div.inspect-layer');
   private readonly logList = h('ol.log-list');
   private readonly logPanel: HTMLElement;
@@ -155,11 +158,16 @@ class BoardScreen implements Screen {
       this.inspectCard(id, this.discardHero, this.discardTopDiscarded);
     });
     this.eventChip.addEventListener('click', () => this.inspectEvent());
+    this.twilightChip.addEventListener('click', () => {
+      if (!this.view) return;
+      audio.play('uiClick');
+      toast(t('rulesTwilight', twilightValues(this.view.rules)).replace(/<[^>]+>/g, ''), 'info', 9000);
+    });
 
     this.el = h(
       'div.board',
       { class: `mode-${session.kind}` },
-      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), this.eventChip, h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
+      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), h('div.event-box', null, this.eventChip, this.twilightChip), h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
       this.panels[0].el,
       this.panels[1].el,
       h('div.board-field', null, this.plaques[0].el, this.plaques[1].el, h('div.piles', null, this.deckPile, this.discardPile)),
@@ -559,6 +567,22 @@ class BoardScreen implements Screen {
 
     // Battle event chip.
     this.renderEventChip(view);
+    this.renderTwilightChip(view);
+  }
+
+  private renderTwilightChip(view: PlayerView): void {
+    const status = view.phase === 'finished' ? null : twilightStatus(view);
+    this.twilightChip.hidden = !status;
+    this.el.classList.toggle('twilight', !!status && status.level > 0);
+    if (!status) return;
+    this.twilightChip.classList.toggle('active', status.level > 0);
+    this.twilightChip.classList.toggle('last', status.level > 0 && status.turns === 0);
+    const line = twilightLine(status);
+    this.twilightChip.replaceChildren(
+      html(iconSvg('sunset')),
+      h('span.event-text', null, h('strong', null, t('twilightName')), h('small', null, line)),
+    );
+    this.twilightChip.title = `${t('twilightName')}: ${line}`;
   }
 
   private renderEventChip(view: PlayerView): void {
@@ -660,7 +684,7 @@ class BoardScreen implements Screen {
       this.field.setMaxPoints(view.rules.keepWin);
       for (const plaque of this.plaques) plaque.setKeepWin(view.rules.keepWin);
       this.field.setHeroes([view.players[this.seatOfSide(0)].hero, view.players[this.seatOfSide(1)].hero]);
-      void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
+      void this.field.setMood(skyFor(view.activeEvent?.id ?? null, twilightLevel(view)), 400);
     }
     if (!starting && this.discardPile.querySelector('.pile-empty')) {
       // Resumed mid-game: show the last card played, by whoever played most recently.
@@ -706,7 +730,7 @@ class BoardScreen implements Screen {
     }
     this.field.setShield(this.sideOf(0), view.players[0].shield);
     this.field.setShield(this.sideOf(1), view.players[1].shield);
-    void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
+    void this.field.setMood(skyFor(view.activeEvent?.id ?? null, twilightLevel(view)), 400);
   }
 
   private heights(seat: PlayerId): { keep: number; wall: number } {
@@ -744,8 +768,16 @@ class BoardScreen implements Screen {
         void fx.battleEvent(e.eventId, ctx);
         break;
       case 'battleEventEnded':
-        void fx.battleEventEnded(ctx);
+        void fx.battleEventEnded(ctx, this.view ? twilightLevel(this.view) : 0);
         break;
+      case 'twilightRose': {
+        const values = this.view ? twilightValues(this.view.rules) : { atk: 0, wall: 0 };
+        this.showBanner(t('twilightName'), t('twilightRose', { level: e.level, atk: values.atk! * e.level, wall: values.wall! * e.level }));
+        if (this.view) this.renderTwilightChip(this.view);
+        await fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
+        if (this.view?.activeEvent) void ctx.field.setMood(skyFor(this.view.activeEvent.id), 400);
+        break;
+      }
       case 'produced': {
         const p = shown[e.player];
         for (const res of RESOURCES) p.resources[res] += e.gained[res];

@@ -661,6 +661,34 @@ label.check input {
   accent-color: var(--gold);
 }
 
+.twilight-toggle {
+  align-items: flex-start;
+}
+
+.twilight-toggle input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.twilight-toggle span svg {
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  color: #ff9a5a;
+}
+
+.twilight-toggle small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.room-info small svg {
+  vertical-align: -2px;
+}
+
 input.shake {
   animation: shake 0.4s;
 }

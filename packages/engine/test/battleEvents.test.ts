@@ -80,7 +80,7 @@ describe('battle events', () => {
   }
 
   it('fires every 8 turns, is announced in advance and never repeats back to back', () => {
-    let { state } = createGame({ seed: 'events', heroes: ['guardian', 'guardian'], rules: { turnLimit: 0 } });
+    let { state } = createGame({ seed: 'events', heroes: ['guardian', 'guardian'], rules: { turnLimit: 0, twilightTurn: 0 } });
     const fired: Array<{ id: string; turn: number }> = [];
     let announced = state.upcomingEvent;
     expect(announced.turn).toBe(9);

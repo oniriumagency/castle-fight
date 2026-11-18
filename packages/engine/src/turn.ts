@@ -11,6 +11,8 @@ import {
   loseStructure,
   nextAlive,
   opponents,
+  twilightDeadline,
+  twilightLevel,
 } from './core';
 import { runOps } from './effects';
 import { randomPick } from './rng';
@@ -75,9 +77,37 @@ function fireBattleEvent(state: GameState, events: GameEvent[]): void {
 }
 
 /**
+ * Twilight Fury: once a game runs long, every attack hits harder and the
+ * Walls crumble a little more each turn, until the deadline decides it.
+ */
+function twilight(state: GameState, events: GameEvent[], player: PlayerId): void {
+  const level = twilightLevel(state);
+  if (level === 0) return;
+  const rules = state.rules;
+  if ((state.turn - rules.twilightTurn) % Math.max(1, rules.twilightEvery) === 0) {
+    events.push({ type: 'twilightRose', level, deadline: twilightDeadline(rules) });
+  }
+  // Like a battle event: not an attack, ignores Shield and does not charge the ultimate.
+  const reason = { kind: 'twilight' as const, id: 'twilight' };
+  loseStructure(state, events, player, 'wall', level * (rules.twilightErosion ?? 0), 0, reason);
+  loseStructure(state, events, player, 'keep', level * (rules.twilightKeepErosion ?? 0), rules.eventKeepFloor, reason);
+}
+
+/** The game is decided on points: highest Keep, then Wall, among the castles standing; a tie is a draw. */
+function decideOnPoints(state: GameState, events: GameEvent[], reason: 'turnLimit' | 'twilight'): void {
+  const ranked = alivePlayers(state).sort(
+    (x, y) =>
+      state.players[y]!.keep - state.players[x]!.keep || state.players[y]!.wall - state.players[x]!.wall,
+  );
+  const [first, second] = ranked.map((p) => state.players[p]!);
+  const tie = second !== undefined && first!.keep === second.keep && first!.wall === second.wall;
+  finishGame(state, events, tie ? null : ranked[0]!, reason);
+}
+
+/**
  * Begin the turn of `player`:
  *  1. effects that last "until your next turn" end;
- *  2. the battle event fires if it is due;
+ *  2. the battle event fires if it is due, and the Twilight Fury erodes the Wall;
  *  3. Burn deals its damage;
  *  4. enchantments with a start-of-turn effect trigger;
  *  5. workers produce (unless frozen) and the hero passive pays out.
@@ -109,8 +139,9 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
     }
   }
 
-  // 2. Battle event.
+  // 2. Battle event, then the Twilight Fury.
   if (state.turn >= state.upcomingEvent.turn) fireBattleEvent(state, events);
+  twilight(state, events, player);
 
   // 3. Burn. It is not an attack: no bonuses, and Shield does not stop it.
   if (self.burn > 0) {
@@ -204,15 +235,13 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
   self.schoolsThisTurn = [];
   events.push({ type: 'turnEnded', player, turn: state.turn });
 
+  const deadline = twilightDeadline(state.rules);
+  if (deadline > 0 && state.turn >= deadline) {
+    decideOnPoints(state, events, 'twilight');
+    return;
+  }
   if (state.rules.turnLimit > 0 && state.turn >= state.rules.turnLimit) {
-    // Highest Keep, then Wall, among the castles still standing; a tie is a draw.
-    const ranked = alivePlayers(state).sort(
-      (x, y) =>
-        state.players[y]!.keep - state.players[x]!.keep || state.players[y]!.wall - state.players[x]!.wall,
-    );
-    const [first, second] = ranked.map((p) => state.players[p]!);
-    const tie = second !== undefined && first!.keep === second.keep && first!.wall === second.wall;
-    finishGame(state, events, tie ? null : ranked[0]!, 'turnLimit');
+    decideOnPoints(state, events, 'turnLimit');
     return;
   }
 

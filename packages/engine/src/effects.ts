@@ -13,6 +13,7 @@ import {
   opponents,
   other,
   statusDurationBonus,
+  twilightLevel,
 } from './core';
 import { randomPick } from './rng';
 import type {
@@ -225,7 +226,8 @@ function applyOp(
   switch (op.op) {
     case 'wall':
     case 'keep': {
-      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0) + discardBonus(ctx, op);
+      const fury = op.op === 'keep' ? twilightLevel(state) * (state.rules.twilightBuildBonus ?? 0) : 0;
+      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0) + discardBonus(ctx, op) + fury;
       if (amount <= 0) return null;
       build(state, events, me, op.op, amount, reason);
       return null;
