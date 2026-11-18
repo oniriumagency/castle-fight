@@ -308,7 +308,8 @@
 }
 
 .hero-grid .card {
-  --w: clamp(120px, min(15vw, 24vh), 200px);
+  /* Big enough to read each hero's passive and ultimate on the card itself. */
+  --w: clamp(150px, min(16.5vw, calc((100vh - 150px) / 2.9)), 250px);
   cursor: pointer;
   transition: transform 0.2s, filter 0.2s, box-shadow 0.2s;
   filter: saturate(0.7) brightness(0.8);
@@ -330,17 +331,22 @@
 }
 
 .hero-detail {
-  width: min(380px, 40vw);
+  width: min(380px, 34vw);
+  min-width: 0;
   padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   max-height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
+/* The whole illustration (4:3), so the hero's head is never cut. */
 .hero-portrait {
-  height: 150px;
+  flex: none;
+  aspect-ratio: 4 / 3;
+  max-height: 30vh;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 0 0 1px var(--gold-d), 0 0 0 3px rgb(0 0 0 / 60%), 0 0 30px color-mix(in srgb, var(--hero) 60%, transparent);
@@ -350,7 +356,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 30%;
+  object-position: 50% 12%;
 }
 
 .hero-detail h2 {
@@ -430,8 +436,29 @@
   padding-top: 6px;
 }
 
+.hero-actions .btn {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Back and Start stay in view at the bottom of the panel, even when its content scrolls. */
+.hero-actions {
+  position: sticky;
+  bottom: -18px;
+  margin-bottom: -18px;
+  padding-bottom: 18px;
+  padding-top: 14px;
+  background: linear-gradient(180deg, transparent, var(--panel-solid) 22%);
+}
+
 .hero-actions .btn.primary {
   flex: 1;
+  padding-inline: 14px;
+}
+
+@media (max-width: 1180px) {
+  .hero-actions .btn { padding-inline: 12px; font-size: 0.95rem; }
+  .hero-actions .btn.primary { padding-inline: 10px; }
 }
 
 @media (max-width: 900px), (max-height: 560px) {

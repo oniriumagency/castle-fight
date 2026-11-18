@@ -379,3 +379,12 @@
 .card.compact.long-rules .rules { font-size: max(4.8cqw, 9px); line-height: 1.08; }
 .card.compact .cost { width: 24cqw; height: 29cqw; }
 .card.compact .cost span { font-size: max(11.5cqw, 13px); }
+
+.card.compact .rules.hero-rules,
+.card.compact.mid-rules .rules.hero-rules,
+.card.compact.long-rules .rules.hero-rules {
+  font-size: max(7.4cqw, 12.5px);
+  line-height: 1.2;
+  padding: 2.6cqw 3cqw 4.4cqw;
+}
+.card.compact .hero-rules p { margin-bottom: 2.2cqw; }
