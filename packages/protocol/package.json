@@ -1,12 +1,13 @@
 {
   "name": "@cardcraft-castles/protocol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Mensajes entre cliente y servidor de Cardcraft: Castles",
+  "description": "Mensajes entre cliente y servidor de Cardcraft: Castles, y SDK de cliente tipado",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
