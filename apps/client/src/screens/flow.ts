@@ -8,6 +8,7 @@ import type { Difficulty } from '../game/ai';
 import { LocalSession } from '../game/localSession';
 import type { MatchSession } from '../game/session';
 import { boardScreen } from './board/board';
+import { ffaScreen } from './ffa';
 import { heroSelectScreen, type HeroSelectMode } from './heroSelect';
 import { lobbyScreen } from './lobby';
 import { menuScreen } from './menu';
@@ -74,6 +75,12 @@ export const flow = {
       ],
     });
     flow.board(session);
+  },
+
+  /** Free-for-all prototype: you against two AIs. */
+  ffa(): void {
+    setRoomInUrl(null);
+    show(ffaScreen());
   },
 
   /** Back into the unfinished game saved on this device. False when there is none. */

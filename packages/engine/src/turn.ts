@@ -6,9 +6,11 @@ import {
   dealDamage,
   drawCards,
   emptyResources,
+  alivePlayers,
   finishGame,
   loseStructure,
-  other,
+  nextAlive,
+  opponents,
 } from './core';
 import { runOps } from './effects';
 import { randomPick } from './rng';
@@ -29,7 +31,7 @@ function fireBattleEvent(state: GameState, events: GameEvent[]): void {
   const lasting = effect.kind === 'halfCost' || effect.kind === 'banSchool';
   events.push({ type: 'battleEventStarted', eventId: id, turns: lasting ? effect.turns : null });
 
-  const both: PlayerId[] = [state.active, other(state.active)];
+  const both: PlayerId[] = [state.active, ...opponents(state, state.active)];
   switch (effect.kind) {
     case 'bothLoseWall':
       for (const p of both) loseStructure(state, events, p, 'wall', effect.amount, 0, reason);
@@ -82,8 +84,7 @@ function fireBattleEvent(state: GameState, events: GameEvent[]): void {
  * The game can end during steps 3 and 4.
  */
 export function startTurn(state: GameState, events: GameEvent[], player: PlayerId, extraTurn: boolean): void {
-  const self = state.players[player];
-  const opp = state.players[other(player)];
+  const self = state.players[player]!;
 
   state.turn += 1;
   state.active = player;
@@ -98,10 +99,14 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
     self.drawbridge = false;
     events.push({ type: 'drawbridgeLowered', player });
   }
-  if (opp.handRevealed) {
-    opp.handRevealed = false;
-    events.push({ type: 'handHidden', player: other(player) });
-  }
+  state.players.forEach((p, i) => {
+    // Hands this player revealed hide again. (Old saves have no `revealedBy`: 2 players only.)
+    if (i !== player && p.handRevealed && (p.revealedBy ?? player) === player) {
+      p.handRevealed = false;
+      delete p.revealedBy;
+      events.push({ type: 'handHidden', player: i });
+    }
+  });
 
   // 2. Battle event.
   if (state.turn >= state.upcomingEvent.turn) fireBattleEvent(state, events);
@@ -109,12 +114,16 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
   // 3. Burn. It is not an attack: no bonuses, and Shield does not stop it.
   if (self.burn > 0) {
     self.burn -= 1;
-    dealDamage(state, events, other(player), player, state.rules.burnDamage, {
+    dealDamage(state, events, nextAlive(state, player), player, state.rules.burnDamage, {
       kind: 'normal',
       cause: 'burn',
       attack: false,
     });
     if (checkGameOver(state, events)) return;
+    if (self.eliminated) {
+      endTurn(state, events);
+      return;
+    }
   }
 
   // 4. Enchantment upkeep.
@@ -163,10 +172,10 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
  */
 export function endTurn(state: GameState, events: GameEvent[]): void {
   const player = state.active;
-  const self = state.players[player];
+  const self = state.players[player]!;
   state.actionsLeft = 0;
 
-  drawCards(state, events, player, state.rules.handSize - self.hand.length);
+  if (!self.eliminated) drawCards(state, events, player, state.rules.handSize - self.hand.length);
 
   // Enchantments last for the owner's next N turns: the turn they are played
   // on does not count.
@@ -195,17 +204,22 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
   events.push({ type: 'turnEnded', player, turn: state.turn });
 
   if (state.rules.turnLimit > 0 && state.turn >= state.rules.turnLimit) {
-    const [a, b] = state.players;
-    const diff = a.keep - b.keep || a.wall - b.wall;
-    finishGame(state, events, diff === 0 ? null : diff > 0 ? 0 : 1, 'turnLimit');
+    // Highest Keep, then Wall, among the castles still standing; a tie is a draw.
+    const ranked = alivePlayers(state).sort(
+      (x, y) =>
+        state.players[y]!.keep - state.players[x]!.keep || state.players[y]!.wall - state.players[x]!.wall,
+    );
+    const [first, second] = ranked.map((p) => state.players[p]!);
+    const tie = second !== undefined && first!.keep === second.keep && first!.wall === second.wall;
+    finishGame(state, events, tie ? null : ranked[0]!, 'turnLimit');
     return;
   }
 
-  if (self.extraTurns > 0) {
+  if (self.extraTurns > 0 && !self.eliminated) {
     self.extraTurns -= 1;
     startTurn(state, events, player, true);
   } else {
-    startTurn(state, events, other(player), false);
+    startTurn(state, events, nextAlive(state, player), false);
   }
 }
 
@@ -215,7 +229,8 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
  */
 export function settle(state: GameState, events: GameEvent[]): void {
   if (state.phase === 'finished' || state.pending) return;
-  if (state.actionsLeft > 0 && state.players[state.active].hand.length > 0) {
+  const self = state.players[state.active]!;
+  if (state.actionsLeft > 0 && !self.eliminated && self.hand.length > 0) {
     state.phase = 'action';
   } else {
     endTurn(state, events);

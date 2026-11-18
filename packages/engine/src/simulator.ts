@@ -28,8 +28,8 @@ export const eagerPolicy: Policy = (_state, legal, rng) => {
 };
 
 export interface PlayoutOptions extends GameOptions {
-  /** One policy for both players, or one each. Defaults to `eagerPolicy`. */
-  policy?: Policy | [Policy, Policy];
+  /** One policy for every player, or one each. Defaults to `eagerPolicy`. */
+  policy?: Policy | Policy[];
   /** Called after every action, for invariant checks. */
   onStep?: (state: GameState, action: Action) => void;
   /** Safety net against endless games. */
@@ -43,31 +43,31 @@ export interface PlayoutResult {
   firstPlayer: PlayerId;
   actions: Action[];
   /** Cards played by each player, in order. */
-  played: [CardId[], CardId[]];
+  played: CardId[][];
   finalState: GameState;
 }
 
 /** Play one whole game. */
 export function playGame(options: PlayoutOptions): PlayoutResult {
-  const policies: [Policy, Policy] = Array.isArray(options.policy)
+  const policies: Policy[] = Array.isArray(options.policy)
     ? options.policy
-    : [options.policy ?? eagerPolicy, options.policy ?? eagerPolicy];
+    : options.heroes.map(() => (options.policy as Policy | undefined) ?? eagerPolicy);
   const rng: RngHolder = { rng: hashSeed(`policy:${options.seed}`) };
   const maxActions = options.maxActions ?? 5000;
 
   let { state } = createGame(options);
   const firstPlayer = state.active;
   const actions: Action[] = [];
-  const played: [CardId[], CardId[]] = [[], []];
+  const played: CardId[][] = options.heroes.map(() => []);
 
   while (state.phase !== 'finished' && actions.length < maxActions) {
-    const action = policies[state.active](state, legalActions(state), rng);
+    const action = policies[state.active]!(state, legalActions(state), rng);
     const result = applyAction(state, action);
     if (!result.ok) {
       throw new Error(`Policy chose an illegal action (${result.error.code}): ${JSON.stringify(action)}`);
     }
     for (const event of result.events) {
-      if (event.type === 'cardPlayed') played[event.player].push(event.cardId);
+      if (event.type === 'cardPlayed') played[event.player]!.push(event.cardId);
     }
     state = result.state;
     actions.push(action);
@@ -90,8 +90,10 @@ export interface SimulationOptions {
   seed?: number | string;
   /** Heroes to draw from. Defaults to all of them. */
   heroes?: HeroId[];
-  policy?: Policy | [Policy, Policy];
+  policy?: Policy | Policy[];
   rules?: Partial<Rules>;
+  /** Players per game (2 by default; 3 for the free-for-all prototype). */
+  players?: number;
 }
 
 export interface SimulationReport {
@@ -101,6 +103,8 @@ export interface SimulationReport {
   maxTurns: number;
   /** Share of decided games won by the player who moved first. */
   firstPlayerWinRate: number;
+  /** Share of decided games won by each seat in turn order (index 0 = moved first). */
+  seatWinRates: number[];
   draws: number;
   reasons: Record<string, number>;
   heroes: Record<HeroId, { games: number; wins: number; winRate: number }>;
@@ -122,9 +126,11 @@ export function simulate(options: SimulationOptions): SimulationReport {
   let decided = 0;
   let firstPlayerWins = 0;
   let draws = 0;
+  const seats = options.players ?? 2;
+  const seatWins: number[] = Array.from({ length: seats }, () => 0);
 
   for (let i = 0; i < options.games; i++) {
-    const pair: [HeroId, HeroId] = [randomPick(rng, heroPool), randomPick(rng, heroPool)];
+    const pair: HeroId[] = Array.from({ length: seats }, () => randomPick(rng, heroPool));
     const result = playGame({
       seed: `${options.seed ?? 0}:${i}`,
       heroes: pair,
@@ -140,13 +146,14 @@ export function simulate(options: SimulationOptions): SimulationReport {
     else {
       decided += 1;
       if (result.winner === result.firstPlayer) firstPlayerWins += 1;
+      seatWins[(result.winner - result.firstPlayer + seats) % seats]! += 1;
     }
 
-    for (const player of [0, 1] as const) {
-      const hero = (heroes[pair[player]] ??= { games: 0, wins: 0, winRate: 0 });
+    for (let player = 0; player < seats; player++) {
+      const hero = (heroes[pair[player]!] ??= { games: 0, wins: 0, winRate: 0 });
       hero.games += 1;
       if (result.winner === player) hero.wins += 1;
-      for (const cardId of result.played[player]) {
+      for (const cardId of result.played[player]!) {
         const card = (cardStats[cardId] ??= { played: 0, inWins: 0 });
         card.played += 1;
         if (result.winner === player) card.inWins += 1;
@@ -166,6 +173,7 @@ export function simulate(options: SimulationOptions): SimulationReport {
     minTurns: options.games ? minTurns : 0,
     maxTurns,
     firstPlayerWinRate: decided ? firstPlayerWins / decided : 0,
+    seatWinRates: seatWins.map((w) => (decided ? w / decided : 0)),
     draws,
     reasons,
     heroes,

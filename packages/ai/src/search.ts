@@ -40,7 +40,7 @@ function distinctActions(state: GameState, w: Weights, onlyBestDiscard: boolean)
   for (const action of legalActions(state)) {
     if (action.type === 'play' || action.type === 'discard') {
       const cardId = cardOf(state, player, action.uid);
-      const key = `${action.type}:${cardId}`;
+      const key = `${action.type}:${cardId}:${action.type === 'play' ? (action.target ?? '') : ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
       if (action.type === 'discard' && onlyBestDiscard) {
@@ -135,9 +135,15 @@ export function rankActions(view: PlayerView, profile: Profile, w: Weights, rng:
   for (const action of legal) {
     let key: string;
     if (action.type === 'play' || action.type === 'discard') {
-      key = `${action.type}:${view.players[me].hand.find((c) => c.uid === action.uid)!.cardId}`;
+      const target = action.type === 'play' ? (action.target ?? '') : '';
+      key = `${action.type}:${view.players[me]!.hand.find((c) => c.uid === action.uid)!.cardId}:${target}`;
     } else {
-      key = action.type === 'choose' ? `choose:${action.option}` : action.type;
+      key =
+        action.type === 'choose'
+          ? `choose:${action.option}`
+          : action.type === 'ultimate'
+            ? `ultimate:${action.target ?? ''}`
+            : action.type;
     }
     if (seen.has(key)) continue;
     seen.add(key);

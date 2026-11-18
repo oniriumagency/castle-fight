@@ -17,8 +17,73 @@ import type {
 
 /** Shared low-level helpers. Everything here mutates the state it is given. */
 
+/** The opponent in a 2-player game. With 3+ players use `opponents` instead. */
 export function other(player: PlayerId): PlayerId {
   return player === 0 ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Seats (2 players, or 3+ in free-for-all)
+// ---------------------------------------------------------------------------
+
+type Seats = Pick<Board, 'players'>;
+
+export function isAlive(state: Seats, player: PlayerId): boolean {
+  return !state.players[player]?.eliminated;
+}
+
+/** Players still in the game. */
+export function alivePlayers(state: Seats): PlayerId[] {
+  return state.players.map((_, i) => i).filter((i) => isAlive(state, i));
+}
+
+/** Living rivals of `player`, in turn order starting with the one who plays next. */
+export function opponents(state: Seats, player: PlayerId): PlayerId[] {
+  const n = state.players.length;
+  const list: PlayerId[] = [];
+  for (let k = 1; k < n; k++) {
+    const p = (player + k) % n;
+    if (isAlive(state, p)) list.push(p);
+  }
+  return list;
+}
+
+/** The next living player after `player` in turn order (`player` itself if alone). */
+export function nextAlive(state: Seats, player: PlayerId): PlayerId {
+  return opponents(state, player)[0] ?? player;
+}
+
+/** True when the game has 3+ seats (free-for-all rules apply). */
+export function isMultiplayer(state: Seats): boolean {
+  return state.players.length > 2;
+}
+
+/** The living player with the strictly highest Keep, or null on a tie. */
+export function leaderOf(state: Seats & { players: { keep: number }[] }): PlayerId | null {
+  let best: PlayerId | null = null;
+  let tie = false;
+  for (const p of alivePlayers(state)) {
+    if (best === null || state.players[p]!.keep > state.players[best]!.keep) {
+      best = p;
+      tie = false;
+    } else if (state.players[p]!.keep === state.players[best]!.keep) tie = true;
+  }
+  return tie ? null : best;
+}
+
+/**
+ * The rival a single-target effect hits when nobody picked one: the living
+ * rival with the highest Keep (then Wall), so the default goes after the leader.
+ */
+export function defaultTarget(state: GameState, player: PlayerId): PlayerId {
+  const list = opponents(state, player);
+  let best = list[0] ?? other(player);
+  for (const p of list) {
+    const a = state.players[p]!;
+    const b = state.players[best]!;
+    if (a.keep > b.keep || (a.keep === b.keep && a.wall > b.wall)) best = p;
+  }
+  return best;
 }
 
 export function emptyResources(value = 0): ResourceMap {
@@ -47,7 +112,7 @@ function clonePlayer(p: PlayerState): PlayerState {
 export function cloneState(s: GameState): GameState {
   return {
     ...s,
-    players: [clonePlayer(s.players[0]), clonePlayer(s.players[1])],
+    players: s.players.map(clonePlayer),
     pending: s.pending
       ? {
           ...s.pending,
@@ -112,9 +177,11 @@ export function effectiveCost(state: Board, player: PlayerId, cardId: CardId): n
   const reduction = getHero(state.players[player].hero).passive.costReduction;
   if (reduction && reduction.school === card.school) cost -= reduction.amount;
 
-  for (const e of state.players[other(player)].enchantments) {
-    const increase = getEnchantmentModifiers(e.cardId)?.opponentCostIncrease;
-    if (increase && increase.school === card.school) cost += increase.amount;
+  for (const rival of opponents(state, player)) {
+    for (const e of state.players[rival]!.enchantments) {
+      const increase = getEnchantmentModifiers(e.cardId)?.opponentCostIncrease;
+      if (increase && increase.school === card.school) cost += increase.amount;
+    }
   }
 
   cost = Math.max(0, cost);
@@ -256,6 +323,10 @@ export function dealDamage(
 
   if (options.attack) {
     amount += attackBonus(state, source);
+    // Free-for-all: the leader is everyone's target, so it takes a little more.
+    if (state.rules.leaderExtraDamage && isMultiplayer(state) && leaderOf(state) === target) {
+      amount += state.rules.leaderExtraDamage;
+    }
     if (t.shield > 0) {
       t.shield -= 1;
       events.push({
@@ -380,20 +451,70 @@ export function finishGame(
   events.push({ type: 'gameOver', winner, reason });
 }
 
+/** Take `player` out of the game (3+ players). `by` gains the elimination bounty. */
+export function eliminate(state: GameState, events: GameEvent[], player: PlayerId, by: PlayerId | null): void {
+  const p = state.players[player]!;
+  if (p.eliminated) return;
+  p.eliminated = true;
+  p.keep = Math.max(0, p.keep);
+  p.burn = 0;
+  p.extraTurns = 0;
+  for (const e of p.enchantments) {
+    events.push({ type: 'enchantmentRemoved', player, cardId: e.cardId, reason: 'destroyed' });
+  }
+  p.enchantments = [];
+  if (p.handRevealed) {
+    p.handRevealed = false;
+    events.push({ type: 'handHidden', player });
+  }
+  events.push({ type: 'playerEliminated', player, by });
+  const bounty = state.rules.eliminationBounty;
+  if (by !== null && by !== player && bounty > 0) {
+    changeResources(state, events, by, { piedra: bounty, acero: bounty, mana: bounty }, {
+      kind: 'hero',
+      id: state.players[by]!.hero,
+    });
+  }
+  if (state.active === player && state.phase !== 'finished') {
+    // The fallen player's turn is over: drop any pending choice.
+    state.pending = null;
+    state.phase = 'action';
+    state.actionsLeft = 0;
+  }
+}
+
 /**
- * End the game if a Keep reached the winning height or fell to 0. When both
- * players qualify at once, the active player wins. Returns true if the game is over.
+ * End the game if a Keep reached the winning height or fell to 0. When several
+ * players qualify at once, the active player wins (then turn order decides).
+ * With 3+ players a fallen castle is eliminated and the game goes on until one
+ * castle is left standing. Returns true if the game is over.
  */
 export function checkGameOver(state: GameState, events: GameEvent[]): boolean {
   if (state.phase === 'finished') return true;
-  const a = state.active;
-  const b = other(a);
-  const pa = state.players[a];
-  const pb = state.players[b];
   const win = state.rules.keepWin;
-  if (pa.keep >= win) finishGame(state, events, a, 'keepBuilt');
-  else if (pb.keep <= 0) finishGame(state, events, a, 'keepDestroyed');
-  else if (pa.keep <= 0) finishGame(state, events, b, 'keepDestroyed');
-  else if (pb.keep >= win) finishGame(state, events, b, 'keepBuilt');
+  const a = state.active;
+  const order = [a, ...opponents(state, a)];
+  const alive = (p: PlayerId) => !state.players[p]!.eliminated;
+
+  if (alive(a) && state.players[a]!.keep >= win) {
+    finishGame(state, events, a, 'keepBuilt');
+    return true;
+  }
+  const fallen = order.filter((p) => alive(p) && state.players[p]!.keep <= 0);
+  const standing = order.filter((p) => alive(p) && state.players[p]!.keep > 0);
+  if (fallen.length > 0) {
+    if (standing.length === 0) {
+      // Everyone fell at once: the active player wins.
+      finishGame(state, events, a, 'keepDestroyed');
+      return true;
+    }
+    if (standing.length === 1) {
+      finishGame(state, events, standing[0]!, 'keepDestroyed');
+      return true;
+    }
+    for (const p of fallen) eliminate(state, events, p, a);
+  }
+  const builder = standing.find((p) => state.players[p]!.keep >= win);
+  if (builder !== undefined) finishGame(state, events, builder, 'keepBuilt');
   return state.result !== null;
 }
