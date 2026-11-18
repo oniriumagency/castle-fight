@@ -163,6 +163,8 @@ const STRINGS = {
   ultimateReady: { es: '¡Definitiva lista!', en: 'Ultimate ready!' },
   legendaryCall: { es: '¡Legendaria!', en: 'Legendary!' },
   ultimateReadyBig: { es: '¡Definitiva lista!', en: 'Ultimate ready!' },
+  ultimateUsedCall: { es: '¡{who} ha usado su definitiva!', en: '{who} used their ultimate!' },
+  ultimateUsedSelf: { es: '¡Has usado tu definitiva!', en: 'You used your ultimate!' },
   ultimateReadyHint: { es: 'Úsala con tu héroe, junto a tus cartas', en: 'Use it with your hero, next to your cards' },
   ultimateFree: { es: 'No gasta tu jugada', en: 'Does not use up your play' },
   ultimateOnYourTurn: { es: 'Úsala en tu turno', en: 'Use it on your turn' },
