@@ -237,25 +237,48 @@ class BoardScreen implements Screen {
   private layout(): void {
     const w = window.innerWidth;
     const hgt = window.innerHeight;
-    const short = hgt < 520;
-    // Hand cards: as big as the screen allows without eating the castles.
-    const cardW = Math.round(Math.max(78, Math.min(w * 0.115, hgt * (short ? 0.24 : 0.2), 176)));
+    const portrait = hgt > w;
+    const short = !portrait && hgt < 520;
+    const touch = matchMedia('(hover: none)').matches;
+    // Phones get a hand made to be read: no overlap, no part below the edge.
+    const phonePortrait = portrait && w < 640;
+    let cardW: number;
+    let peek: number;
+    if (phonePortrait) {
+      cardW = Math.min(w * 0.31, hgt * 0.17, 150);
+      peek = 0;
+      this.hand.mode = 'scroll';
+    } else if (short) {
+      cardW = Math.min((w - 40) / 6.25, (hgt * 0.4) / 1.4);
+      peek = 0.05;
+      this.hand.mode = 'row';
+    } else {
+      cardW = Math.min(w * 0.115, hgt * 0.2, 176);
+      if (portrait) cardW = Math.min(w * 0.16, hgt * 0.15, 176);
+      // With a mouse the cards rest partly below the edge and rise on hover.
+      peek = touch ? 0 : 0.3;
+      this.hand.mode = w < 700 || touch ? 'row' : 'fan';
+    }
+    cardW = Math.round(Math.max(72, cardW));
+    this.hand.compact = cardW < 150;
+    this.hand.previewHost = touch ? null : this.layer;
     this.el.style.setProperty('--card-w', `${cardW}px`);
+    this.el.style.setProperty('--peek-f', String(peek));
     this.el.classList.toggle('short', short);
     this.el.classList.toggle('narrow', w < 760);
+    this.el.classList.toggle('phone-portrait', phonePortrait);
+    this.el.classList.toggle('touch', touch);
 
     const left = this.panels[0].el.getBoundingClientRect();
     const right = this.panels[1].el.getBoundingClientRect();
     const top = this.el.querySelector('.topbar')!.getBoundingClientRect();
-    const portrait = hgt > w;
-    // Visible part of the resting hand (see --peek-f in board.css), plus room for the castle plaques.
-    const peek = short ? 0.34 : 0.3;
-    const handTop = hgt - 6 - cardW * 1.4 * (1 - peek);
-    const plaqueRoom = short ? 34 : 46;
+    // Top of the resting hand, plus room for the castle plaques.
+    const handTop = hgt - 6 - cardW * 1.4 * (1 - peek) - (phonePortrait ? 6 : 0);
+    const plaqueRoom = short ? 30 : 46;
     const fieldLeft = portrait ? 0 : left.right;
     const fieldRight = portrait ? w : right.left;
-    const fieldTop = portrait ? Math.max(top.bottom, left.bottom) : top.bottom;
-    const rect = { left: fieldLeft, top: fieldTop, width: Math.max(200, fieldRight - fieldLeft), height: Math.max(120, (handTop - plaqueRoom - fieldTop) / 0.94) };
+    const fieldTop = portrait ? Math.max(top.bottom, left.bottom, right.bottom) : top.bottom;
+    const rect = { left: fieldLeft, top: fieldTop, width: Math.max(200, fieldRight - fieldLeft), height: Math.max(90, (handTop - plaqueRoom - fieldTop) / 0.94) };
     this.field.layout(rect);
     const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
     Object.assign(fieldEl.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });

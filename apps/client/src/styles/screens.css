@@ -486,6 +486,8 @@
 
   .hero-grid {
     grid-template-columns: repeat(3, auto);
+    flex: none;
+    justify-content: center;
   }
 
   .hero-grid .card {
@@ -641,7 +643,7 @@ input.shake {
   40%, 80% { transform: translateX(6px); }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px) and (orientation: portrait) {
   .lobby-body {
     flex-direction: column;
     overflow-y: auto;
@@ -850,4 +852,65 @@ input.shake {
   width: 0.95em;
   height: 0.95em;
   vertical-align: -0.12em;
+}
+
+/* Phones in landscape: lobby side by side, hero details wide enough for their buttons. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .lobby-body {
+    gap: 10px;
+  }
+
+  .lobby-side {
+    width: min(300px, 42vw);
+    overflow-y: auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .lobby-side .btn.big {
+    min-height: 40px;
+    padding-block: 6px;
+  }
+
+  .lobby-side input[type='text'] {
+    padding-block: 6px;
+  }
+
+  .lobby .screen-head,
+  .lobby-screen .screen-head {
+    padding-block: 6px;
+  }
+
+  .room {
+    grid-template-columns: 1fr auto;
+  }
+
+  .room-status,
+  .room-players {
+    display: none;
+  }
+
+  .hero-body {
+    gap: 12px;
+  }
+
+  .hero-grid .card {
+    --w: clamp(64px, 24vh, 110px);
+  }
+
+  .hero-detail {
+    width: min(420px, 54vw);
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    padding-inline: 12px;
+    font-size: 0.95rem;
+  }
+
+  .hero-actions .btn.primary {
+    flex: 2 1 auto;
+  }
 }

@@ -56,6 +56,18 @@ export class Hand {
   deckPoint = { x: 0, y: 0 };
   /** Drop target for discards. */
   discardTarget: HTMLElement | null = null;
+  /**
+   * fan: overlapping arc (desktop). row: flat row, little or no overlap
+   * (phones in landscape). scroll: a row wider than the screen that scrolls
+   * sideways (phones in portrait), so every card is big enough to read.
+   */
+  mode: 'fan' | 'row' | 'scroll' = 'fan';
+  /** Small cards use the compact frame with a readable minimum text size. */
+  compact = false;
+  /** Where the big hover preview goes (mouse only); null disables it. */
+  previewHost: HTMLElement | null = null;
+  private preview: { uid: number; el: HTMLElement } | null = null;
+  private readonly spacer = h('div.hand-spacer', { 'aria-hidden': 'true' });
 
   onSelect: (uid: number | null) => void = () => {};
   onPlay: (uid: number) => void = () => {};
@@ -93,6 +105,7 @@ export class Hand {
     const index = this.slots.findIndex((s) => s.uid === uid);
     if (index < 0) return null;
     const [slot] = this.slots.splice(index, 1);
+    this.hidePreview(uid);
     if (this.selected === uid) this.select(null);
     this.layout();
     return slot.el;
@@ -125,6 +138,7 @@ export class Hand {
     }
     for (const gone of keep.values()) gone.el.remove();
     this.slots = next;
+    if (this.preview && !this.slots.some((s) => s.uid === this.preview!.uid)) this.hidePreview();
     if (this.selected !== null && !this.slots.some((s) => s.uid === this.selected)) this.select(null);
     this.refreshStates();
     this.layout();
@@ -154,20 +168,26 @@ export class Hand {
   /** Positions the cards in a fan (or a flat row on narrow screens). */
   layout(): void {
     const n = this.slots.length;
+    this.el.classList.toggle('scroll', this.mode === 'scroll');
+    if (!this.spacer.isConnected) this.el.prepend(this.spacer);
     if (n === 0) return;
     const width = this.el.clientWidth;
     const cardW = parseFloat(getComputedStyle(this.el).getPropertyValue('--card-w')) || 150;
-    const flat = width < 700;
-    const gap = Math.min(cardW * 0.94, (width - cardW) / Math.max(1, n - 1));
+    const flat = this.mode !== 'fan';
+    const scroll = this.mode === 'scroll';
+    const pad = scroll ? 10 : 0;
+    const gap = scroll ? cardW + 8 : Math.min(flat ? cardW + 8 : cardW * 0.94, (width - cardW) / Math.max(1, n - 1));
     const total = gap * (n - 1) + cardW;
-    const start = (width - total) / 2;
+    const start = scroll ? Math.max(pad, (width - total) / 2) : (width - total) / 2;
+    this.spacer.style.width = scroll ? `${total + pad * 2}px` : '0px';
     const mid = (n - 1) / 2;
     this.slots.forEach((slot, i) => {
+      slot.el.classList.toggle('compact', this.compact);
       const x = start + gap * i;
       const off = i - mid;
       const rot = flat ? 0 : off * 3.2;
       const y = flat ? 0 : off * off * 3.2;
-      const lifted = slot.uid === this.selected ? -cardW * 0.22 : 0;
+      const lifted = slot.uid === this.selected && !scroll ? -cardW * 0.22 : 0;
       slot.el.style.setProperty('--x', `${x}px`);
       slot.el.style.setProperty('--y', `${y + lifted}px`);
       slot.el.style.setProperty('--r', `${rot}deg`);
@@ -177,7 +197,39 @@ export class Hand {
     });
   }
 
+  /** Big readable copy of the hovered card above the hand (mouse only). */
+  private showPreview(uid: number): void {
+    const host = this.previewHost;
+    const slot = this.slots.find((s) => s.uid === uid);
+    if (!host || !slot?.cardId || this.selected !== null) return;
+    this.hidePreview();
+    const big = cardFace(slot.cardId, { calm: true });
+    const costEl = slot.el.querySelector('.cost');
+    if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
+    big.classList.add('hover-preview');
+    big.classList.toggle('combo', slot.el.classList.contains('combo'));
+    big.classList.toggle('blocked', slot.el.classList.contains('blocked'));
+    const r = slot.el.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+    const handTop = this.el.getBoundingClientRect().top;
+    // As large as the inspect view, standing on the hand and kept on screen.
+    const w = Math.round(Math.min(300, Math.max(200, (handTop - hostRect.top - 70) / 1.4)));
+    const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    big.style.setProperty('--w', `${w}px`);
+    big.style.left = `${x - hostRect.left}px`;
+    big.style.top = `${Math.max(64, handTop - w * 1.4 - 12) - hostRect.top}px`;
+    host.appendChild(big);
+    this.preview = { uid, el: big };
+  }
+
+  hidePreview(uid?: number): void {
+    if (!this.preview || (uid !== undefined && this.preview.uid !== uid)) return;
+    this.preview.el.remove();
+    this.preview = null;
+  }
+
   select(uid: number | null): void {
+    this.hidePreview();
     if (this.selected === uid) return;
     this.selected = uid;
     if (uid !== null) audio.play('cardSelect');
@@ -192,10 +244,14 @@ export class Hand {
     el.tabIndex = 0;
     el.dataset.uid = String(card.uid);
     el.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'mouse') audio.play('cardHover');
+      if (e.pointerType !== 'mouse') return;
+      audio.play('cardHover');
+      if (!this.drag?.active) this.showPreview(card.uid);
     });
+    el.addEventListener('pointerleave', () => this.hidePreview(card.uid));
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      this.hidePreview();
       this.drag = { uid: card.uid, el, startX: e.clientX, startY: e.clientY, dx: 0, dy: 0, active: false, pointer: e.pointerId };
     });
     el.addEventListener('click', () => {
@@ -225,11 +281,13 @@ export class Hand {
     d.dy = e.clientY - d.startY;
     if (!d.active) {
       if (Math.hypot(d.dx, d.dy) < 12) return;
-      if (!this.ctx?.canAct) {
+      // In a scrolling hand a sideways swipe scrolls; only an upward pull drags.
+      if (!this.ctx?.canAct || (this.mode === 'scroll' && Math.abs(d.dx) > Math.abs(d.dy))) {
         this.drag = null;
         return;
       }
       d.active = true;
+      this.hidePreview();
       d.el.classList.add('dragging');
       this.el.classList.add('has-drag');
       try {
