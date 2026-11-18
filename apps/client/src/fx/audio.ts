@@ -1,64 +1,85 @@
 import { settings } from '../app/settings';
+import { Instruments } from './sound/instruments';
+import { MusicPlayer, type MusicTrack } from './sound/music';
+import { idle, renderRecipe } from './sound/render';
+import { RECIPES, WARM_ORDER, type Cue } from './sound/sfx';
+import { impulseResponse, Synth } from './sound/synth';
+
+export type { Cue } from './sound/sfx';
+export type { MusicTrack } from './sound/music';
 
 /**
- * Audio hook. Every sound the interface makes goes through `audio.play(cue)`
- * and every music change through `audio.music(track)`, so the sound pass
- * only has to replace what each cue does (samples, Howler, layers) without
- * touching the screens.
+ * Every sound goes through here: `audio.play(cue)` for effects and
+ * `audio.music(track)` for the score. All of it is synthesized in the
+ * browser (see `sound/`), so the game downloads no audio at all. Nothing is
+ * built until the first tap or key press (browsers require it), and then
+ * the instruments and the most common effects are rendered a few at a time
+ * in idle moments.
  *
- * Until then the cues are short placeholder sounds synthesized with Web
- * Audio, and music is silent.
+ *   sfx ──┬──────────────► master ─► limiter ─► speakers
+ *         └─► reverb ──────┘   ▲
+ *   music ─► duck ─────────────┘ (and a reverb send)
  */
 
-export type Cue =
-  | 'uiHover'
-  | 'uiClick'
-  | 'uiBack'
-  | 'cardDraw'
-  | 'cardHover'
-  | 'cardSelect'
-  | 'cardPlay'
-  | 'cardDiscard'
-  | 'build'
-  | 'hit'
-  | 'hitBig'
-  | 'pierce'
-  | 'blocked'
-  | 'burn'
-  | 'frost'
-  | 'shield'
-  | 'enchant'
-  | 'resource'
-  | 'worker'
-  | 'ultimateReady'
-  | 'ultimate'
-  | 'event'
-  | 'yourTurn'
-  | 'tick'
-  | 'victory'
-  | 'defeat'
-  | 'error'
-  | 'emote';
+const INTENSITY_BUCKETS = [0.2, 0.55, 0.9];
+const MAX_VOICES = 28;
 
-export type MusicTrack = 'menu' | 'battle' | 'victory' | 'defeat' | null;
+export interface PlayOptions {
+  /** -1 (left) .. 1 (right): which castle the sound comes from. */
+  pan?: number;
+  /** Delay in ms. */
+  delay?: number;
+  /** Volume multiplier. */
+  gain?: number;
+}
+
+function normalize(buffer: AudioBuffer, level: number): void {
+  const data = buffer.getChannelData(0);
+  let peak = 0;
+  for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+  if (peak < 1e-4) return;
+  const k = level / peak;
+  for (let i = 0; i < data.length; i++) data[i] *= k;
+}
 
 class AudioBus {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private sfx: GainNode | null = null;
-  private musicGain: GainNode | null = null;
-  private currentTrack: MusicTrack = null;
-  private tension = 0;
+  private musicBus: GainNode | null = null;
+  private duckGain: GainNode | null = null;
+  private reverb: ConvolverNode | null = null;
+  private player: MusicPlayer | null = null;
+  private instruments: Instruments | null = null;
+  private bank = new Map<string, Promise<AudioBuffer | null>>();
   private lastPlayed = new Map<Cue, number>();
+  private voices = 0;
+  private wantedTrack: MusicTrack = null;
+  private tension = 0;
+  private warmed = false;
 
   constructor() {
     // Browsers only allow audio after a user gesture.
     const unlock = (): void => {
-      this.ensure();
-      void this.ctx?.resume();
+      const ctx = this.ensure();
+      if (ctx && ctx.state !== 'running' && document.visibilityState === 'visible') {
+        void ctx.resume().then(() => this.player?.resync());
+        // iOS needs a sound started inside the gesture to wake the output.
+        const silent = ctx.createBufferSource();
+        silent.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+        silent.connect(ctx.destination);
+        silent.start();
+      }
     };
-    window.addEventListener('pointerdown', unlock, { once: false, passive: true });
-    window.addEventListener('keydown', unlock, { once: false });
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown', unlock);
+    // No music in a background tab, and no battery spent on it.
+    document.addEventListener('visibilitychange', () => {
+      const ctx = this.ctx;
+      if (!ctx) return;
+      if (document.visibilityState === 'hidden') void ctx.suspend();
+      else void ctx.resume().then(() => this.player?.resync());
+    });
     settings.subscribe(() => this.applyVolumes());
   }
 
@@ -66,183 +87,165 @@ class AudioBus {
     if (this.ctx) return this.ctx;
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
-    this.ctx = new Ctor();
-    this.master = this.ctx.createGain();
-    this.sfx = this.ctx.createGain();
-    this.musicGain = this.ctx.createGain();
+    try {
+      // Mix with whatever else the phone is playing instead of stopping it.
+      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = 'ambient';
+    } catch {
+      // Not supported: the default session is fine.
+    }
+    const ctx = new Ctor({ latencyHint: 'interactive' });
+    this.ctx = ctx;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 8;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.2;
+    this.master = ctx.createGain();
+    this.sfx = ctx.createGain();
+    this.musicBus = ctx.createGain();
+    this.duckGain = ctx.createGain();
+    this.reverb = ctx.createConvolver();
+    this.reverb.buffer = impulseResponse(ctx);
+    const reverbReturn = ctx.createGain();
+    reverbReturn.gain.value = 0.55;
+    const musicSend = ctx.createGain();
+    musicSend.gain.value = 0.28;
+
     this.sfx.connect(this.master);
-    this.musicGain.connect(this.master);
-    this.master.connect(this.ctx.destination);
+    this.musicBus.connect(this.duckGain).connect(this.master);
+    this.duckGain.connect(musicSend).connect(this.reverb);
+    this.reverb.connect(reverbReturn).connect(this.master);
+    this.master.connect(limiter).connect(ctx.destination);
     this.applyVolumes();
-    return this.ctx;
+
+    this.instruments = new Instruments(ctx);
+    this.player = new MusicPlayer(ctx, this.musicBus, this.instruments);
+    this.player.setTension(this.tension);
+    if (this.wantedTrack) this.player.play(this.wantedTrack);
+    void this.warm();
+    return ctx;
   }
 
   private applyVolumes(): void {
     const s = settings.get();
-    if (this.master) this.master.gain.value = s.masterVolume;
-    if (this.sfx) this.sfx.gain.value = s.sfxVolume * 0.6;
-    if (this.musicGain) this.musicGain.gain.value = s.musicVolume;
+    const now = this.ctx?.currentTime ?? 0;
+    const set = (node: GainNode | null, value: number): void => {
+      node?.gain.setTargetAtTime(value, now, 0.05);
+    };
+    set(this.master, s.muted ? 0 : s.masterVolume);
+    set(this.sfx, s.sfxVolume * 0.9);
+    set(this.musicBus, s.musicVolume * 1.5);
   }
 
-  /** Plays a sound effect. `intensity` (0..1) scales big hits. */
-  play(cue: Cue, intensity = 0.5): void {
+  /** Renders the instruments, then the common effects, without blocking frames. */
+  private async warm(): Promise<void> {
+    if (this.warmed) return;
+    this.warmed = true;
+    await this.instruments?.prepare();
+    for (const cue of WARM_ORDER) {
+      if (RECIPES[cue].scaled) for (const k of INTENSITY_BUCKETS) void this.buffer(cue, k);
+      else void this.buffer(cue, 0.5);
+      await idle();
+    }
+  }
+
+  private buffer(cue: Cue, intensity: number): Promise<AudioBuffer | null> {
+    const recipe = RECIPES[cue];
+    const k = recipe.scaled ? INTENSITY_BUCKETS.reduce((a, b) => (Math.abs(b - intensity) < Math.abs(a - intensity) ? b : a)) : 0.5;
+    const key = recipe.scaled ? `${cue}@${k}` : cue;
+    let pending = this.bank.get(key);
+    if (!pending) {
+      pending = renderRecipe(recipe.len, this.ctx!.sampleRate, (s) => recipe.fn(s, k)).then((buffer) => {
+        if (buffer && recipe.level && !recipe.scaled) normalize(buffer, recipe.level);
+        return buffer;
+      });
+      this.bank.set(key, pending);
+    }
+    return pending;
+  }
+
+  /** Plays a sound effect. `intensity` (0..1) picks how hard hits and builds sound. */
+  play(cue: Cue, intensity = 0.5, opts: PlayOptions = {}): void {
     const ctx = this.ctx;
-    if (!ctx || ctx.state !== 'running' || !this.sfx) return;
+    if (!ctx || ctx.state !== 'running' || !this.sfx || settings.get().muted) return;
     // Do not stack the same cue within a few milliseconds (bursts of events).
     const now = performance.now();
     if (now - (this.lastPlayed.get(cue) ?? 0) < 35) return;
     this.lastPlayed.set(cue, now);
-    PLACEHOLDERS[cue]?.(new Synth(ctx, this.sfx), intensity);
+    if (this.voices >= MAX_VOICES) return;
+    const recipe = RECIPES[cue];
+    const requested = ctx.currentTime;
+    void this.buffer(cue, intensity).then((buffer) => {
+      // A sound that took too long to render would arrive late: drop it.
+      const late = ctx.currentTime - requested;
+      if (late > 0.25) return;
+      this.voices++;
+      const out = ctx.createGain();
+      out.gain.value = (opts.gain ?? 1) * (recipe.scaled ? 0.55 + intensity * 0.5 : 1);
+      let node: AudioNode = out;
+      if (opts.pan && ctx.createStereoPanner) {
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = Math.max(-1, Math.min(1, opts.pan));
+        out.connect(panner);
+        node = panner;
+      }
+      node.connect(this.sfx!);
+      if (recipe.verb && this.reverb) {
+        const send = ctx.createGain();
+        send.gain.value = recipe.verb;
+        node.connect(send).connect(this.reverb);
+      }
+      const at = ctx.currentTime + (opts.delay ?? 0) / 1000;
+      const release = (): void => {
+        this.voices = Math.max(0, this.voices - 1);
+        out.disconnect();
+      };
+      if (buffer) {
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        if (recipe.vary) src.playbackRate.value = 1 + (Math.random() - 0.5) * 2 * recipe.vary;
+        src.connect(out);
+        src.onended = release;
+        src.start(at);
+      } else {
+        // No offline rendering in this browser: synthesize it live.
+        recipe.fn(new Synth(ctx, out, at), intensity);
+        setTimeout(release, (recipe.len + 0.2) * 1000 + (opts.delay ?? 0));
+      }
+    });
   }
 
-  /** Switches the music track. Placeholder: no music yet, the hook only records it. */
+  /** Switches the music track (crossfade). */
   music(track: MusicTrack): void {
-    this.currentTrack = track;
+    this.wantedTrack = track;
+    this.player?.play(track);
   }
 
-  /** 0..1: how close the game is to ending. The music pass can layer tension on it. */
+  /** 0..1: how close the game is to ending. Fades in the battle's tension layer. */
   setTension(value: number): void {
     this.tension = Math.max(0, Math.min(1, value));
+    this.player?.setTension(this.tension);
+  }
+
+  /** Lowers the music for a moment so a big effect can be heard. */
+  duck(depth = 0.45, ms = 1200): void {
+    const g = this.duckGain;
+    if (!g || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(now);
+    g.gain.setTargetAtTime(depth, now, 0.04);
+    g.gain.setTargetAtTime(1, now + ms / 1000, 0.4);
   }
 
   get track(): MusicTrack {
-    return this.currentTrack;
+    return this.wantedTrack;
   }
 
   get tensionLevel(): number {
     return this.tension;
   }
 }
-
-/** Tiny synthesizer for the placeholder cues. */
-class Synth {
-  constructor(
-    private readonly ctx: AudioContext,
-    private readonly out: AudioNode,
-  ) {}
-
-  tone(freq: number, ms: number, opts: { type?: OscillatorType; gain?: number; to?: number; delay?: number; attack?: number } = {}): void {
-    const t0 = this.ctx.currentTime + (opts.delay ?? 0) / 1000;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = opts.type ?? 'sine';
-    osc.frequency.setValueAtTime(freq, t0);
-    if (opts.to) osc.frequency.exponentialRampToValueAtTime(opts.to, t0 + ms / 1000);
-    const peak = opts.gain ?? 0.2;
-    gain.gain.setValueAtTime(0.0001, t0);
-    gain.gain.exponentialRampToValueAtTime(peak, t0 + (opts.attack ?? 8) / 1000);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
-    osc.connect(gain).connect(this.out);
-    osc.start(t0);
-    osc.stop(t0 + ms / 1000 + 0.05);
-  }
-
-  noise(ms: number, opts: { freq?: number; q?: number; gain?: number; delay?: number; type?: BiquadFilterType; to?: number } = {}): void {
-    const t0 = this.ctx.currentTime + (opts.delay ?? 0) / 1000;
-    const length = Math.ceil((this.ctx.sampleRate * ms) / 1000);
-    const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
-    const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = opts.type ?? 'lowpass';
-    filter.frequency.setValueAtTime(opts.freq ?? 1200, t0);
-    if (opts.to) filter.frequency.exponentialRampToValueAtTime(opts.to, t0 + ms / 1000);
-    filter.Q.value = opts.q ?? 0.8;
-    const gain = this.ctx.createGain();
-    gain.gain.value = opts.gain ?? 0.3;
-    src.connect(filter).connect(gain).connect(this.out);
-    src.start(t0);
-  }
-}
-
-const PLACEHOLDERS: Partial<Record<Cue, (s: Synth, intensity: number) => void>> = {
-  uiHover: (s) => s.tone(880, 50, { gain: 0.03, type: 'triangle' }),
-  uiClick: (s) => {
-    s.tone(660, 70, { gain: 0.08, type: 'triangle' });
-    s.tone(990, 60, { gain: 0.05, type: 'triangle', delay: 30 });
-  },
-  uiBack: (s) => s.tone(520, 90, { gain: 0.07, type: 'triangle', to: 380 }),
-  cardHover: (s) => s.noise(60, { freq: 3000, type: 'highpass', gain: 0.05 }),
-  cardDraw: (s) => s.noise(140, { freq: 2400, to: 5200, type: 'bandpass', q: 1.5, gain: 0.12 }),
-  cardSelect: (s) => s.noise(90, { freq: 1800, to: 3600, type: 'bandpass', gain: 0.12 }),
-  cardPlay: (s) => {
-    s.noise(260, { freq: 600, to: 3800, type: 'bandpass', q: 1.2, gain: 0.22 });
-    s.tone(330, 200, { gain: 0.05, type: 'triangle', to: 660, delay: 60 });
-  },
-  cardDiscard: (s) => s.noise(220, { freq: 2600, to: 500, type: 'bandpass', gain: 0.16 }),
-  build: (s) => {
-    s.tone(140, 160, { gain: 0.25, type: 'triangle', to: 90 });
-    s.noise(120, { freq: 500, gain: 0.25, delay: 10 });
-    s.tone(180, 140, { gain: 0.18, type: 'triangle', to: 110, delay: 150 });
-    s.noise(90, { freq: 600, gain: 0.18, delay: 160 });
-  },
-  hit: (s, k) => {
-    s.noise(260 + k * 200, { freq: 900, to: 180, gain: 0.35 + k * 0.25 });
-    s.tone(90, 220, { gain: 0.3 + k * 0.2, to: 45 });
-  },
-  hitBig: (s) => {
-    s.noise(600, { freq: 1200, to: 120, gain: 0.6 });
-    s.tone(70, 500, { gain: 0.5, to: 30 });
-    s.noise(400, { freq: 300, gain: 0.3, delay: 120 });
-  },
-  pierce: (s) => {
-    s.tone(1400, 160, { gain: 0.1, type: 'sawtooth', to: 300 });
-    s.noise(180, { freq: 4000, to: 800, type: 'bandpass', gain: 0.2 });
-  },
-  blocked: (s) => {
-    s.tone(1250, 400, { gain: 0.12, type: 'sine' });
-    s.tone(1875, 300, { gain: 0.07, type: 'sine', delay: 10 });
-    s.noise(80, { freq: 5000, type: 'highpass', gain: 0.1 });
-  },
-  burn: (s) => {
-    s.noise(500, { freq: 1600, type: 'bandpass', q: 0.6, gain: 0.18 });
-    s.noise(300, { freq: 400, gain: 0.12, delay: 120 });
-  },
-  frost: (s) => {
-    for (let i = 0; i < 4; i++) s.tone(1800 + i * 420, 260, { gain: 0.05, type: 'sine', delay: i * 45 });
-    s.noise(300, { freq: 6000, type: 'highpass', gain: 0.06 });
-  },
-  shield: (s) => {
-    s.tone(523, 500, { gain: 0.08, type: 'sine', attack: 60 });
-    s.tone(784, 500, { gain: 0.06, type: 'sine', attack: 60, delay: 80 });
-  },
-  enchant: (s) => {
-    for (let i = 0; i < 5; i++) s.tone([523, 659, 784, 988, 1175][i], 380, { gain: 0.05, type: 'sine', delay: i * 55 });
-  },
-  resource: (s) => s.tone(1046, 120, { gain: 0.05, type: 'triangle', to: 1318 }),
-  worker: (s) => {
-    s.tone(392, 120, { gain: 0.08, type: 'triangle' });
-    s.tone(523, 160, { gain: 0.08, type: 'triangle', delay: 90 });
-  },
-  ultimateReady: (s) => {
-    s.tone(659, 220, { gain: 0.07, type: 'triangle' });
-    s.tone(988, 320, { gain: 0.07, type: 'triangle', delay: 110 });
-  },
-  ultimate: (s) => {
-    s.tone(196, 900, { gain: 0.15, type: 'sawtooth', to: 392, attack: 200 });
-    s.tone(294, 900, { gain: 0.1, type: 'sawtooth', to: 587, attack: 200 });
-    s.noise(900, { freq: 400, to: 4000, type: 'bandpass', gain: 0.2 });
-  },
-  event: (s) => {
-    s.tone(110, 1400, { gain: 0.25, type: 'sine', attack: 10 });
-    s.tone(165, 1200, { gain: 0.12, type: 'sine', attack: 10 });
-    s.tone(220, 900, { gain: 0.08, type: 'triangle', attack: 10 });
-  },
-  yourTurn: (s) => {
-    s.tone(784, 300, { gain: 0.07, type: 'sine' });
-    s.tone(1175, 420, { gain: 0.05, type: 'sine', delay: 120 });
-  },
-  tick: (s) => s.tone(1600, 30, { gain: 0.05, type: 'square' }),
-  victory: (s) => {
-    [523, 659, 784, 1046].forEach((f, i) => s.tone(f, 700, { gain: 0.1, type: 'triangle', delay: i * 130 }));
-  },
-  defeat: (s) => {
-    [392, 330, 262, 196].forEach((f, i) => s.tone(f, 800, { gain: 0.09, type: 'triangle', delay: i * 180 }));
-  },
-  error: (s) => s.tone(180, 160, { gain: 0.1, type: 'square', to: 140 }),
-  emote: (s) => s.tone(880, 140, { gain: 0.06, type: 'triangle', to: 1320 }),
-};
 
 export const audio = new AudioBus();

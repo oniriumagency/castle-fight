@@ -175,6 +175,13 @@ const STRINGS = {
   reducedMotion: { es: 'Reducir movimiento', en: 'Reduce motion' },
   screenShake: { es: 'Sacudida de pantalla', en: 'Screen shake' },
   localTimer: { es: 'Reloj de turno en partidas locales', en: 'Turn clock in local games' },
+  mute: { es: 'Silenciar', en: 'Mute' },
+  unmute: { es: 'Activar sonido', en: 'Unmute' },
+  muteAll: { es: 'Silenciar todo', en: 'Mute everything' },
+  effectsQuality: { es: 'Calidad de efectos', en: 'Effects quality' },
+  qualityAuto: { es: 'Auto', en: 'Auto' },
+  qualityHigh: { es: 'Alta', en: 'High' },
+  qualityLow: { es: 'Baja', en: 'Low' },
   on: { es: 'Sí', en: 'On' },
   off: { es: 'No', en: 'Off' },
 

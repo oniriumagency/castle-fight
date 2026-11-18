@@ -347,3 +347,34 @@
   .card .holo { animation: none !important; }
   .card { transition: none; }
 }
+
+/* Rarity sheen in the rarity's own colour (gold stays for legendaries). */
+.card.r-rara .holo {
+  background-image: linear-gradient(115deg, transparent 30%, rgb(200 230 255 / 60%) 44%, rgb(120 190 255 / 55%) 50%, rgb(80 150 255 / 40%) 56%, transparent 70%);
+}
+.card.r-epica .holo {
+  background-image: linear-gradient(115deg, transparent 30%, rgb(235 210 255 / 65%) 44%, rgb(178 108 255 / 60%) 50%, rgb(120 70 255 / 45%) 56%, transparent 70%);
+}
+.card.r-rara.ember .holo { animation-duration: 7s; }
+.card.r-epica.ember .holo { animation-duration: 5.5s; }
+
+/* A card landing on the table flashes bright for a moment. */
+.card.landed > .trim { animation: landPulse 0.7s ease-out; }
+.card.land-epica > .trim { animation: landPulse 0.9s ease-out; }
+.card.land-legendaria > .trim { animation: landPulseGold 1.3s ease-out; }
+.card.land-legendaria .holo { opacity: 0.9; animation: sheen 1.3s ease-out 1; }
+
+@keyframes landPulse {
+  0% { filter: brightness(1.9) saturate(1.2); }
+  100% { filter: none; }
+}
+@keyframes landPulseGold {
+  0% { filter: brightness(2.4) saturate(1.4); }
+  40% { filter: brightness(1.4) saturate(1.2); }
+  100% { filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.landed > .trim { animation: none !important; }
+}
+.reduced-motion .card.landed > .trim { animation: none; }

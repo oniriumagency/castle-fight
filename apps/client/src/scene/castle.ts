@@ -52,6 +52,12 @@ export class Castle extends Container {
   private readonly cracks = new Graphics();
   private readonly rubble = new Graphics();
   readonly shieldBubble = new Graphics();
+  private readonly frostCoat = new Graphics();
+  private frozen = false;
+  private hitColor = 0xffffff;
+  private hitLeft = 0;
+  private kick = 0;
+  private kickPhase = 0;
   private shieldCharges = 0;
   private shieldPulse = 0;
   private detailKey = '';
@@ -77,6 +83,7 @@ export class Castle extends Container {
       this.wallShade,
       this.wallTop,
       this.rubble,
+      this.frostCoat,
       this.shieldBubble,
     );
   }
@@ -109,6 +116,25 @@ export class Castle extends Container {
     this.redraw();
   }
 
+  get keepWidth(): number {
+    return this.layoutValue?.keepWidth ?? 40;
+  }
+
+  /** Flash of colour and a small recoil when struck. */
+  hit(color: number, power = 1): void {
+    this.hitColor = color;
+    this.hitLeft = 260;
+    this.kick = Math.min(10, 3 + power * 5);
+    this.kickPhase = 0;
+  }
+
+  /** Ice over the stones while a resource is frozen. */
+  setFrost(on: boolean): void {
+    if (on === this.frozen) return;
+    this.frozen = on;
+    this.drawFrost();
+  }
+
   setShield(charges: number): void {
     this.shieldCharges = charges;
     this.drawShield();
@@ -125,6 +151,21 @@ export class Castle extends Container {
 
   /** Called every frame: the flag waves and the shield breathes. */
   tick(dt: number): void {
+    if (this.hitLeft > 0) {
+      this.hitLeft = Math.max(0, this.hitLeft - dt);
+      const k = this.hitLeft / 260;
+      const c = this.hitColor;
+      const mix = (shift: number): number => Math.round(255 + (((c >> shift) & 255) - 255) * k) << shift;
+      this.tint = mix(16) | mix(8) | mix(0);
+    }
+    if (this.kick > 0.05) {
+      this.kickPhase += dt * 0.05;
+      this.x = -this.facing * this.kick * Math.cos(this.kickPhase);
+      this.kick *= 0.86;
+    } else if (this.x !== 0) {
+      this.x = 0;
+      this.kick = 0;
+    }
     this.flagPhase += dt * 0.004;
     this.drawFlag();
     if (this.shieldCharges > 0) {
@@ -201,6 +242,30 @@ export class Castle extends Container {
     }
     this.drawRubble(l);
     this.drawShield();
+    if (this.frozen) this.drawFrost();
+  }
+
+  private drawFrost(): void {
+    const l = this.layoutValue;
+    const g = this.frostCoat.clear();
+    if (!l || !this.frozen) return;
+    const kh = Math.max(this.keepPx(), l.unit * 1.5);
+    const kx = l.x - l.keepWidth / 2;
+    const wh = this.wallPx();
+    const wx = this.wallX() - l.wallWidth / 2;
+    g.rect(kx, l.groundY - kh, l.keepWidth, kh).fill({ color: 0xbfeaff, alpha: 0.22 });
+    if (wh > 0.5) g.rect(wx, l.groundY - wh, l.wallWidth, wh).fill({ color: 0xbfeaff, alpha: 0.22 });
+    // Icicles under the parapet and along the wall top.
+    const icicles = (x0: number, width: number, y: number, n: number): void => {
+      for (let i = 0; i < n; i++) {
+        const x = x0 + (width * (i + 0.5)) / n;
+        const len = l.unit * (1.5 + ((i * 7) % 4));
+        g.poly([x - 2.5, y, x + 2.5, y, x, y + len]).fill({ color: 0xeaf9ff, alpha: 0.85 });
+      }
+    };
+    icicles(kx, l.keepWidth, l.groundY - kh, 6);
+    if (wh > 0.5) icicles(wx, l.wallWidth, l.groundY - wh, 3);
+    g.rect(kx, l.groundY - kh, l.keepWidth, 2).fill({ color: 0xffffff, alpha: 0.7 });
   }
 
   private drawKeepCrown(l: CastleLayout): void {

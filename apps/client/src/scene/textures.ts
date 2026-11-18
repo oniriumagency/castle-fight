@@ -153,3 +153,123 @@ export function rubbleTexture(): Texture {
 }
 
 export { rand as seededRandom };
+
+/** A thin soft ring for shockwaves and shield ripples. */
+export function ringTexture(size = 128): Texture {
+  const [c, g] = canvas(size, size);
+  const r = size / 2;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.82, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.9, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return Texture.from(c);
+}
+
+/** A fan of light rays from the centre (legendary cards, ultimates). */
+export function raysTexture(size = 256, rays = 14): Texture {
+  const [c, g] = canvas(size, size);
+  const r = size / 2;
+  const rnd = rand(77);
+  g.translate(r, r);
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2 + rnd() * 0.2;
+    const w = 0.05 + rnd() * 0.07;
+    const grad = g.createRadialGradient(0, 0, 0, 0, 0, r);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.arc(0, 0, r, a - w, a + w);
+    g.closePath();
+    g.fill();
+  }
+  return Texture.from(c);
+}
+
+/** A soft, uneven puff for smoke and dust (normal blend, tinted). */
+export function smokeTexture(size = 64): Texture {
+  const [c, g] = canvas(size, size);
+  const rnd = rand(31);
+  for (let i = 0; i < 9; i++) {
+    const x = size * (0.3 + rnd() * 0.4);
+    const y = size * (0.3 + rnd() * 0.4);
+    const rad = size * (0.18 + rnd() * 0.18);
+    const grad = g.createRadialGradient(x, y, 0, x, y, rad);
+    grad.addColorStop(0, 'rgba(255,255,255,0.32)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+  }
+  return Texture.from(c);
+}
+
+/** A bright streak for sparks; stretched along its velocity. */
+export function sparkTexture(): Texture {
+  const [c, g] = canvas(32, 8);
+  const grad = g.createLinearGradient(0, 0, 32, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.7, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(1, 'rgba(255,255,255,1)');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.ellipse(16, 4, 16, 3, 0, 0, Math.PI * 2);
+  g.fill();
+  return Texture.from(c);
+}
+
+/** A six-pointed ice crystal. */
+export function crystalTexture(): Texture {
+  const [c, g] = canvas(32, 32);
+  g.translate(16, 16);
+  g.strokeStyle = 'rgba(255,255,255,0.95)';
+  g.lineWidth = 2;
+  g.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    g.rotate(Math.PI / 3);
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(0, -13);
+    g.moveTo(0, -7);
+    g.lineTo(-4, -10);
+    g.moveTo(0, -7);
+    g.lineTo(4, -10);
+    g.stroke();
+  }
+  return Texture.from(c);
+}
+
+/** A flame tongue: bright core, soft tip, drawn pointing up. */
+export function flameTexture(): Texture {
+  const [c, g] = canvas(32, 48);
+  const grad = g.createRadialGradient(16, 34, 0, 16, 30, 22);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(16, 2);
+  g.bezierCurveTo(26, 18, 30, 30, 16, 46);
+  g.bezierCurveTo(2, 30, 6, 18, 16, 2);
+  g.fill();
+  return Texture.from(c);
+}
+
+/** A wide, soft bloom for flares: a small hot core and a long falloff. */
+export function flareTexture(size = 128): Texture {
+  const [c, g] = canvas(size, size);
+  const r = size / 2;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.12, 'rgba(255,255,255,0.5)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.12)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return Texture.from(c);
+}
