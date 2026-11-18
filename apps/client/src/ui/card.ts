@@ -8,6 +8,7 @@ import {
   getHero,
   type BattleEventId,
   type CardId,
+  type EffectOp,
   type HeroId,
   type LocalizedText,
 } from '@cardcraft-castles/engine';
@@ -95,6 +96,64 @@ export function rulesHtml(text: string): string {
   );
 }
 
+/** What a hero's passive adds to the numbers printed on cards. */
+export function heroBuffs(heroId: HeroId): { attack: number; status: number } {
+  const passive = getHero(heroId).passive;
+  return { attack: passive.attackBonus ?? 0, status: passive.statusDurationBonus ?? 0 };
+}
+
+/** Attack amounts and Burn/Frost durations among a card's effects, to tell which printed numbers they are. */
+function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>(), status: new Set<number>() }) {
+  for (const op of ops) {
+    if (op.op === 'damage') out.damage.add(op.amount);
+    else if (op.op === 'burn' || op.op === 'frost') out.status.add(op.turns);
+    else if (op.op === 'if') {
+      effectNumbers(op.then, out);
+      if (op.else) effectNumbers(op.else, out);
+    }
+  }
+  return out;
+}
+
+// Markers around a buffed number, put in before escaping and turned into a span after.
+const BUFF_OPEN = '\u0001';
+const BUFF_CLOSE = '\u0002';
+
+/**
+ * Card text with the numbers the player's hero improves already counted:
+ * "13 damage" becomes "15 (+2) damage" for the Marshal, "for 4 turns" becomes
+ * "for 5 (+1) turns" for the Sorceress. Hits that are not single attacks
+ * (per card discarded, Burn ticks) and other modifiers stay as printed.
+ */
+function buffText(ops: readonly EffectOp[], text: string, heroId: HeroId): string {
+  const buffs = heroBuffs(heroId);
+  if (!buffs.attack && !buffs.status) return text;
+  const numbers = effectNumbers(ops);
+  const mark = (n: number, bonus: number): string => `${BUFF_OPEN}${n + bonus} (+${bonus})${BUFF_CLOSE}`;
+  const es = locale() === 'es';
+  let out = text;
+  if (buffs.attack && numbers.damage.size) {
+    const damage = es ? /(?<![+\d])(\d+)(?= de daño(?! menos| por))/g : /(?<![+\d])(\d+)(?= (?:piercing )?damage(?! per| for each))/g;
+    out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? mark(Number(m), buffs.attack) : m));
+  }
+  if (buffs.status && numbers.status.size) {
+    const turns = es ? /(?<=durante )(\d+) (turnos?)/g : /(?<=for )(\d+) (turns?)/g;
+    out = out.replace(turns, (m, n: string, word: string) => {
+      if (!numbers.status.has(Number(n))) return m;
+      const plural = es ? 'turnos' : 'turns';
+      return `${mark(Number(n), buffs.status)} ${Number(n) + buffs.status > 1 ? plural : word}`;
+    });
+  }
+  return out;
+}
+
+function buffHtml(html: string): string {
+  return html.replace(/\u0001([^\u0002]*)\u0002/g, (_, inner: string) => {
+    const [total, bonus] = inner.split(' ');
+    return `<span class="hero-buff">${total} <small>${bonus}</small></span>`;
+  });
+}
+
 /** Explanations for the keywords a text uses, for the inspect view. */
 export function glossaryFor(text: string): { word: string; text: string }[] {
   const found: { word: string; text: string }[] = [];
@@ -117,6 +176,8 @@ export interface CardOptions {
   lazy?: boolean;
   /** No pulsing ember glow on legendaries (small or many cards on screen). */
   calm?: boolean;
+  /** The hero of whoever holds or played the card: numbers its passive improves show with the bonus. */
+  hero?: HeroId;
 }
 
 function frame(classes: string, opts: CardOptions): HTMLDivElement {
@@ -136,7 +197,7 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
     <div class="trim"><div class="body">
       <div class="art"><img alt="" draggable="false" ${opts.lazy ? 'loading="lazy"' : ''} src="${artUrl(card.art)}"></div>
       <div class="type">${escapeHtml(L(SCHOOL_NAMES[card.school]))} · ${escapeHtml(L(RARITY_NAMES[card.rarity]))}</div>
-      <div class="rules"><span>${rulesHtml(L(card.text))}</span></div>
+      <div class="rules"><span>${opts.hero ? buffHtml(rulesHtml(buffText(card.effects, L(card.text), opts.hero))) : rulesHtml(L(card.text))}</span></div>
     </div></div>
     <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(L(card.name))}</b></div>
     <div class="cost ${costClass}"><span>${cost}</span>${emblemSvg(SCHOOL_EMBLEM[card.school])}</div>
@@ -156,6 +217,11 @@ export function heroParts(heroId: HeroId): { passive: string; ultimate: string }
   return match ? { passive: match[1], ultimate: match[2] } : { passive: text, ultimate: '' };
 }
 
+/** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */
+export function ultimateHtml(heroId: HeroId): string {
+  return buffHtml(rulesHtml(buffText(getHero(heroId).ultimate, heroParts(heroId).ultimate, heroId)));
+}
+
 export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement {
   const hero = getHero(heroId);
   const el = frame('face s-heroe hero-card', opts);
@@ -168,7 +234,7 @@ export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement
       <div class="type">${locale() === 'es' ? 'Héroe' : 'Hero'}</div>
       <div class="rules hero-rules">
         <p><b>${labels[0]}:</b> ${rulesHtml(passive)}</p>
-        <p><b>${labels[1]}:</b> ${rulesHtml(ultimate)}</p>
+        <p><b>${labels[1]}:</b> ${ultimate ? ultimateHtml(heroId) : ''}</p>
       </div>
     </div></div>
     <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(L(hero.name))}</b></div>

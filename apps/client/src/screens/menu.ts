@@ -12,6 +12,7 @@ import { skyFor } from '../ui/theme';
 import { hasSavedGame } from '../game/localSession';
 import { flow } from './flow';
 import { openHowToPlay } from './howToPlay';
+import { openRecord } from './recordModal';
 import { openSettings } from './settingsModal';
 import { muteButton } from '../ui/muteButton';
 
@@ -90,6 +91,7 @@ export function menuScreen(): Screen {
           'div.menu-secondary',
           null,
           h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openHowToPlay()) }, html(iconSvg('book')), t('howToPlay')),
+          h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openRecord()) }, html(iconSvg('hero')), t('myRecord')),
           h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openSettings()) }, html(iconSvg('gear')), t('settings')),
           h(
             'button.btn',

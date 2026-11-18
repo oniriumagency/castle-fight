@@ -11,7 +11,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { artUrl, emblemSvg, iconSvg, type EmblemName } from '../../ui/assets';
-import { heroParts, rulesHtml } from '../../ui/card';
+import { ultimateHtml } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
 const RESOURCE_EMBLEM: Record<Resource, EmblemName> = { piedra: 'piedra', acero: 'acero', mana: 'mana' };
@@ -164,7 +164,6 @@ export class SidePanel {
     this.portrait.title = p.ultimateReady ? t('ultimateReady') : progressText;
     this.portrait.setAttribute('aria-label', `${L(getHero(p.hero).name)}. ${this.portrait.title}`);
 
-    const effect = heroParts(p.hero).ultimate;
     const left = Math.max(0, p.ultimateThreshold - p.ultimateCharge);
     let title: string;
     let hint: string;
@@ -183,7 +182,7 @@ export class SidePanel {
       this.ultBtn.dataset.key = ultKey;
       this.ultTitle.textContent = title;
       this.ultHint.textContent = hint;
-      this.ultEffect.innerHTML = rulesHtml(effect);
+      this.ultEffect.innerHTML = ultimateHtml(p.hero);
       const plain = this.ultEffect.textContent ?? '';
       this.ultBtn.title = `${t('ultimate')}: ${plain}\n${t('ultimateHow')}`;
       this.ultBtn.setAttribute('aria-label', `${title}. ${hint}. ${plain}`);

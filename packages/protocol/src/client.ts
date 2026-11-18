@@ -42,7 +42,7 @@ import {
   type RoomServerMessage,
   type RoomSummary,
 } from './index';
-import { isRoomId } from './validate';
+import { isPlayerId, isRoomId } from './validate';
 
 // ---------------------------------------------------------------------------
 // Platform
@@ -528,6 +528,8 @@ export interface RoomEvents {
 export interface JoinOptions {
   nickname: string;
   hero: HeroChoice;
+  /** Public browser id; `OnlineClient.joinRoom` fills it in. */
+  pid?: string;
 }
 
 interface StoredSeat {
@@ -799,6 +801,8 @@ export class OnlineClient {
   private readonly platform: Platform;
   /** Random id kept per browser; lets quick join avoid pairing you with your own room. */
   readonly clientId: string;
+  /** Public random id kept per browser. Sent when taking a seat, so opponents can count your games together. */
+  readonly playerId: string;
 
   constructor(options: OnlineClientOptions = {}) {
     const location = (globalThis as { location?: { origin?: string } }).location;
@@ -827,6 +831,14 @@ export class OnlineClient {
       this.platform.storage.setItem(key, clientId);
     }
     this.clientId = clientId;
+    // Separate from clientId, which stays private: this one is shown to opponents.
+    const pidKey = `${STORAGE_PREFIX}playerId`;
+    let playerId = this.platform.storage.getItem(pidKey);
+    if (!playerId || !isPlayerId(playerId)) {
+      playerId = randomId();
+      this.platform.storage.setItem(pidKey, playerId);
+    }
+    this.playerId = playerId;
   }
 
   health(): Promise<HealthResponse> {
@@ -868,7 +880,7 @@ export class OnlineClient {
    * there (page reload, dropped connection), it takes that seat back instead.
    */
   joinRoom(roomId: string, options: JoinOptions): RoomConnection {
-    return new RoomConnection(roomId, this.socketUrl(ROUTES.roomSocket(roomId)), this.platform, options);
+    return new RoomConnection(roomId, this.socketUrl(ROUTES.roomSocket(roomId)), this.platform, { ...options, pid: options.pid ?? this.playerId });
   }
 
   /**

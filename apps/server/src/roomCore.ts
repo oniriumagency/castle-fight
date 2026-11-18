@@ -61,6 +61,8 @@ export const ROOM_LIMITS = {
 
 export interface SeatRecord {
   nickname: string;
+  /** Public browser id from `join` (absent in records saved before it existed). */
+  pid?: string | null;
   /** Hero for the next game. */
   choice: HeroChoice;
   /** Hero of the current or last game. */
@@ -202,7 +204,7 @@ export class RoomCore<S> {
     }
     switch (message.type) {
       case 'join':
-        return this.join(socket, message.v, message.nickname, message.hero);
+        return this.join(socket, message.v, message.nickname, message.hero, message.pid);
       case 'resume':
         return this.resume(socket, message.v, message.token);
       case 'action':
@@ -304,6 +306,7 @@ export class RoomCore<S> {
       if (!s) return null;
       return {
         nickname: s.nickname,
+        pid: s.pid ?? null,
         hero: s.hero,
         connected: this.isConnected(index),
         reconnectBy: s.reconnectBy,
@@ -351,7 +354,7 @@ export class RoomCore<S> {
   // Messages
   // -------------------------------------------------------------------------
 
-  private join(socket: S, version: number, nickname: string, hero: HeroChoice): void {
+  private join(socket: S, version: number, nickname: string, hero: HeroChoice, pid?: string): void {
     if (!this.checkVersion(socket, version)) return;
     const room = this.record;
     if (this.host.seatOf(socket) !== null) return this.error(socket, 'alreadySeated', 'You already have a seat');
@@ -364,6 +367,7 @@ export class RoomCore<S> {
     const seat = free as PlayerId;
     room.seats[seat] = {
       nickname: cleanNickname(nickname) ?? `Jugador ${seat + 1}`,
+      pid: pid ?? null,
       choice: hero,
       hero: null,
       token: this.host.randomToken(),

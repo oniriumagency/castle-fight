@@ -1,10 +1,11 @@
 import { getHero, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
-import { h } from '../../app/dom';
+import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
 import type { MatchSession, Presence } from '../../game/session';
+import { gamesOf, loadRecord, nemesisOf, recordAi, recordOnline, type Outcome } from '../../game/record';
 import type { MatchStats } from '../../game/stats';
-import { artUrl } from '../../ui/assets';
+import { artUrl, iconSvg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
 
 export interface ResultsOptions {
@@ -16,6 +17,39 @@ export interface ResultsOptions {
   name: (seat: PlayerId) => string;
   onExit: () => void;
   getPresence: () => Presence | null;
+}
+
+/**
+ * Adds the game to the player's win/loss record (online and against the AI)
+ * and, online, returns the running score against this opponent.
+ */
+function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 'defeat' | 'draw'): HTMLElement | null {
+  const result: Outcome = outcome === 'victory' ? 'win' : outcome === 'defeat' ? 'loss' : 'draw';
+  if (o.session.kind === 'ai') {
+    recordAi(result);
+    return null;
+  }
+  const id = o.session.kind === 'online' ? o.session.gameId?.() : null;
+  if (!id) return null;
+  const seat = o.session.seats[opponent];
+  const rival = recordOnline({ id, outcome: result, rival: { pid: seat.pid ?? null, name: o.name(opponent) } });
+  if (!rival) return null;
+  const isNemesis = nemesisOf(loadRecord())?.key === rival.key;
+  const games = gamesOf(rival);
+  return h(
+    'div.results-h2h',
+    { class: isNemesis ? 'nemesis' : '' },
+    isNemesis ? h('span.nemesis-badge', null, html(iconSvg('sword')), t('nemesisBadge')) : null,
+    h('span.h2h-label', null, t('headToHead', { who: o.name(opponent) })),
+    h(
+      'span.h2h-score',
+      null,
+      h('span.win', null, String(rival.wins)),
+      h('span.sep', null, '–'),
+      h('span.loss', null, String(rival.losses)),
+    ),
+    h('small', null, games === 1 ? t('headToHeadFirst') : t('headToHeadGames', { n: games })),
+  );
 }
 
 /** End of game: victory or defeat banner, why it ended, match statistics and what next. */
@@ -44,6 +78,7 @@ export function showResults(o: ResultsOptions): void {
   })();
 
   const seats: PlayerId[] = o.seatSide(0) === 0 ? [0, 1] : [1, 0];
+  const headToHead = keepRecord(o, seats[1], outcome);
   const row = (label: string, value: (seat: PlayerId) => number | string): HTMLElement =>
     h('tr', null, h('td', null, String(value(seats[0]))), h('th', { scope: 'row' }, label), h('td', null, String(value(seats[1]))));
 
@@ -76,6 +111,7 @@ export function showResults(o: ResultsOptions): void {
         ),
       ),
     ),
+    headToHead,
     h(
       'table.results-stats',
       null,

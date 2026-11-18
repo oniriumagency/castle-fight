@@ -196,6 +196,37 @@ const STRINGS = {
   statBest: { es: 'Mejor golpe', en: 'Biggest hit' },
   statUltimates: { es: 'Definitivas', en: 'Ultimates' },
   rematch: { es: 'Revancha', en: 'Rematch' },
+  headToHead: { es: 'Tú contra {who}', en: 'You vs {who}' },
+  headToHeadGames: { es: '{n} partidas en total', en: '{n} games in total' },
+  headToHeadFirst: { es: 'Vuestra primera partida', en: 'Your first game together' },
+  nemesisBadge: { es: 'Tu némesis', en: 'Your nemesis' },
+
+  // Win/loss record
+  myRecord: { es: 'Mi historial', en: 'My record' },
+  recordOnline: { es: 'En línea', en: 'Online' },
+  recordAi: { es: 'Contra la IA', en: 'Against the AI' },
+  recordWins: { es: 'Victorias', en: 'Wins' },
+  recordLosses: { es: 'Derrotas', en: 'Losses' },
+  recordDraws: { es: 'Empates', en: 'Draws' },
+  recordRate: { es: '{pct}% de victorias', en: '{pct}% win rate' },
+  recordRivals: { es: 'Rivales', en: 'Opponents' },
+  recordNoRivals: {
+    es: 'Aún no has jugado en línea. Cada rival al que te enfrentes aparecerá aquí con vuestro marcador.',
+    en: 'No online games yet. Every opponent you face will show up here with your score.',
+  },
+  recordNemesisHint: {
+    es: 'Tu némesis es el rival con quien más has jugado (desde {n} partidas).',
+    en: 'Your nemesis is the opponent you have played most (from {n} games on).',
+  },
+  recordNemesisLead: { es: 'Le vas ganando', en: "You're ahead" },
+  recordNemesisBehind: { es: 'Te va ganando', en: "They're ahead" },
+  recordNemesisTied: { es: 'Vais empatados', en: "You're tied" },
+  recordLocalNote: {
+    es: 'El historial se guarda en este navegador. Las partidas en el mismo dispositivo no cuentan.',
+    en: 'Your record is kept in this browser. Games on a shared device do not count.',
+  },
+  recordReset: { es: 'Borrar historial', en: 'Clear record' },
+  recordResetConfirm: { es: '¿Seguro? Pulsa otra vez para borrarlo.', en: 'Sure? Press again to clear it.' },
   mainMenu: { es: 'Menú principal', en: 'Main menu' },
   viewBoard: { es: 'Ver tablero', en: 'View board' },
 
