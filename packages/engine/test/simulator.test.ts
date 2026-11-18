@@ -15,41 +15,62 @@ import type { GameState } from '../src/index';
 
 const DECK_SIZE = buildDeckList(DEFAULT_RULES).length;
 
-/** Things that must hold after every single action of every game. */
-function checkInvariants(state: GameState): void {
+/**
+ * Things that must hold after every single action of every game. It runs
+ * tens of thousands of times, so it uses plain comparisons and reports the
+ * broken rules instead of calling `expect` for each one.
+ */
+function brokenInvariants(state: GameState): string[] {
+  const broken: string[] = [];
+  const check = (ok: boolean, rule: string): void => {
+    if (!ok) broken.push(rule);
+  };
+  const { rules } = state;
   for (const p of state.players) {
-    expect(p.keep).toBeGreaterThanOrEqual(0);
-    expect(p.keep).toBeLessThanOrEqual(state.rules.keepWin);
-    expect(p.wall).toBeGreaterThanOrEqual(0);
+    check(p.keep >= 0 && p.keep <= rules.keepWin, 'keep within 0..keepWin');
+    check(p.wall >= 0, 'wall >= 0');
     for (const r of ['piedra', 'acero', 'mana'] as const) {
-      expect(p.resources[r]).toBeGreaterThanOrEqual(0);
-      expect(p.workers[r]).toBeGreaterThanOrEqual(state.rules.minWorkers);
-      expect(p.frost[r]).toBeGreaterThanOrEqual(0);
-      expect(p.frost[r]).toBeLessThanOrEqual(state.rules.frostMaxTurns);
+      check(p.resources[r] >= 0, `${r} >= 0`);
+      check(p.workers[r] >= rules.minWorkers, `${r} workers >= minWorkers`);
+      check(p.frost[r] >= 0 && p.frost[r] <= rules.frostMaxTurns, `${r} frost within cap`);
     }
-    expect(p.burn).toBeGreaterThanOrEqual(0);
-    expect(p.burn).toBeLessThanOrEqual(state.rules.burnMaxTurns);
-    expect(p.shield).toBeGreaterThanOrEqual(0);
-    expect(p.shield).toBeLessThanOrEqual(state.rules.shieldMaxCharges);
-    expect(p.enchantments.length).toBeLessThanOrEqual(state.rules.maxEnchantments);
-    expect(p.hand.length).toBeLessThanOrEqual(state.rules.handSize);
+    check(p.burn >= 0 && p.burn <= rules.burnMaxTurns, 'burn within cap');
+    check(p.shield >= 0 && p.shield <= rules.shieldMaxCharges, 'shield within cap');
+    check(p.ultimateCharge >= 0, 'ultimate charge >= 0');
+    check(p.enchantments.length <= rules.maxEnchantments, 'enchantments within max');
+    check(p.hand.length <= rules.handSize, 'hand within size');
     // No card is ever created or lost.
-    expect(p.hand.length + p.deck.length + p.discard.length).toBe(DECK_SIZE);
+    check(p.hand.length + p.deck.length + p.discard.length === DECK_SIZE, 'cards conserved');
   }
   const uids = state.players.flatMap((p) => p.hand.map((c) => c.uid));
-  expect(new Set(uids).size).toBe(uids.length);
-  if (state.phase === 'finished') expect(state.result).not.toBeNull();
-  else {
-    expect(state.result).toBeNull();
-    expect(state.phase === 'choice').toBe(state.pending !== null);
+  check(new Set(uids).size === uids.length, 'unique card uids');
+  if (state.phase === 'finished') {
+    check(state.result !== null, 'finished game has a result');
+  } else {
+    check(state.result === null, 'running game has no result');
+    check((state.phase === 'choice') === (state.pending !== null), 'pending matches phase');
     if (state.phase === 'action') {
-      expect(state.actionsLeft).toBeGreaterThan(0);
-      expect(state.players[state.active].hand.length).toBeGreaterThan(0);
+      check(state.actionsLeft > 0, 'action phase has an action left');
+      check(state.players[state.active].hand.length > 0, 'active player has cards');
     }
   }
+  return broken;
+}
+
+function checkInvariants(state: GameState): void {
+  const broken = brokenInvariants(state);
+  if (broken.length > 0) expect(broken, `turn ${state.turn}, action ${state.seq}`).toEqual([]);
 }
 
 describe('random playouts', () => {
+  it('the invariant checker notices a broken state', () => {
+    const { finalState } = playGame({ seed: 'broken', heroes: ['guardian', 'mariscal'], maxActions: 3 });
+    expect(brokenInvariants(finalState)).toEqual([]);
+    finalState.players[0].wall = -1;
+    finalState.players[1].deck.pop();
+    expect(brokenInvariants(finalState)).toEqual(['wall >= 0', 'cards conserved']);
+  });
+
   it('300 games with every hero pairing finish cleanly and keep the invariants', () => {
     const heroes = HEROES.map((h) => h.id);
     const played = new Set<string>();
@@ -79,7 +100,7 @@ describe('random playouts', () => {
     expect([...played].sort()).toEqual(CARDS.map((c) => c.id).sort());
     expect(reasons.has('keepDestroyed')).toBe(true);
     expect(reasons.has('keepBuilt')).toBe(true);
-  });
+  }, 60_000);
 
   it('views and redacted events stay serialisable and leak nothing during a game', () => {
     playGame({
