@@ -43,6 +43,8 @@ export interface Rules {
   secondPlayerWall: number;
   /** Cards in hand; the hand refills to this size at the end of your turn. */
   handSize: number;
+  /** Most cards one discard action can throw away. */
+  discardMax: number;
   /** Turn clock for online play. The engine has no clock: see the `timeout` action. */
   turnSeconds: number;
   /** Enchantments a player can have at once. */
@@ -401,8 +403,11 @@ export interface Board {
 export type Action =
   /** Play the card `uid` from your hand, paying its cost. */
   | { type: 'play'; player: PlayerId; uid: number }
-  /** Discard the card `uid` from your hand as your action. */
-  | { type: 'discard'; player: PlayerId; uid: number }
+  /**
+   * Discard the card `uid` from your hand as your action, plus the cards in
+   * `also` (up to `rules.discardMax` cards in all). The hand refills at the end of the turn.
+   */
+  | { type: 'discard'; player: PlayerId; uid: number; also?: number[] }
   /** Use the hero ultimate. Free action: it does not use up your play. */
   | { type: 'ultimate'; player: PlayerId }
   /** Answer the pending choice with one of `state.pending.options`. */

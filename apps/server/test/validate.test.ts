@@ -68,6 +68,11 @@ describe('parseRoomClientMessage', () => {
   it('rejects server-only and unknown actions', () => {
     expect(parseRoomClientMessage(JSON.stringify({ type: 'action', action: { type: 'timeout' } }))).toBeNull();
     expect(parseRoomClientMessage(JSON.stringify({ type: 'action', action: { type: 'play', uid: -1 } }))).toBeNull();
+    expect(parseRoomClientMessage(JSON.stringify({ type: 'action', action: { type: 'discard', uid: 3, also: [4, 5], x: 1 } }))).toEqual({
+      type: 'action',
+      action: { type: 'discard', uid: 3, also: [4, 5] },
+    });
+    expect(parseRoomClientMessage(JSON.stringify({ type: 'action', action: { type: 'discard', uid: 3, also: ['4'] } }))).toBeNull();
     expect(parseRoomClientMessage(JSON.stringify({ type: 'chat', text: 'hola' }))).toBeNull();
   });
 

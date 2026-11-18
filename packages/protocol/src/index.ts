@@ -230,7 +230,8 @@ export type PlayerAction = Exclude<Action, { type: 'timeout' }>;
  */
 export type ActionIntent =
   | { type: 'play'; uid: number }
-  | { type: 'discard'; uid: number }
+  /** `also`: more cards discarded in the same action (the rules cap the total). */
+  | { type: 'discard'; uid: number; also?: number[] }
   | { type: 'ultimate' }
   | { type: 'choose'; option: string }
   | { type: 'concede' };

@@ -586,8 +586,9 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
     return legalActions(this.currentView).flatMap((action): ActionIntent[] => {
       switch (action.type) {
         case 'play':
+          return [{ type: 'play', uid: action.uid }];
         case 'discard':
-          return [{ type: action.type, uid: action.uid }];
+          return [{ type: 'discard', uid: action.uid }];
         case 'choose':
           return [{ type: 'choose', option: action.option }];
         case 'ultimate':
@@ -608,8 +609,9 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
     return this.act({ type: 'play', uid });
   }
 
-  discard(uid: number): boolean {
-    return this.act({ type: 'discard', uid });
+  /** Discard `uid`, and the cards in `also` with the same action. */
+  discard(uid: number, also: readonly number[] = []): boolean {
+    return this.act(also.length ? { type: 'discard', uid, also: [...also] } : { type: 'discard', uid });
   }
 
   ultimate(): boolean {

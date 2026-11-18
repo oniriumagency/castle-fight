@@ -108,6 +108,22 @@ describe('turn flow', () => {
     expect(eventsOf(events, 'cardDiscarded')[0]).toMatchObject({ cardId: 'cimientos', reason: 'action' });
   });
 
+  it('one discard action can throw away up to three cards', () => {
+    const start = scenario({ hand: ['parapeto', 'cimientos', 'catapulta', 'almenas'], keepTurn: false });
+    const [a, b, c, d] = start.players[ME].hand.map((card) => card.uid);
+    const { state, events } = mustApply(start, { type: 'discard', player: ME, uid: a!, also: [b!, c!] });
+    expect(state.active).toBe(OPP);
+    expect(state.players[ME].discard).toEqual(['parapeto', 'cimientos', 'catapulta']);
+    expect(eventsOf(events, 'cardDiscarded')).toHaveLength(3);
+    // The hand refills to full at the end of the turn.
+    expect(state.players[ME].hand).toHaveLength(6);
+
+    const tooMany = applyAction(start, { type: 'discard', player: ME, uid: a!, also: [b!, c!, d!] });
+    expect(tooMany.ok).toBe(false);
+    const twice = applyAction(start, { type: 'discard', player: ME, uid: a!, also: [a!] });
+    expect(twice.ok).toBe(false);
+  });
+
   it('the input state is never modified', () => {
     const start = scenario({ hand: ['catapulta'], keepTurn: false });
     const snapshot = JSON.stringify(start);
@@ -399,6 +415,13 @@ describe('timeout (turn clock hook)', () => {
     expect(state.active).toBe(ME);
     state = mustApply(state, { type: 'timeout' }).state;
     expect(state.active).toBe(OPP);
+  });
+
+  it('the Saboteur steals once per discard action, however many cards it throws away', () => {
+    const start = scenario({ heroes: ['saboteadora', 'saboteadora'], hand: ['parapeto', 'cimientos', 'catapulta'], keepTurn: false });
+    const [a, b, c] = start.players[ME].hand.map((card) => card.uid);
+    const { events } = mustApply(start, { type: 'discard', player: ME, uid: a!, also: [b!, c!] });
+    expect(eventsOf(events, 'resourcesChanged').filter((e) => e.player === ME)).toHaveLength(1);
   });
 
   it('the Saboteur passive does not reward a timeout', () => {

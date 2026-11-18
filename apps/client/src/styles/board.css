@@ -2066,3 +2066,82 @@
 .board.touch .event-hold .card.event-reveal {
   --w: clamp(150px, 30vh, 240px);
 }
+
+/* ---------- Discard picker ---------- */
+
+.discard-box {
+  align-items: center;
+}
+
+.discard-hint {
+  margin: -6px 0 0;
+  max-width: 560px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.discard-option {
+  position: relative;
+}
+
+.discard-option .card {
+  transition: filter 0.15s, transform 0.15s;
+}
+
+.discard-option.picked .card {
+  filter: saturate(0.55) brightness(0.75);
+  transform: translateY(-6px);
+}
+
+.discard-option.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.discard-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #b8382a;
+  color: #fff;
+  border: 2px solid #ffd2c8;
+  box-shadow: 0 0 18px rgb(255 90 60 / 70%);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+  z-index: 9;
+}
+
+.discard-mark svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.discard-option.picked .discard-mark {
+  opacity: 1;
+  transform: none;
+}
+
+.discard-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.discard-actions .btn {
+  min-width: 140px;
+}
+
+.board.touch .discard-option .card,
+.board.short .discard-option .card {
+  --w: clamp(84px, 26vw, 130px);
+}

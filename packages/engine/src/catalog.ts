@@ -43,6 +43,7 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   workerStart: design.rules.workerStart,
   secondPlayerWall: design.rules.secondPlayerWall,
   handSize: design.rules.handSize,
+  discardMax: 3,
   turnSeconds: design.rules.turnSeconds,
   maxEnchantments: design.rules.maxEnchantments,
   eventEveryTurns: design.rules.eventEveryTurns,

@@ -445,6 +445,8 @@ class BoardScreen implements Screen {
   }
 
   private render(): void {
+    // The turn moved on (clock, opponent) while the discard picker was open.
+    if (this.closeDiscard && !this.canAct()) this.closeDiscard();
     const view = this.view;
     if (!view || !this.shown) {
       this.turnLabel.textContent = '';
@@ -1288,11 +1290,90 @@ class BoardScreen implements Screen {
     this.act({ type: 'play', player: ctx.seat, uid });
   }
 
+  /** Open the discard picker with `uid` chosen: the player may add more cards, up to the rules' cap. */
   private tryDiscard(uid: number): void {
     const ctx = this.hand.context;
     if (!ctx || !this.canAct()) return;
-    this.act({ type: 'discard', player: ctx.seat, uid });
+    const max = ctx.view.rules.discardMax;
+    const hand = this.handModel.filter((c) => c.cardId !== null);
+    if (max <= 1 || hand.length <= 1) {
+      this.act({ type: 'discard', player: ctx.seat, uid });
+      return;
+    }
+    this.closeDiscard?.();
+    this.closeInspect?.();
+    this.hand.select(null);
+    const picked: number[] = [uid];
+    const confirmBtn = h('button.btn.primary', { type: 'button' });
+    const hint = h('p.discard-hint');
+    const options = hand.map((c) => {
+      const btn = h(
+        'button.choice-option.card-option.discard-option',
+        { type: 'button', 'aria-pressed': 'false' },
+        cardFace(c.cardId!, { calm: true }),
+        h('span.discard-mark', null, html(iconSvg('close'))),
+      );
+      btn.addEventListener('click', () => {
+        const at = picked.indexOf(c.uid);
+        if (at >= 0) picked.splice(at, 1);
+        else if (picked.length < max) picked.push(c.uid);
+        else {
+          audio.play('error');
+          return;
+        }
+        audio.play('cardSelect');
+        refresh();
+      });
+      return { uid: c.uid, btn };
+    });
+    const refresh = (): void => {
+      for (const o of options) {
+        const on = picked.includes(o.uid);
+        o.btn.classList.toggle('picked', on);
+        o.btn.setAttribute('aria-pressed', String(on));
+        o.btn.classList.toggle('locked', !on && picked.length >= max);
+      }
+      confirmBtn.textContent = t('discardN', { n: picked.length });
+      (confirmBtn as HTMLButtonElement).disabled = picked.length === 0;
+      hint.textContent = t('discardPickHint', { max });
+    };
+    const box = h(
+      'div.choice-box.panel.discard-box',
+      null,
+      h('h2', null, t('discardPickTitle', { max })),
+      hint,
+      h('div.choice-options', null, options.map((o) => o.btn)),
+      h(
+        'div.discard-actions',
+        null,
+        h('button.btn', { type: 'button', onclick: () => (audio.play('uiBack'), close()) }, t('cancel')),
+        confirmBtn,
+      ),
+    );
+    const wrap = h('div.choice.discard-picker', null, box);
+    const close = (): void => {
+      if (this.closeDiscard === close) this.closeDiscard = null;
+      wrap.remove();
+    };
+    const confirm = (): void => {
+      if (!picked.length || !this.canAct()) return close();
+      close();
+      const [first, ...also] = picked;
+      this.act(also.length ? { type: 'discard', player: ctx.seat, uid: first!, also } : { type: 'discard', player: ctx.seat, uid: first! });
+    };
+    this.closeDiscard = close;
+    this.discardConfirm = confirm;
+    confirmBtn.addEventListener('click', confirm);
+    wrap.addEventListener('click', (e) => {
+      if (e.target === wrap) close();
+    });
+    refresh();
+    this.layer.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add('in'));
   }
+
+  private closeDiscard: (() => void) | null = null;
+  private discardConfirm: (() => void) | null = null;
 
   private onSelect(uid: number | null): void {
     this.closeInspect?.();
@@ -1358,6 +1439,14 @@ class BoardScreen implements Screen {
 
   private onKey = (e: KeyboardEvent): void => {
     if (e.target instanceof HTMLInputElement || document.querySelector('.modal-backdrop')) return;
+    if (this.closeDiscard) {
+      if (e.key === 'Escape') this.closeDiscard();
+      else if (e.key === 'Enter' || e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        this.discardConfirm?.();
+      }
+      return;
+    }
     if (e.key === 'Escape') {
       if (this.closeInspect) this.closeInspect();
       else if (this.closeEvent) this.closeEvent();

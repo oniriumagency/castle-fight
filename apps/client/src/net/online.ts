@@ -84,7 +84,7 @@ export class OnlineSession extends BaseSession implements MatchSession {
         this.connection.play(action.uid);
         break;
       case 'discard':
-        this.connection.discard(action.uid);
+        this.connection.discard(action.uid, action.also ?? []);
         break;
       case 'ultimate':
         this.connection.ultimate();
