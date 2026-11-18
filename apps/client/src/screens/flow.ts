@@ -1,5 +1,6 @@
 import { HEROES, type HeroId } from '@cardcraft-castles/engine';
 import { INVITE_PARAM } from '@cardcraft-castles/protocol';
+import { toast } from '../app/dom';
 import { t } from '../app/i18n';
 import { show } from '../app/router';
 import { settings } from '../app/settings';
@@ -80,6 +81,16 @@ export const flow = {
   ffa(): void {
     setRoomInUrl(null);
     show(ffaScreen());
+  },
+
+  /** Back into the unfinished game saved on this device. False when there is none. */
+  resumeLocal(): boolean {
+    const session = LocalSession.resume();
+    if (!session) return false;
+    setRoomInUrl(null);
+    flow.board(session);
+    toast(t('gameRestored'), 'info', 2600);
+    return true;
   },
 
   board(session: MatchSession): void {

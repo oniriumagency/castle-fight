@@ -2,6 +2,8 @@ import type { Locale } from '@cardcraft-castles/engine';
 
 export interface Settings {
   locale: Locale;
+  /** The player picked the language themselves; otherwise the game is in Spanish. */
+  localeChosen: boolean;
   nickname: string;
   /** 0..1 */
   masterVolume: number;
@@ -14,7 +16,7 @@ export interface Settings {
   screenShake: boolean;
   /** Particles, light and weather. `auto` lowers them if the device struggles. */
   effectsQuality: 'auto' | 'high' | 'low';
-  /** Run the turn clock in games against the AI and on one device. */
+  /** Run the turn clock in games between two people on one device (games against the AI have none). */
   localTimer: boolean;
 }
 
@@ -23,7 +25,9 @@ const KEY = 'cardcraft-castles:settings';
 function defaults(): Settings {
   const prefersReduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return {
-    locale: navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en',
+    // Spanish first, whatever the phone's language: English is one tap away in the menu.
+    locale: 'es',
+    localeChosen: false,
     nickname: '',
     masterVolume: 0.8,
     musicVolume: 0.6,
@@ -43,7 +47,8 @@ function load(): Settings {
     const raw = localStorage.getItem(KEY);
     if (!raw) return base;
     const saved = JSON.parse(raw) as Partial<Settings>;
-    return { ...base, ...saved, locale: saved.locale === 'en' || saved.locale === 'es' ? saved.locale : base.locale };
+    const chosen = saved.localeChosen === true && (saved.locale === 'en' || saved.locale === 'es');
+    return { ...base, ...saved, locale: chosen ? saved.locale! : base.locale, localeChosen: chosen };
   } catch {
     return base;
   }
@@ -62,7 +67,7 @@ class SettingsStore {
 
   set(patch: Partial<Settings>): void {
     const previous = this.value;
-    this.value = { ...previous, ...patch };
+    this.value = { ...previous, ...patch, ...(patch.locale ? { localeChosen: true } : {}) };
     try {
       localStorage.setItem(KEY, JSON.stringify(this.value));
     } catch {

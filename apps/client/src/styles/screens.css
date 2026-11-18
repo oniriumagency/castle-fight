@@ -1211,3 +1211,32 @@ input.shake {
     --w: calc((100vw - 32px - 16px) / 3);
   }
 }
+
+/* Phone in landscape with the browser bar still showing: everything fits without scrolling. */
+@media (max-height: 360px) and (orientation: landscape) {
+  .menu-screen {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .menu-main {
+    row-gap: 6px;
+  }
+
+  .modes {
+    gap: 6px;
+  }
+
+  .mode-btn {
+    padding: 5px 10px;
+  }
+
+  .mode-text small {
+    display: none;
+  }
+
+  .logo-emblem,
+  .tagline {
+    display: none;
+  }
+}

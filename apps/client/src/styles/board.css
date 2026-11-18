@@ -1420,8 +1420,19 @@
 /* ---------- Small screens ---------- */
 
 .board.short {
-  --top-h: 44px;
-  --side-w: clamp(118px, 17vw, 168px);
+  --top-h: 40px;
+  --side-w: clamp(112px, 16vw, 160px);
+}
+
+/* Phones in landscape: "Your turn · Turn 4" on one line to give the castles more height. */
+.board.short .turn-label {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.board.short .turn-label small {
+  font-size: 0.62rem;
 }
 
 .board.short .side {
@@ -1851,7 +1862,24 @@
   display: none;
 }
 
-.board.short .ult-btn:not(.ready) .ult-btn-hint {
+.board.short .ult-btn .ult-btn-hint {
+  display: none;
+}
+
+/* Ready on a phone: one short gold line instead of a big block over the resources. */
+.board.short .ult-btn.ready {
+  padding: 4px 6px;
+}
+
+.board.short .ult-btn.ready .ult-btn-title {
+  font-size: 0.64rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The button already says it: no second label over the portrait. */
+.board.short .portrait.ready .ult-label {
   display: none;
 }
 
@@ -2156,4 +2184,22 @@
 }
 .kind-discardOwn {
   align-items: center;
+}
+
+/* Phones in landscape: long texts start at the top and fade out at the bottom instead of being cut at both ends (tap shows the whole card). */
+.board.short .hand .card.compact:is(.mid-rules, .long-rules) .rules {
+  justify-content: flex-start;
+  padding-top: 3cqw;
+  overflow: hidden;
+  mask-image: linear-gradient(180deg, #000 80%, transparent);
+}
+
+/* A name on two lines hangs over the top of the text box. */
+.board.short .hand .card.compact:is(.mid-name, .long-name):is(.mid-rules, .long-rules) .rules {
+  padding-top: 12cqw;
+}
+
+.board.short .hand .card.compact.long-rules .rules {
+  font-size: 8.5px;
+  line-height: 1.06;
 }
