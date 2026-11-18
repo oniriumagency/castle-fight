@@ -64,8 +64,7 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   twilightRound: 11,
   twilightEvery: 2,
   twilightAttackBonus: 4,
-  twilightErosion: 4,
-  twilightKeepErosion: 3,
+  twilightDamage: 5,
   twilightBuildBonus: 4,
 });
 
