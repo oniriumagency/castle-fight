@@ -1,10 +1,18 @@
 import { DEFAULT_TIMINGS, type RoomTimings } from '@cardcraft-castles/protocol';
 import type { Lobby } from './lobby';
+import type { Reports } from './reports';
 import type { Room } from './room';
 
 export interface Env {
   LOBBY: DurableObjectNamespace<Lobby>;
   ROOM: DurableObjectNamespace<Room>;
+  REPORTS: DurableObjectNamespace<Reports>;
+  /**
+   * Secret that opens `/reportes`, where the players' reports are read. Set it
+   * in Cloudflare (Workers & Pages → cardcraft-castles → Settings → Variables
+   * and Secrets) or with `wrangler secret put REPORTS_KEY --env production`.
+   */
+  REPORTS_KEY?: string;
   /**
    * Optional overrides for local development and tests. Leave them unset in
    * production: the defaults are the real game.

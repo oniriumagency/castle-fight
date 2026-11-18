@@ -11,6 +11,13 @@ const ENDPOINT = `${serverUrl.replace(/\/+$/, '')}/api/client-error`;
 const MAX_REPORTS = 15;
 
 let sent = 0;
+/** The last few problems, attached to a player's report. */
+const recent: string[] = [];
+
+export function recentProblems(): string[] {
+  return [...recent];
+}
+
 const seen = new Set<string>();
 const startedAt = Date.now();
 
@@ -23,6 +30,8 @@ function trim(value: unknown, max = 1500): string {
 export function reportProblem(kind: string, message: unknown, details?: Record<string, unknown>): void {
   try {
     const text = trim(message);
+    recent.push(`${kind}: ${text.slice(0, 300)}`);
+    if (recent.length > 5) recent.shift();
     const key = `${kind}|${text.slice(0, 200)}`;
     if (seen.has(key) || sent >= MAX_REPORTS) return;
     seen.add(key);

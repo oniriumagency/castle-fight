@@ -356,3 +356,29 @@ export type RoomServerMessage =
     }
   | { type: 'emote'; seat: PlayerId; emote: Emote }
   | { type: 'error'; code: RoomErrorCode; message: string };
+
+// ---------------------------------------------------------------------------
+// Player reports (bugs, suggestions): POST /api/reports, read at /reportes
+// ---------------------------------------------------------------------------
+
+export const REPORT_KINDS = ['bug', 'idea', 'other'] as const;
+export type ReportKind = (typeof REPORT_KINDS)[number];
+
+/** Shared by the form and the server. The form shrinks screenshots to fit before sending. */
+export const REPORT_LIMITS = {
+  /** Characters in the message. */
+  maxText: 4000,
+  /** Screenshots per report. */
+  maxImages: 3,
+  /** Bytes per screenshot, after the form recompresses it. */
+  maxImageBytes: 1_500_000,
+  /** Bytes of the automatic context (version, mode, hero, browser…). */
+  maxContextBytes: 8192,
+  /** Whole request body. */
+  maxBodyBytes: 5_000_000,
+  /** Reports kept; the oldest go first. */
+  maxStored: 500,
+} as const;
+
+/** Image types the server keeps. */
+export const REPORT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;

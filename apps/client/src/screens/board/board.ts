@@ -38,6 +38,8 @@ import { CastlePlaque, SidePanel } from './hud';
 import { showResults } from './results';
 import { UltimateMode } from './ultimateMode';
 import { muteButton } from '../../ui/muteButton';
+import { hideFeedbackHint, showFeedbackHint } from '../../ui/feedback';
+import { setGameContext } from '../../app/reportContext';
 
 type StateUpdate = Extract<SessionEvent, { type: 'state' }>;
 
@@ -241,6 +243,9 @@ class BoardScreen implements Screen {
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
     window.addEventListener('keydown', this.onKey);
+    // Player reports carry the game being played; every game reminds them the button is there.
+    setGameContext(() => this.reportContext());
+    showFeedbackHint();
     // Online, the browser can call the player back when it is their turn: ask on their first click.
     if (this.session.kind === 'online') this.el.addEventListener('pointerdown', askNotificationPermission, { once: true });
     this.unsubscribeSettings = settings.subscribe((next, prev) => {
@@ -263,6 +268,8 @@ class BoardScreen implements Screen {
 
   unmount(): void {
     this.destroyed = true;
+    setGameContext(null);
+    hideFeedbackHint();
     this.unsubscribe();
     this.unsubscribeSettings();
     cancelAnimationFrame(this.raf);
@@ -290,6 +297,24 @@ class BoardScreen implements Screen {
   relocalize(): void {
     this.render();
     this.logPanel.querySelector('h3')!.textContent = t('log');
+  }
+
+  /** What a player's report says about this game (see `reportContext`). */
+  private reportContext(): Record<string, string | number | boolean | null> {
+    const session = this.session;
+    const mine = this.leftSeat;
+    const view = this.view;
+    const difficulty = 'difficulty' in session ? String((session as { difficulty: unknown }).difficulty) : null;
+    const room = 'connection' in session ? ((session as { connection: { roomId?: string } }).connection.roomId ?? null) : null;
+    return {
+      mode: `${session.kind}${this.count > 2 ? ' (todos contra todos)' : ''}`,
+      difficulty: session.kind === 'ai' ? difficulty : null,
+      hero: session.seats[mine]?.hero ?? null,
+      rivals: session.seats.filter((_, seat) => seat !== mine).map((s) => s.hero).join(', '),
+      turn: view ? view.turn : null,
+      gameOver: view ? view.result !== null : null,
+      room,
+    };
   }
 
   // ---------------------------------------------------------------------------

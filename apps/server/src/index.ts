@@ -17,9 +17,11 @@ import {
 } from '@cardcraft-castles/protocol';
 import type { Env } from './env';
 import type { LobbyResult } from './lobby';
+import { handleReports } from './reportsApi';
 
 export { Lobby } from './lobby';
 export { Room } from './room';
+export { Reports } from './reports';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -125,6 +127,11 @@ export default {
         }
         console.warn('[client]', JSON.stringify({ report, country: request.headers.get('cf-ipcountry') ?? undefined }));
         return new Response(null, { status: 204, headers: CORS });
+      }
+
+      // Bug reports and suggestions from the game, and the page that reads them.
+      if (path === '/reportes' || path === '/api/reports' || path.startsWith('/api/reports/')) {
+        return await handleReports(request, env, path, ipOf(request));
       }
 
       if (path === '/api/quick-join') {

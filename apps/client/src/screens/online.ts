@@ -2,6 +2,7 @@ import type { HeroId } from '@cardcraft-castles/engine';
 import type { RoomInfo } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
+import { setScreenName } from '../app/reportContext';
 import { show, type Screen } from '../app/router';
 import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
@@ -39,6 +40,7 @@ export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
     offClosed();
   };
 
+  setScreenName('onlineWaiting');
   show(waitingScreen(session, () => {
     cleanup();
     session.leave();

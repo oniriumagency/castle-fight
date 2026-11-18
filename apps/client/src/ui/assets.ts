@@ -62,6 +62,9 @@ const PATHS = {
   arrow: '<path d="M10 1L3 8l7 7 1.4-1.4L5.8 8l5.6-5.6z"/>',
   sound: '<path d="M1 5.5h3L8 2v12l-4-3.5H1zm9.6-.9a4.6 4.6 0 0 1 0 6.8l-1-1a3.2 3.2 0 0 0 0-4.8zm2.1-2.1a7.6 7.6 0 0 1 0 11l-1-1a6.2 6.2 0 0 0 0-9z"/>',
   mute: '<path d="M1 5.5h3L8 2v12l-4-3.5H1zm9.3-.3L12 6.9l1.7-1.7 1 1L13 7.9l1.7 1.7-1 1L12 8.9l-1.7 1.7-1-1L11 7.9 9.3 6.2z"/>',
+  // Speech bubble with an exclamation mark: send a report or a suggestion.
+  feedback: '<path d="M2.5 1h11A2.5 2.5 0 0 1 16 3.5v6.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3.5v-3.5H2.5A2.5 2.5 0 0 1 0 10V3.5A2.5 2.5 0 0 1 2.5 1zm4.6 2.2l.3 4.6h1.2l.3-4.6zM8 8.6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill-rule="evenodd"/>',
+  image: '<path d="M1.5 2h13A1.5 1.5 0 0 1 16 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5v-9A1.5 1.5 0 0 1 1.5 2zm.1 1.6v7.6l3.6-3.8 2.6 2.6 2.1-2.2 4.5 4.4V3.6zM11 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" fill-rule="evenodd"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -76,7 +76,7 @@ function randomSeed(): string {
 export class LocalSession extends BaseSession implements MatchSession {
   readonly kind: 'ai' | 'local';
   readonly seats: Seat[];
-  private readonly difficulty: Difficulty;
+  readonly difficulty: Difficulty;
   private state!: GameState;
   private viewer: PlayerId = 0;
   private deadline: number | null = null;

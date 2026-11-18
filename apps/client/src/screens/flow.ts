@@ -2,6 +2,7 @@ import { HEROES, type HeroId } from '@cardcraft-castles/engine';
 import { INVITE_PARAM } from '@cardcraft-castles/protocol';
 import { toast } from '../app/dom';
 import { t } from '../app/i18n';
+import { setScreenName } from '../app/reportContext';
 import { show } from '../app/router';
 import { settings } from '../app/settings';
 import type { Difficulty } from '../game/ai';
@@ -37,16 +38,19 @@ export function setRoomInUrl(roomId: string | null): void {
 export const flow = {
   menu(): void {
     setRoomInUrl(null);
+    setScreenName('menu');
     show(menuScreen());
   },
 
   lobby(): void {
     setRoomInUrl(null);
+    setScreenName('lobby');
     show(lobbyScreen());
   },
 
   heroSelect(mode: HeroSelectMode, roomId?: string): void {
     setRoomInUrl(mode === 'online' && roomId ? roomId : null);
+    setScreenName(`heroSelect (${mode})`);
     show(heroSelectScreen(mode, roomId));
   },
 
@@ -110,6 +114,7 @@ export const flow = {
   },
 
   board(session: MatchSession): void {
+    setScreenName('board');
     show(boardScreen(session));
   },
 };
