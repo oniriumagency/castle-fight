@@ -833,3 +833,21 @@ input.shake {
     display: none;
   }
 }
+
+.turn-picker {
+  display: flex;
+}
+
+.turn-picker button {
+  flex: 1;
+  padding-inline: 0.3em;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.room-info small .icon,
+.room-info small svg {
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: -0.12em;
+}

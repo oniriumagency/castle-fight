@@ -43,6 +43,8 @@ export interface CreateRoomInput {
   nickname: string;
   name: string;
   private: boolean;
+  /** Seconds per turn chosen by the host; null keeps the server's default. */
+  turnSeconds: number | null;
   clientId: string | null;
   ip: string;
 }
@@ -121,6 +123,7 @@ export class Lobby extends DurableObject<Env> {
         nickname: input.nickname,
         name: cleanRoomName(`Partida rápida de ${input.nickname}`) ?? 'Partida rápida',
         private: false,
+        turnSeconds: null,
         clientId: input.clientId,
         ip: input.ip,
       },
@@ -199,7 +202,8 @@ export class Lobby extends DurableObject<Env> {
   // ---------------------------------------------------------------------------
 
   private async spawnRoom(input: CreateRoomInput, now: number): Promise<RoomSummary> {
-    const timings = timingsFrom(this.env);
+    const base = timingsFrom(this.env);
+    const timings = input.turnSeconds ? { ...base, turnSeconds: input.turnSeconds } : base;
     for (let attempt = 0; ; attempt++) {
       const id = newRoomId();
       try {

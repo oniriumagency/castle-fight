@@ -8,6 +8,7 @@ import {
   PROTOCOL_VERSION,
   cleanNickname,
   cleanRoomName,
+  cleanTurnSeconds,
   isRoomId,
   type ApiErrorCode,
   type HealthResponse,
@@ -97,6 +98,7 @@ export default {
           nickname,
           name: cleanRoomName(body.name) ?? cleanRoomName(`Sala de ${nickname}`)!,
           private: body.private === true,
+          turnSeconds: cleanTurnSeconds(body.turnSeconds),
           clientId: clientIdOf(body.clientId),
           ip: ipOf(request),
         });
