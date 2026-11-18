@@ -434,6 +434,14 @@ Golden wheat fields and orchards full of harvesters and carts filling the valley
 The valley under deep quiet snow, both castles with smoke rising from chimneys, a single white flag on a pole in the middle. Sky color: soft pearl white. Painterly dark-fantasy trading card illustration, digital oil painting with visible confident brushwork, semi-realistic proportions, dramatic cinematic lighting with a strong warm rim light and deep cool shadows, rich saturated color, subtle gold accent highlights, fine atmospheric haze and drifting dust motes, highly detailed focal subject with a softer painterly background. World: a medieval high-fantasy mountain valley of weathered pale-sandstone castles with slate-blue roofs and plain teal-and-gold cloth banners without any symbols. Color palette: the full valley in muted teal and sandstone, dominated by the sky color named in the description. Composition: wide establishing landscape seen from a hillside, two distant castles facing each other across the valley, one on the left and one on the right, the sky occupying the upper two thirds. Aspect ratio 16:9 landscape. No text, no letters, no numbers, no runes that look like writing, no logos, no card frame, no border, no watermark, no signature, no user interface.
 ```
 
+## 72b. Furia del Ocaso (`art/events/ocaso.jpg`, 16:9)
+
+Ahora mismo hay un marcador de posición dibujado a mano; al sustituir el archivo se ve en el juego sin tocar código.
+
+```
+A blood-red dusk over the valley, a huge low sun sinking between the mountains behind the two castles, embers and ash drifting on hot wind, torch fires lit on both castle walls as the war grows fiercer. Sky color: deep crimson fading to molten orange at the horizon. Painterly dark-fantasy trading card illustration, digital oil painting with visible confident brushwork, semi-realistic proportions, dramatic cinematic lighting with a strong warm rim light and deep cool shadows, rich saturated color, subtle gold accent highlights, fine atmospheric haze and drifting dust motes, highly detailed focal subject with a softer painterly background. World: a medieval high-fantasy mountain valley of weathered pale-sandstone castles with slate-blue roofs and plain teal-and-gold cloth banners without any symbols. Color palette: the full valley in muted teal and sandstone, dominated by the sky color named in the description. Composition: wide establishing landscape seen from a hillside, two distant castles facing each other across the valley, one on the left and one on the right, the sky occupying the upper two thirds. Aspect ratio 16:9 landscape. No text, no letters, no numbers, no runes that look like writing, no logos, no card frame, no border, no watermark, no signature, no user interface.
+```
+
 ## 73. Escombros Útiles (`art/cards/escombros-utiles.jpg`, 4:3)
 
 ```

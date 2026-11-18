@@ -1221,3 +1221,149 @@ input.shake {
   font-family: var(--numeral);
   color: var(--ink);
 }
+
+/* Twilight Fury: toggle with its (?) and the explanation popup. */
+.twilight-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.twilight-row .twilight-toggle {
+  flex: 1;
+  min-width: 0;
+}
+
+.help-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 154 90 / 60%);
+  background: rgb(40 16 18 / 85%);
+  color: #ffb27a;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.help-btn:hover,
+.help-btn:focus-visible {
+  background: rgb(90 30 24 / 95%);
+  box-shadow: 0 0 12px rgb(255 110 60 / 45%);
+}
+
+.twilight-info {
+  width: min(860px, 100%);
+}
+
+.twilight-info h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffb27a;
+}
+
+.twilight-info h2 svg {
+  width: 26px;
+  height: 26px;
+}
+
+.twilight-info-body {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+.twilight-info-card {
+  flex: none;
+  position: sticky;
+  top: 0;
+}
+
+.twilight-info-card .card {
+  --w: 210px;
+}
+
+.twilight-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.twilight-info-text p {
+  margin: 0;
+}
+
+.twilight-info-text .lead {
+  font-size: 1.05rem;
+}
+
+.twilight-info-text h3 {
+  margin: 0 0 3px;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  color: var(--gold);
+}
+
+.twilight-info-text .note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.twilight-info .table-wrap {
+  overflow-x: auto;
+}
+
+.twilight-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.twilight-table th,
+.twilight-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.twilight-table thead th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.twilight-table tr.current {
+  background: rgb(255 106 58 / 18%);
+}
+
+.twilight-table tbody th {
+  color: #ffb27a;
+}
+
+@media (max-height: 500px) {
+  .twilight-info-card .card {
+    --w: 140px;
+  }
+}
+
+@media (max-width: 640px) {
+  .twilight-info-body {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .twilight-info-card {
+    position: static;
+  }
+
+  .twilight-info-card .card {
+    --w: 170px;
+  }
+}
