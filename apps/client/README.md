@@ -33,15 +33,14 @@ El tablero no sabe de dónde viene la partida: recibe de la sesión una vista (`
 
 ## Sonido, música y efectos visuales
 
-Todo el audio y los efectos son originales y se generan en el navegador: no hay archivos de sonido, música ni sprites de efectos de terceros, así que no hay nada que descargar ni licencias que respetar.
+Los efectos de sonido y visuales son originales y se generan en el navegador: no hay archivos de sonido ni sprites de efectos de terceros. La música son tres pistas elegidas por el equipo, en `public/music/`.
 
 **Sonido** (`src/fx/sound/`)
 
 - `synth.ts`: un sintetizador pequeño (osciladores, ruido blanco, rosa y marrón, FM, filtros y envolventes) que funciona en contextos de audio en vivo y sin conexión, y la respuesta al impulso de la reverb de sala.
 - `sfx.ts`: más de 60 efectos, cada uno una receta: botones, cartas, un sonido por escuela (Construcción, Asalto, Arcano), uno por rareza, construir, lanzar, impactos según el daño, perforante, escudo, quemadura, escarcha, encantamientos, definitivas con un sello distinto por héroe, un sonido por evento de batalla, reloj de turno, victoria y derrota. Cada receta se renderiza una vez a un búfer (`OfflineAudioContext`) la primera vez que hace falta, se normaliza a su nivel y luego solo se reproduce, con una pequeña variación de tono en cada golpe.
-- `instruments.ts` y `songs.ts`: una pequeña orquesta (cuerdas, metales, flauta, campanas, bajo, arpa por Karplus-Strong y percusión renderizada) y cuatro piezas originales en re: menú, batalla, victoria y derrota. La batalla tiene una capa de tensión (shaker, trémolo agudo, bajo y redobles) que entra y sube el tempo según lo cerca que esté el final.
-- `music.ts`: secuenciador con planificación anticipada, fundidos entre pistas y atenuación de la música cuando suena un efecto grande.
-- `src/fx/audio.ts`: la API (`audio.play(cue, intensidad, { pan })`, `audio.music(track)`, `audio.setTension(0..1)`, `audio.duck()`), buses de efectos y música, reverb y limitador. Nada se crea hasta el primer toque o tecla; después se preparan los instrumentos y los efectos más usados en momentos libres, sin bloquear fotogramas. En segundo plano el audio se suspende. En móvil se mezcla con lo que esté sonando en lugar de pararlo.
+- `music.ts`: la banda sonora. *Celtic Morning* suena en el menú y en la victoria, *Diversity* durante la partida (sube un poco de volumen cuando el final está cerca) y *To the Fallen* en la derrota. Son MP3 de unos 95 kbps (6,6 MB en total) que se reproducen en streaming con dos elementos `<audio>` conectados al bus de música, así que no se descodifican enteros en memoria, funcionan los volúmenes y la atenuación, y cambiar de pista hace un fundido cruzado. Para cambiar una pista basta con sustituir el MP3 y, si hace falta, ajustar su nivel en `TRACKS`.
+- `src/fx/audio.ts`: la API (`audio.play(cue, intensidad, { pan })`, `audio.music(track)`, `audio.setTension(0..1)`, `audio.duck()`), buses de efectos y música, reverb y limitador. Nada se crea hasta el primer toque o tecla; después se preparan los efectos más usados en momentos libres, sin bloquear fotogramas. En segundo plano el audio se suspende y la música deja de descargarse. En móvil se mezcla con lo que esté sonando en lugar de pararlo.
 
 **Efectos visuales**
 
