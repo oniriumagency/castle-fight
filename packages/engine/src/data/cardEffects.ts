@@ -31,7 +31,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'fragua-del-gremio': [{ op: 'gainWorker', worker: 'acero', amount: 1 }],
   'aula-de-arcanistas': [{ op: 'gainWorker', worker: 'mana', amount: 1 }],
   'torre-vigia': [{ op: 'keep', amount: 12 }, { op: 'revealHand' }],
-  contrafuertes: [{ op: 'enchant', turns: 4, modifiers: { wallDamageReduction: 3 } }],
+  contrafuertes: [{ op: 'enchant', charges: 4, modifiers: { wallDamageReduction: 3 } }],
   'fortaleza-viva': [
     { op: 'enchant', turns: 5, modifiers: { onTurnStart: [{ op: 'keep', amount: 5 }] } },
   ],
@@ -77,7 +77,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'balista-de-asedio': [{ op: 'damage', amount: 15, kind: 'piercing' }],
   'espia-en-la-corte': [{ op: 'peekAndDiscard' }],
   sabotaje: [{ op: 'destroyEnchantment' }, { op: 'damage', amount: 8 }],
-  'estandarte-de-guerra': [{ op: 'enchant', turns: 4, modifiers: { attackBonus: 3 } }],
+  'estandarte-de-guerra': [{ op: 'enchant', charges: 4, modifiers: { attackBonus: 3 } }],
   emboscada: [
     {
       op: 'if',

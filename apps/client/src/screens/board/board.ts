@@ -1062,11 +1062,21 @@ class BoardScreen implements Screen {
         break;
       case 'enchantmentAdded': {
         const p = shown[e.player];
-        p.enchantments = [...p.enchantments.filter((x) => x.cardId !== e.cardId), { cardId: e.cardId, turnsLeft: e.turns, fresh: true }];
+        p.enchantments = [
+          ...p.enchantments.filter((x) => x.cardId !== e.cardId),
+          { cardId: e.cardId, turnsLeft: e.turns, fresh: true, ...(e.charges !== undefined ? { charges: e.charges } : {}) },
+        ];
         this.render();
         fx.enchantment(e.player, ctx);
         this.panels[this.sideOf(e.player)].pulse(`.enchant[data-card="${e.cardId}"]`);
         await wait(450);
+        break;
+      }
+      case 'enchantmentCharge': {
+        const x = shown[e.player].enchantments.find((y) => y.cardId === e.cardId);
+        if (x) x.charges = e.charges;
+        this.render();
+        this.panels[this.sideOf(e.player)].pulse(`.enchant[data-card="${e.cardId}"]`);
         break;
       }
       case 'enchantmentTriggered':

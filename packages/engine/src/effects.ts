@@ -8,6 +8,7 @@ import {
   discardFromHand,
   drawCards,
   defaultTarget,
+  enchantmentLife,
   highestOf,
   isMultiplayer,
   opponents,
@@ -160,7 +161,7 @@ function choiceFor(state: GameState, ctx: EffectContext, op: EffectOp): Choice |
     }
     case 'destroyEnchantment': {
       // Default: the enchantment with the most turns left.
-      const sorted = [...opp.enchantments].sort((a, b) => b.turnsLeft - a.turnsLeft);
+      const sorted = [...opp.enchantments].sort((a, b) => enchantmentLife(b) - enchantmentLife(a));
       return { kind: 'destroyEnchantment', options: sorted.map((e) => e.cardId) };
     }
     case 'discardOwn': {
@@ -340,8 +341,9 @@ function applyOp(
       const existing = self.enchantments.find((e) => e.cardId === cardId);
       if (existing) {
         // Playing the same enchantment again restarts its duration.
-        existing.turnsLeft = op.turns;
+        existing.turnsLeft = op.turns ?? 0;
         existing.fresh = true;
+        if (op.charges !== undefined) existing.charges = op.charges;
       } else {
         if (self.enchantments.length >= state.rules.maxEnchantments) {
           const oldest = self.enchantments.shift()!;
@@ -352,13 +354,19 @@ function applyOp(
             reason: 'replaced',
           });
         }
-        self.enchantments.push({ cardId, turnsLeft: op.turns, fresh: true });
+        self.enchantments.push({
+          cardId,
+          turnsLeft: op.turns ?? 0,
+          fresh: true,
+          ...(op.charges !== undefined ? { charges: op.charges } : {}),
+        });
       }
       events.push({
         type: 'enchantmentAdded',
         player: me,
         cardId,
-        turns: op.turns,
+        turns: op.turns ?? 0,
+        ...(op.charges !== undefined ? { charges: op.charges } : {}),
         refreshed: !!existing,
       });
       return null;
@@ -370,7 +378,7 @@ function applyOp(
         targets.length > 1
           ? targets.map((t) => [
               t,
-              [...state.players[t]!.enchantments].sort((a, b) => b.turnsLeft - a.turnsLeft)[0]?.cardId ?? null,
+              [...state.players[t]!.enchantments].sort((a, b) => enchantmentLife(b) - enchantmentLife(a))[0]?.cardId ?? null,
             ])
           : [[them, answer]];
       for (const [target, cardId] of picks) {

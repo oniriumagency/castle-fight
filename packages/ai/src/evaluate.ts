@@ -3,6 +3,7 @@ import {
   RESOURCES,
   costResource,
   effectiveCost,
+  enchantmentLife,
   getCard,
   getHero,
   getEnchantmentModifiers,
@@ -173,7 +174,8 @@ function opNominal(op: EffectOp, w: Weights): number {
     case 'cleanse':
       return 3;
     case 'enchant':
-      return op.turns * modifiersPerTurn(op.modifiers, w);
+      // An enchantment counted in attacks lasts about one attack per turn.
+      return (op.charges ?? op.turns ?? 0) * modifiersPerTurn(op.modifiers, w);
     case 'destroyEnchantment':
       return 5;
     case 'revealHand':
@@ -337,7 +339,7 @@ function sideValue(
   value += w.shield * p.shield;
 
   for (const e of p.enchantments) {
-    value += Math.min(e.turnsLeft, turnsLeft + 1) * enchantmentPerTurn(tables, e.cardId, w);
+    value += Math.min(enchantmentLife(e), turnsLeft + 1) * enchantmentPerTurn(tables, e.cardId, w);
   }
 
   const threshold = ultimateThreshold(state, player);

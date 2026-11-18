@@ -191,8 +191,12 @@ export type EffectOp =
   | { op: 'shield'; charges: number }
   /** Remove your negative statuses (Burn and Frost). */
   | { op: 'cleanse' }
-  /** Put the source card on the table as an enchantment. */
-  | { op: 'enchant'; turns: number; modifiers: EnchantmentModifiers }
+  /**
+   * Put the source card on the table as an enchantment. It lasts `turns` of
+   * the owner's turns or, with `charges`, that many attacks: each attack that
+   * uses its `attackBonus` or `wallDamageReduction` spends one.
+   */
+  | { op: 'enchant'; turns?: number; charges?: number; modifiers: EnchantmentModifiers }
   /** Destroy one enemy enchantment (choice when there are several). */
   | { op: 'destroyEnchantment' }
   /** The opponent's hand is revealed until your next turn. */
@@ -292,8 +296,13 @@ export interface CardInstance {
 
 export interface Enchantment {
   cardId: CardId;
-  /** Owner turns left. It ticks down at the end of each owner turn after the one it was played on. */
+  /**
+   * Owner turns left. It ticks down at the end of each owner turn after the
+   * one it was played on. Unused (0) when the enchantment has `charges`.
+   */
   turnsLeft: number;
+  /** Attacks left, for enchantments that last a number of attacks instead of turns. */
+  charges?: number;
   /** True during the turn the enchantment was played. */
   fresh: boolean;
 }
@@ -598,13 +607,23 @@ export type GameEvent =
   | { type: 'drawbridgeLowered'; player: PlayerId }
   | { type: 'handRevealed'; player: PlayerId; cards: CardInstance[] }
   | { type: 'handHidden'; player: PlayerId }
-  | { type: 'enchantmentAdded'; player: PlayerId; cardId: CardId; turns: number; refreshed: boolean }
+  | {
+      type: 'enchantmentAdded';
+      player: PlayerId;
+      cardId: CardId;
+      turns: number;
+      /** Attacks it lasts, for enchantments counted in attacks instead of turns. */
+      charges?: number;
+      refreshed: boolean;
+    }
   | { type: 'enchantmentTriggered'; player: PlayerId; cardId: CardId }
+  /** An attack spent one charge of an enchantment; `charges` are the ones left. */
+  | { type: 'enchantmentCharge'; player: PlayerId; cardId: CardId; charges: number }
   | {
       type: 'enchantmentRemoved';
       player: PlayerId;
       cardId: CardId;
-      reason: 'expired' | 'destroyed' | 'replaced';
+      reason: 'expired' | 'destroyed' | 'replaced' | 'spent';
     }
   | { type: 'choiceRequested'; player: PlayerId; kind: ChoiceKind; options: string[]; revealed?: CardInstance[] }
   | { type: 'choiceMade'; player: PlayerId; kind: ChoiceKind; option: string }

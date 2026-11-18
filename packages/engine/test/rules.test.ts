@@ -326,23 +326,47 @@ describe('enchantments', () => {
 
   it('playing the same enchantment again restarts its duration', () => {
     const state = scenario({
-      hand: ['contrafuertes', 'cimientos'],
-      you: { enchantments: [{ cardId: 'contrafuertes', turnsLeft: 1, fresh: false }] },
+      hand: ['fortaleza-viva', 'cimientos'],
+      you: { enchantments: [{ cardId: 'fortaleza-viva', turnsLeft: 1, fresh: false }] },
     });
-    const result = playCard(state, 'contrafuertes');
-    expect(result.state.players[ME].enchantments).toEqual([{ cardId: 'contrafuertes', turnsLeft: 4, fresh: true }]);
+    const result = playCard(state, 'fortaleza-viva');
+    expect(result.state.players[ME].enchantments).toEqual([{ cardId: 'fortaleza-viva', turnsLeft: 5, fresh: true }]);
     expect(eventsOf(result.events, 'enchantmentAdded')[0]!.refreshed).toBe(true);
   });
 
+  it('playing the same enchantment again restores its charges', () => {
+    const state = scenario({
+      hand: ['contrafuertes', 'cimientos'],
+      you: { enchantments: [{ cardId: 'contrafuertes', turnsLeft: 0, charges: 1, fresh: false }] },
+    });
+    const result = playCard(state, 'contrafuertes');
+    expect(result.state.players[ME].enchantments).toEqual([
+      { cardId: 'contrafuertes', turnsLeft: 0, charges: 4, fresh: true },
+    ]);
+    expect(eventsOf(result.events, 'enchantmentAdded')[0]).toMatchObject({ charges: 4, refreshed: true });
+  });
+
   it('lasts for the owner\'s next N turns and protects during N opponent turns', () => {
-    let state = playCard(scenario({ hand: ['contrafuertes'], keepTurn: false }), 'contrafuertes').state;
+    let state = playCard(
+      scenario({ hand: ['fortaleza-viva'], keepTurn: false, rules: { eventEveryTurns: 1000 } }),
+      'fortaleza-viva',
+    ).state;
     let protectedTurns = 0;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
       // Opponent's turn: is the enchantment still up?
       if (state.players[ME].enchantments.length > 0) protectedTurns += 1;
       state = pass(pass(state));
     }
-    expect(protectedTurns).toBe(4);
+    expect(protectedTurns).toBe(5);
+  });
+
+  it('an enchantment counted in attacks does not wear off with turns', () => {
+    let state = playCard(
+      scenario({ hand: ['contrafuertes'], keepTurn: false, rules: { eventEveryTurns: 1000, twilightTurn: 0 } }),
+      'contrafuertes',
+    ).state;
+    for (let i = 0; i < 8; i++) state = pass(pass(state));
+    expect(state.players[ME].enchantments).toEqual([{ cardId: 'contrafuertes', turnsLeft: 0, charges: 4, fresh: false }]);
   });
 });
 
