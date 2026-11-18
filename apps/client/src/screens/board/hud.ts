@@ -229,7 +229,7 @@ export class SidePanel {
             title: `${L(card.name)} · ${t('turnsLeft', { n: e.turnsLeft })}`,
             onclick: () => this.onInspect(e.cardId),
           },
-          h('img', { src: artUrl(card.art), alt: L(card.name), draggable: 'false' }),
+          h('img', { src: artUrl(card.art), alt: L(card.name), draggable: 'false', onerror: hideMissingArt }),
           h('span.enchant-turns', null, String(e.turnsLeft)),
         );
         return el;
@@ -260,7 +260,7 @@ export class SidePanel {
               this.onInspect(cardId);
             },
           },
-          h('img', { src: artUrl(card.art), alt: '', draggable: 'false' }),
+          h('img', { src: artUrl(card.art), alt: '', draggable: 'false', onerror: hideMissingArt }),
           h('span.hist-cost', null, String(card.cost)),
         );
         el.addEventListener('pointerenter', (e) => {
@@ -336,4 +336,9 @@ export class CastlePlaque {
     this.el.style.left = `${x}px`;
     this.el.style.top = `${y}px`;
   }
+}
+
+/** A card whose illustration is not painted yet leaves its thumbnail empty instead of showing a broken image. */
+function hideMissingArt(e: Event): void {
+  (e.target as HTMLElement).style.visibility = 'hidden';
 }

@@ -229,6 +229,22 @@ describe('determinize', () => {
     expect(result.state.players[OPP].wall).toBe(state.players[OPP].wall - 5);
     expect(getCard('sabotaje').effects.at(-1)).toMatchObject({ op: 'damage', amount: 8 });
   });
+
+  it('rebuilds a discard from its own hand halfway through', () => {
+    let state = scenario({ hand: ['tierra-quemada', 'escaramuza', 'parapeto', 'catapulta'], keepTurn: false });
+    state = playCard(state, 'tierra-quemada').state;
+    const first = state.players[ME].hand.find((c) => c.cardId === 'escaramuza')!.uid;
+    const step = applyAction(state, { type: 'choose', player: ME, option: String(first) });
+    if (!step.ok) throw new Error(step.error.message);
+    state = step.state;
+    // One card gone, up to two more: the rebuilt world must remember both.
+    const world = determinize(getPlayerView(state, ME), { rng: 3 })!;
+    expect(world.pending!.progress).toEqual({ done: 1, left: 2 });
+    const result = applyAction(world, { type: 'choose', player: ME, option: 'done' });
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.state.players[OPP].wall).toBe(state.players[OPP].wall - 4);
+    for (const level of DIFFICULTIES) expect(legalActions(state)).toContainEqual(chooseAction(state, level));
+  });
 });
 
 describe('difficulty levels', () => {

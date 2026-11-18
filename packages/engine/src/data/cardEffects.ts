@@ -43,6 +43,19 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'bastion-ciclopeo': [{ op: 'wall', amount: 37 }],
   'aguja-celeste': [{ op: 'keep', amount: 33 }],
   'ciudadela-eterna': [{ op: 'keep', amount: 33 }, { op: 'wall', amount: 25 }, { op: 'cleanse' }],
+  'escombros-utiles': [
+    { op: 'discardOwn', count: 3, upTo: true },
+    { op: 'wall', amount: 0, perDiscard: 4 },
+  ],
+  'planos-revisados': [
+    { op: 'discardOwn', count: 1 },
+    { op: 'draw', count: 2 },
+    { op: 'extraPlay' },
+  ],
+  'sillares-reciclados': [
+    { op: 'discardOwn', count: 3, upTo: true },
+    { op: 'keep', amount: 0, perDiscard: 4 },
+  ],
 
   // ----- Asalto ------------------------------------------------------------
   escaramuza: [{ op: 'damage', amount: 5 }],
@@ -77,6 +90,20 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'hueste-imparable': [
     { op: 'damage', amount: 27 },
     { op: 'damage', amount: 13, kind: 'piercing' },
+  ],
+  'tierra-quemada': [
+    { op: 'discardOwn', count: 3, upTo: true },
+    { op: 'damage', amount: 0, perDiscard: 4 },
+  ],
+  'relevo-de-tropas': [
+    { op: 'damage', amount: 5 },
+    { op: 'discardOwn', count: 1 },
+    { op: 'draw', count: 1 },
+    { op: 'extraPlay' },
+  ],
+  'todo-o-nada': [
+    { op: 'discardOwn', count: 'hand' },
+    { op: 'damage', amount: 0, perDiscard: 6 },
   ],
 
   // ----- Arcano ------------------------------------------------------------
@@ -126,5 +153,18 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'cometa-del-ocaso': [
     { op: 'damage', amount: 17, kind: 'wallOnly' },
     { op: 'damage', amount: 17, kind: 'piercing' },
+  ],
+  'ofrenda-arcana': [
+    { op: 'discardOwn', count: 2 },
+    { op: 'draw', count: 1 },
+    { op: 'extraPlay' },
+  ],
+  'grimorio-en-llamas': [
+    { op: 'discardOwn', count: 3, upTo: true },
+    { op: 'damage', amount: 0, perDiscard: 4, kind: 'piercing' },
+  ],
+  'quema-de-pergaminos': [
+    { op: 'discardRandom', count: 2 },
+    { op: 'damage', amount: 6, kind: 'piercing' },
   ],
 };

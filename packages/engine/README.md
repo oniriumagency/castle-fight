@@ -68,7 +68,7 @@ Las cartas de una mano se identifican por `uid`, un número que se asigna al rob
 
 ### Elecciones pendientes
 
-Tres efectos piden una decisión: qué recurso congelar (Aliento de Escarcha), qué carta descartar tras mirar la mano rival (Espía en la Corte) y qué encantamiento destruir (Sabotaje, Disipar). Al jugarlos, `state.phase` pasa a `'choice'` y `state.pending` trae `kind` y `options`. El jugador responde con `{ type: 'choose', option }` y el efecto continúa. Si solo hay una opción válida se toma sola, y si no hay ninguna esa parte del efecto no hace nada. La primera opción de la lista es siempre la que se aplica por defecto si se agota el tiempo.
+Cuatro efectos piden una decisión: qué recurso congelar (Aliento de Escarcha), qué carta descartar tras mirar la mano rival (Espía en la Corte), qué encantamiento destruir (Sabotaje, Disipar) y qué cartas de tu propia mano descartar (`discardOwn`, por ejemplo Ofrenda Arcana o Tierra Quemada). Los descartes propios se eligen de uno en uno; `pending.progress` dice cuántos llevas y cuántos quedan como máximo, y cuando el efecto dice «hasta N» la primera opción es `'done'`, que termina antes. Al jugarlos, `state.phase` pasa a `'choice'` y `state.pending` trae `kind` y `options`. El jugador responde con `{ type: 'choose', option }` y el efecto continúa. Si solo hay una opción válida se toma sola, y si no hay ninguna esa parte del efecto no hace nada. La primera opción de la lista es siempre la que se aplica por defecto si se agota el tiempo.
 
 ### Reloj de turno
 
@@ -82,7 +82,7 @@ Cada acción devuelve la lista ordenada de lo que ha pasado (`GameEvent[]`): `ca
 
 Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. Todos se pueden cambiar por partida con `createGame({ rules })`, pensado para las simulaciones de equilibrio.
 
-**Preparación.** Torreón 50, Muralla 15, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Quien juega segundo empieza con 5 más de Muralla (`rules.secondPlayerWall`), que compensa la ventaja de mover primero. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (195 cartas). Cuando el mazo se agota se baraja el descarte.
+**Preparación.** Torreón 50, Muralla 15, 8 de cada recurso, 2 trabajadores de cada tipo y 6 cartas en mano. Quien juega segundo empieza con 5 más de Muralla (`rules.secondPlayerWall`), que compensa la ventaja de mover primero. Cada jugador tiene su propia copia barajada del mazo común: 4 copias de cada carta común, 3 de cada rara, 2 de cada épica y 1 de cada legendaria (224 cartas). Cuando el mazo se agota se baraja el descarte.
 
 **Turno.** Al empezar el turno, en este orden: terminan los efectos «hasta tu próximo turno», salta el evento de batalla si toca, la Quemadura hace su daño, se activan los encantamientos de inicio de turno y los trabajadores producen. Después el jugador juega una carta pagando su coste o descarta una. Al terminar repone la mano hasta 6.
 
@@ -123,6 +123,7 @@ Estas son interpretaciones mías del texto de las cartas. Están cubiertas por t
 | Eclipse | La mitad del coste, redondeando hacia arriba. |
 | Descartes | Los descartes por acción, tiempo o efecto son públicos. El de Ojo del Augur es boca abajo. |
 | Mano del rival | Las cartas que te hacen descartar no se reponen hasta el final de tu propio turno. |
+| Descartes por carta | Los descartes de tu propia mano por efecto son públicos y no activan la pasiva de la Saboteadora. «Por cada una» cuenta las cartas que descartó ese mismo efecto y se suma en un solo golpe. |
 
 ## Simulador
 

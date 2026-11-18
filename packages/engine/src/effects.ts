@@ -39,6 +39,12 @@ interface Choice {
   /** Valid answers, best default first. */
   options: string[];
   revealed?: CardInstance[];
+  progress?: { done: number; left: number };
+}
+
+/** The extra amount a `perDiscard` op gets for the cards its effect discarded. */
+function discardBonus(ctx: EffectContext, op: { perDiscard?: number }): number {
+  return (op.perDiscard ?? 0) * (ctx.discarded ?? 0);
 }
 
 function evalCondition(state: Board, ctx: Pick<EffectContext, 'player'>, cond: Condition): boolean {
@@ -85,6 +91,18 @@ function choiceFor(state: GameState, ctx: EffectContext, op: EffectOp): Choice |
       const sorted = [...opp.enchantments].sort((a, b) => b.turnsLeft - a.turnsLeft);
       return { kind: 'destroyEnchantment', options: sorted.map((e) => e.cardId) };
     }
+    case 'discardOwn': {
+      if (op.count === 'hand') return null;
+      // Default: stop if allowed, otherwise the cheapest card.
+      const hand = state.players[ctx.player].hand;
+      const sorted = [...hand].sort((a, b) => getCard(a.cardId).cost - getCard(b.cardId).cost);
+      const uids = sorted.map((c) => String(c.uid));
+      return {
+        kind: 'discardOwn',
+        options: op.upTo ? ['done', ...uids] : uids,
+        progress: { done: ctx.discarded ?? 0, left: op.count },
+      };
+    }
     default:
       return null;
   }
@@ -127,13 +145,15 @@ function applyOp(
   switch (op.op) {
     case 'wall':
     case 'keep': {
-      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0);
+      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0) + discardBonus(ctx, op);
+      if (amount <= 0) return null;
       build(state, events, me, op.op, amount, reason);
       return null;
     }
 
     case 'damage': {
-      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0);
+      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0) + discardBonus(ctx, op);
+      if (amount <= 0) return null;
       const times = op.times ?? 1;
       for (let i = 0; i < times; i++) {
         dealDamage(state, events, me, them, amount, {
@@ -274,6 +294,26 @@ function applyOp(
       }
       return null;
 
+    case 'discardOwn': {
+      const discarded = ctx.discarded ?? 0;
+      if (op.count === 'hand') {
+        const uids = self.hand.map((c) => c.uid);
+        for (const uid of uids) discardFromHand(state, events, me, uid, 'effect');
+        return { ops: [], ctx: { ...ctx, discarded: discarded + uids.length } };
+      }
+      if (answer === null || answer === 'done') return null;
+      if (!discardFromHand(state, events, me, Number(answer), 'effect')) return null;
+      // The remaining discards come back as a smaller copy of this op.
+      return {
+        ops: op.count > 1 ? [{ ...op, count: op.count - 1 }] : [],
+        ctx: { ...ctx, discarded: discarded + 1 },
+      };
+    }
+
+    case 'draw':
+      drawCards(state, events, me, op.count);
+      return null;
+
     case 'swapWalls': {
       const mine = self.wall;
       self.wall = opp.wall;
@@ -344,6 +384,7 @@ export function runOps(
         kind: choice.kind,
         options: choice.options,
         ...(choice.revealed ? { revealed: choice.revealed } : {}),
+        ...(choice.progress ? { progress: choice.progress } : {}),
         ctx,
         op,
         rest: queue,
@@ -375,7 +416,7 @@ export function resolvePending(state: GameState, events: GameEvent[], option: st
   state.pending = null;
   state.phase = 'action';
   events.push({ type: 'choiceMade', player: pending.player, kind: pending.kind, option });
-  applyOp(state, events, pending.ctx, pending.op, option);
+  const next = applyOp(state, events, pending.ctx, pending.op, option);
   if (checkGameOver(state, events)) return;
-  runOps(state, events, pending.ctx, pending.rest);
+  runOps(state, events, next?.ctx ?? pending.ctx, next ? [...next.ops, ...pending.rest] : pending.rest);
 }
