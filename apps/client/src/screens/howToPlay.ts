@@ -2,7 +2,6 @@ import { DEFAULT_RULES } from '@cardcraft-castles/engine';
 import { h, html } from '../app/dom';
 import { t, type StringKey } from '../app/i18n';
 import { modal } from '../app/router';
-import { audio } from '../fx/audio';
 import { cardFace } from '../ui/card';
 
 const SECTIONS: StringKey[] = ['rulesGoal', 'rulesTurn', 'rulesSchools', 'rulesDamage', 'rulesHeroes', 'rulesExtras', 'rulesControls'];
@@ -15,7 +14,7 @@ export function openHowToPlay(): void {
     max: DEFAULT_RULES.maxEnchantments,
     every: DEFAULT_RULES.eventEveryTurns,
   };
-  modal((close) =>
+  modal(() =>
     h(
       'div.modal.panel.how-to',
       null,
@@ -34,7 +33,6 @@ export function openHowToPlay(): void {
         null,
         SECTIONS.map((key) => h('li', null, html(t(key, values)))),
       ),
-      h('div.actions', null, h('button.btn.primary', { type: 'button', onclick: () => (audio.play('uiBack'), close()) }, t('close'))),
     ),
   );
 }

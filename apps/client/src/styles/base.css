@@ -455,3 +455,50 @@ input[type='range'] {
   animation: none;
   transform: rotate(-90deg);
 }
+
+/* ---------- Close X (every dialog) ---------- */
+
+.close-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #ffd2c8;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff6b57, #c4211a 60%, #8e110c);
+  color: #fff;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 55%), inset 0 1px 0 rgb(255 255 255 / 35%);
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.close-x svg {
+  width: 14px;
+  height: 14px;
+}
+
+.close-x:hover,
+.close-x:focus-visible {
+  transform: scale(1.1);
+  filter: brightness(1.12);
+}
+
+/* On a card: astride its top right corner. */
+.close-x.on-card {
+  top: -13px;
+  right: -13px;
+}
+
+.modal {
+  position: relative;
+}
+
+/* Room for the X next to a dialog's title. */
+.modal > h2:first-child {
+  padding-right: 40px;
+}

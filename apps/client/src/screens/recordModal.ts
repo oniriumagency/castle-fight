@@ -40,7 +40,7 @@ function nemesisCard(r: RivalRecord): HTMLElement {
 
 /** Your wins and losses: online, against the AI, and against each online opponent, with your nemesis on top. */
 export function openRecord(): void {
-  modal((close) => {
+  modal(() => {
     const box = h('div.modal.panel.record');
     const build = (): void => {
       const record = loadRecord();
@@ -80,7 +80,7 @@ export function openRecord(): void {
             )
           : h('p.record-empty', null, t('recordNoRivals')),
         h('p.record-note', null, `${t('recordNemesisHint', { n: NEMESIS_MIN_GAMES })} ${t('recordLocalNote')}`),
-        h('div.actions', null, reset, h('button.btn.primary', { type: 'button', onclick: () => (audio.play('uiBack'), close()) }, t('close'))),
+        h('div.actions', null, reset),
       ]);
     };
     build();

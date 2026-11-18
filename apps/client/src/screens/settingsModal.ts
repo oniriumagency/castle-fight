@@ -50,7 +50,7 @@ function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted', l
 
 /** Settings dialog, available from the menu and during a game. */
 export function openSettings(): void {
-  modal((close) => {
+  modal(() => {
     const box = h('div.modal.panel.settings');
     const build = (): void => {
       box.replaceChildren(
@@ -95,7 +95,6 @@ export function openSettings(): void {
         toggle('screenShake', t('screenShake')),
         toggle('reducedMotion', t('reducedMotion')),
         toggle('localTimer', t('localTimer')),
-        h('div.actions', null, h('button.btn.primary', { type: 'button', onclick: () => (audio.play('uiBack'), close()) }, t('close'))),
       );
     };
     build();

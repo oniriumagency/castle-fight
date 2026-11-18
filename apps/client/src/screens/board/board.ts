@@ -27,10 +27,11 @@ import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import { cardBack, cardFace, eventCard, heroCard } from '../../ui/card';
+import { closeX } from '../../ui/closeX';
 import { skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
-import { Hand, blockReason, inspectPanel } from './hand';
+import { Hand, blockReason, inspectPanel, type InspectPanel } from './hand';
 import { CastlePlaque, SidePanel } from './hud';
 import { showResults } from './results';
 import { muteButton } from '../../ui/muteButton';
@@ -491,6 +492,7 @@ class BoardScreen implements Screen {
     const handSeat = this.handSeat ?? view.viewer;
     this.hand.el.classList.toggle('concealed', !this.curtain.hidden || handSeat !== view.viewer);
     this.hand.render(this.handModel, { view, seat: handSeat, canAct });
+    this.refreshInspect?.();
 
     // Opponent's hand: backs, or faces when revealed.
     const opp = this.shown[other(handSeat)];
@@ -1176,27 +1178,31 @@ class BoardScreen implements Screen {
   private async showEventReveal(eventId: string): Promise<void> {
     this.closeEvent?.();
     const card = eventCard(eventId, { className: 'event-reveal' });
-    const closeBtn = h('button.btn.event-close', { type: 'button' }, t('close'));
     const box = h(
       'div.event-reveal-box.event-hold',
-      { role: 'dialog', 'aria-label': L({ es: 'Evento de batalla', en: 'Battle event' }) },
+      { role: 'dialog', 'aria-modal': 'true', 'aria-label': L({ es: 'Evento de batalla', en: 'Battle event' }) },
       h('div.event-reveal-title', null, L({ es: 'Evento de batalla', en: 'Battle event' })),
-      card,
-      closeBtn,
+      h('div.x-anchor', null, card, closeX(() => close(), true)),
     );
+    // The rest of the screen darkens; a click anywhere outside the card closes it.
+    const scrim = h('div.dialog-scrim', null, box);
     const close = (): void => {
       if (this.closeEvent !== close) return;
       this.closeEvent = null;
-      audio.play('uiBack');
+      scrim.classList.remove('in');
       box
         .animate([{ opacity: 1 }, { opacity: 0, transform: 'translate(-50%, -50%) scale(0.9)' }], { duration: 250 * animScale(), fill: 'forwards' })
         .finished.catch(() => undefined)
-        .then(() => box.remove());
+        .then(() => scrim.remove());
     };
     this.closeEvent = close;
-    closeBtn.addEventListener('click', close);
-    card.addEventListener('click', close);
-    this.layer.appendChild(box);
+    scrim.addEventListener('click', (e) => {
+      if (card.contains(e.target as Node)) return;
+      audio.play('uiBack');
+      close();
+    });
+    this.layer.appendChild(scrim);
+    requestAnimationFrame(() => scrim.classList.add('in'));
     await box
       .animate(
         [
@@ -1369,12 +1375,8 @@ class BoardScreen implements Screen {
       h('h2', null, t('discardPickTitle', { max })),
       hint,
       h('div.choice-options', null, options.map((o) => o.btn)),
-      h(
-        'div.discard-actions',
-        null,
-        h('button.btn', { type: 'button', onclick: () => (audio.play('uiBack'), close()) }, t('cancel')),
-        confirmBtn,
-      ),
+      h('div.discard-actions', null, confirmBtn),
+      closeX(() => close()),
     );
     const wrap = h('div.choice.discard-picker', null, box);
     const close = (): void => {
@@ -1415,7 +1417,7 @@ class BoardScreen implements Screen {
     if (big.classList.contains('boosted')) big.append(boostTag(cardId, big.classList.contains('combo')));
     const costEl = this.hand.elementOf(uid)?.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
-    this.openInspect(
+    const panel = this.openInspect(
       big,
       L(getCard(cardId).text),
       {
@@ -1424,11 +1426,36 @@ class BoardScreen implements Screen {
         reason,
         canAct: ctx.canAct,
       },
-      () => this.hand.select(null),
+      () => {
+        if (this.refreshInspect === refresh) this.refreshInspect = null;
+        this.hand.select(null);
+      },
     );
+    // Kept in step with the game while it stays open (for example the rival's turn ends).
+    const refresh = (): void => {
+      const now = this.hand.context;
+      const handCard = this.hand.elementOf(uid);
+      if (!now || !handCard) return;
+      const blocked = blockReason(now, cardId);
+      panel.updateActions(blocked, now.canAct);
+      const combo = !blocked && handCard.classList.contains('combo');
+      const boosted = !blocked && handCard.classList.contains('boosted');
+      if (combo !== big.classList.contains('combo') || boosted !== big.classList.contains('boosted')) {
+        big.classList.toggle('combo', combo);
+        big.classList.toggle('boosted', boosted);
+        big.querySelector('.combo-tag')?.remove();
+        if (boosted) big.append(boostTag(cardId, combo));
+      }
+      const cost = handCard.querySelector('.cost');
+      if (cost) big.querySelector('.cost')?.replaceWith(cost.cloneNode(true));
+    };
+    this.refreshInspect = refresh;
   }
 
-  private openInspect(card: HTMLElement, text: string, actions?: Parameters<typeof inspectPanel>[0]['actions'], onClose?: () => void): void {
+  /** Updates the open hand card view after a state change. */
+  private refreshInspect: (() => void) | null = null;
+
+  private openInspect(card: HTMLElement, text: string, actions?: Parameters<typeof inspectPanel>[0]['actions'], onClose?: () => void): InspectPanel {
     this.closeInspect?.();
     let closed = false;
     const close = (): void => {
@@ -1443,6 +1470,7 @@ class BoardScreen implements Screen {
     this.layer.appendChild(panel);
     requestAnimationFrame(() => panel.classList.add('in'));
     this.closeInspect = close;
+    return panel;
   }
 
   private inspectCard(cardId: string, hero?: HeroId): void {
