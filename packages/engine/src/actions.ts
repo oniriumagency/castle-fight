@@ -282,17 +282,21 @@ export function legalActions(state: Board): Action[] {
   }
 
   // 3+ players choosing targets: one action per rival for effects that hit one.
-  const rivals = choosesTargets(state) ? opponents(state, player) : [];
-  const aimed = <T extends Action>(action: T, ops: readonly EffectOp[]): T[] =>
-    rivals.length > 1 && effectsNeedTarget(ops) ? rivals.map((target) => ({ ...action, target })) : [action];
+  const rivals = choosesTargets(state) ? opponents(state, player) : null;
+  const add = (actions: Action[], action: Action & { type: 'play' | 'ultimate' }, ops: () => readonly EffectOp[]): void => {
+    if (rivals && rivals.length > 1 && effectsNeedTarget(ops())) {
+      for (const target of rivals) actions.push({ ...action, target });
+    } else actions.push(action);
+  };
 
   const actions: Action[] = [];
   if (isUltimateReady(state, player)) {
-    actions.push(...aimed({ type: 'ultimate', player }, getHero(state.players[player]!.hero).ultimate));
+    add(actions, { type: 'ultimate', player }, () => getHero(state.players[player]!.hero).ultimate);
   }
   for (const card of state.players[player]!.hand) {
     if (card.cardId !== null && !playBlocker(state, player, card.cardId)) {
-      actions.push(...aimed({ type: 'play', player, uid: card.uid }, getCard(card.cardId).effects));
+      const cardId = card.cardId;
+      add(actions, { type: 'play', player, uid: card.uid }, () => getCard(cardId).effects);
     }
   }
   for (const card of state.players[player].hand) {

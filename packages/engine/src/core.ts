@@ -177,11 +177,17 @@ export function effectiveCost(state: Board, player: PlayerId, cardId: CardId): n
   const reduction = getHero(state.players[player].hero).passive.costReduction;
   if (reduction && reduction.school === card.school) cost -= reduction.amount;
 
-  for (const rival of opponents(state, player)) {
-    for (const e of state.players[rival]!.enchantments) {
-      const increase = getEnchantmentModifiers(e.cardId)?.opponentCostIncrease;
-      if (increase && increase.school === card.school) cost += increase.amount;
+  // Enchantments of every living rival (no array allocated: this is on the AI's hot path).
+  const n = state.players.length;
+  for (let rival = n === 2 ? other(player) : 0; rival < n; rival++) {
+    const p = state.players[rival]!;
+    if (rival !== player && !p.eliminated) {
+      for (const e of p.enchantments) {
+        const increase = getEnchantmentModifiers(e.cardId)?.opponentCostIncrease;
+        if (increase && increase.school === card.school) cost += increase.amount;
+      }
     }
+    if (n === 2) break;
   }
 
   cost = Math.max(0, cost);
@@ -493,6 +499,17 @@ export function checkGameOver(state: GameState, events: GameEvent[]): boolean {
   if (state.phase === 'finished') return true;
   const win = state.rules.keepWin;
   const a = state.active;
+  if (state.players.length === 2) {
+    // Duel fast path (same outcome as the general case below).
+    const b = other(a);
+    const pa = state.players[a]!;
+    const pb = state.players[b]!;
+    if (pa.keep >= win) finishGame(state, events, a, 'keepBuilt');
+    else if (pb.keep <= 0) finishGame(state, events, a, 'keepDestroyed');
+    else if (pa.keep <= 0) finishGame(state, events, b, 'keepDestroyed');
+    else if (pb.keep >= win) finishGame(state, events, b, 'keepBuilt');
+    return state.result !== null;
+  }
   const order = [a, ...opponents(state, a)];
   const alive = (p: PlayerId) => !state.players[p]!.eliminated;
 

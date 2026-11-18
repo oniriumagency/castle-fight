@@ -99,14 +99,15 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
     self.drawbridge = false;
     events.push({ type: 'drawbridgeLowered', player });
   }
-  state.players.forEach((p, i) => {
+  for (let i = 0; i < state.players.length; i++) {
     // Hands this player revealed hide again. (Old saves have no `revealedBy`: 2 players only.)
+    const p = state.players[i]!;
     if (i !== player && p.handRevealed && (p.revealedBy ?? player) === player) {
       p.handRevealed = false;
-      delete p.revealedBy;
+      if (p.revealedBy !== undefined) p.revealedBy = undefined;
       events.push({ type: 'handHidden', player: i });
     }
-  });
+  }
 
   // 2. Battle event.
   if (state.turn >= state.upcomingEvent.turn) fireBattleEvent(state, events);

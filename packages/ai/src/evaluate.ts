@@ -275,9 +275,16 @@ function enchantmentPerTurn(tables: Tables, cardId: CardId, w: Weights): number 
 
 /** Rough number of turns each player still has, from how close either Keep is to the end. */
 function horizon(state: GameState, w: Weights): number {
-  const alive = state.players.filter((p) => !p.eliminated);
-  const toKill = Math.min(...alive.map((p) => p.keep + p.wall * 0.5)) / w.killPace;
-  const toBuild = (state.rules.keepWin - Math.max(...alive.map((p) => p.keep))) / w.buildPace;
+  // A plain loop: this runs for every position the search looks at.
+  let weakest = Infinity;
+  let tallest = 0;
+  for (const p of state.players) {
+    if (p.eliminated) continue;
+    weakest = Math.min(weakest, p.keep + p.wall * 0.5);
+    tallest = Math.max(tallest, p.keep);
+  }
+  const toKill = weakest / w.killPace;
+  const toBuild = (state.rules.keepWin - tallest) / w.buildPace;
   return Math.max(1, Math.min(w.horizonMax, toKill, toBuild));
 }
 
