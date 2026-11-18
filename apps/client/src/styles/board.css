@@ -646,6 +646,43 @@
   z-index: 3;
 }
 
+.plaque-name {
+  position: absolute;
+  bottom: calc(100% - 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 170px;
+  padding: 2px 10px 3px;
+  border-radius: 7px 7px 0 0;
+  background: rgb(12 10 20 / 88%);
+  border: 1px solid rgb(227 182 86 / 35%);
+  border-bottom: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 80%);
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.plaque-name:empty {
+  display: none;
+}
+
+.plaque.active .plaque-name {
+  color: var(--gold);
+  border-color: rgb(227 182 86 / 75%);
+}
+
+.plaque.active {
+  border-color: rgb(227 182 86 / 75%);
+}
+
 .plaque-item {
   display: inline-flex;
   align-items: center;
@@ -1697,6 +1734,12 @@
 
 .board.short .plaque {
   padding: 3px 8px 5px;
+}
+
+.board.short .plaque-name {
+  max-width: 120px;
+  padding: 1px 7px 2px;
+  font-size: 0.66rem;
 }
 
 .board.short .event-chip,
