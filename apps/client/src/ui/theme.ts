@@ -53,6 +53,15 @@ const EVENT_SKIES: Record<string, Partial<SkyMood>> = {
   tregua: { top: '#2a3448', middle: '#8d9bb0', horizon: '#dfe6ee', far: 0x7c8aa0, near: 0x56647a, ground: 0x6f7a80, sun: '230,240,255', sunAlpha: 0.5, weather: 'snow' },
 };
 
-export function skyFor(eventId: BattleEventId | null): SkyMood {
-  return eventId ? { ...DEFAULT_SKY, ...(EVENT_SKIES[eventId] ?? {}) } : DEFAULT_SKY;
+/** Twilight Fury: a blood-red dusk with embers, darker from level 3. */
+const TWILIGHT_SKIES: Partial<SkyMood>[] = [
+  { top: '#22142a', middle: '#8a3a34', horizon: '#ff8a48', far: 0x6a3a44, near: 0x34202a, ground: 0x2e2a1e, sun: '255,130,70', sunAlpha: 1, weather: 'embers' },
+  { top: '#120a16', middle: '#62201f', horizon: '#e4502c', far: 0x4e2632, near: 0x24141c, ground: 0x251f17, sun: '255,90,50', sunAlpha: 0.95, weather: 'embers' },
+];
+
+/** Sky for a running battle event, or else for the Twilight Fury level (0: off). */
+export function skyFor(eventId: BattleEventId | null, twilight = 0): SkyMood {
+  if (eventId) return { ...DEFAULT_SKY, ...(EVENT_SKIES[eventId] ?? {}) };
+  if (twilight > 0) return { ...DEFAULT_SKY, ...TWILIGHT_SKIES[twilight >= 3 ? 1 : 0] };
+  return DEFAULT_SKY;
 }

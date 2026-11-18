@@ -34,7 +34,8 @@ function sameSummary(a: RoomSummary, b: RoomSummary): boolean {
     a.private === b.private &&
     a.createdAt === b.createdAt &&
     a.turnSeconds === b.turnSeconds &&
-    a.size === b.size
+    a.size === b.size &&
+    a.twilight === b.twilight
   );
 }
 

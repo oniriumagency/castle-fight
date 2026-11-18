@@ -10,6 +10,7 @@ import {
   cleanRoomName,
   cleanTurnSeconds,
   cleanRoomSize,
+  cleanTwilight,
   isRoomId,
   type ApiErrorCode,
   type HealthResponse,
@@ -104,6 +105,7 @@ export default {
           private: body.private === true,
           turnSeconds: cleanTurnSeconds(body.turnSeconds),
           size: cleanRoomSize(body.size),
+          twilight: cleanTwilight(body.twilight),
           clientId: clientIdOf(body.clientId),
           ip: ipOf(request),
         });

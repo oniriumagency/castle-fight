@@ -1,5 +1,6 @@
 import { DEFAULT_TIMINGS, ROOM_SIZES, TURN_SECONDS_OPTIONS, UNLIMITED_TURN, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
 import type { LobbyConnection } from '@cardcraft-castles/protocol/client';
+import { DEFAULT_RULES } from '@cardcraft-castles/engine';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
 import type { Screen } from '../app/router';
@@ -56,6 +57,8 @@ export function lobbyScreen(): Screen {
   const nickname = h('input', { type: 'text', maxlength: 20, placeholder: t('nicknamePlaceholder'), value: settings.get().nickname });
   const roomName = h('input', { type: 'text', maxlength: 32, placeholder: t('roomNameDefault', { name: settings.get().nickname || '…' }) });
   const privateToggle = h('input', { type: 'checkbox' });
+  // Twilight Fury: on by default every time; the host can turn it off for this room.
+  const twilightToggle = h('input', { type: 'checkbox', checked: true });
   let turnSeconds = storedTurnSeconds();
   let roomSize = 2;
   const sizePicker = h('div.segmented.size-picker', { role: 'group', 'aria-label': t('roomSize') });
@@ -145,7 +148,7 @@ export function lobbyScreen(): Screen {
             'div.room-info',
             null,
             h('strong', null, room.name),
-            h('small', null, t('hostedBy', { host: room.host }), ' · ', html(iconSvg('clock')), ' ', turnLabel(room.turnSeconds ?? DEFAULT_TIMINGS.turnSeconds)),
+            h('small', null, t('hostedBy', { host: room.host }), ' · ', html(iconSvg('clock')), ' ', turnLabel(room.turnSeconds ?? DEFAULT_TIMINGS.turnSeconds), ...(room.twilight !== false ? [' · ', html(iconSvg('sunset')), ' ', t('twilightTag')] : [])),
           ),
           h('span.room-status', null, statusText(room.status)),
           h('span.room-players', null, html(iconSvg('users')), t('players', { n: room.players, max: room.size ?? 2 })),
@@ -213,6 +216,7 @@ export function lobbyScreen(): Screen {
         private: privateToggle.checked,
         turnSeconds,
         size: roomSize,
+        twilight: twilightToggle.checked,
       });
       flow.heroSelect('online', room.id);
     } catch (error) {
@@ -264,6 +268,12 @@ export function lobbyScreen(): Screen {
         h('label.field', null, t('roomName'), roomName),
         h('div.field', null, h('span', null, t('roomSize')), sizePicker),
         h('div.field', null, h('span', null, t('turnTime')), turnPicker),
+        h(
+          'label.check.twilight-toggle',
+          { title: t('twilightToggleHint', { start: DEFAULT_RULES.twilightTurn }) },
+          twilightToggle,
+          h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightTurn }))),
+        ),
         h('label.check', null, privateToggle, h('span', null, t('privateRoom'))),
         h('button.btn.big', { type: 'button', onclick: () => void create() }, t('createRoom')),
       ),

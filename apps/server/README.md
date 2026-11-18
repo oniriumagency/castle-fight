@@ -13,7 +13,7 @@ El cliente no habla el protocolo a mano: usa el SDK de [`@cardcraft-castles/prot
 | --- | --- |
 | `GET /api/health` | Estado, versión del protocolo y número de cartas. |
 | `GET /api/rooms` | Salas públicas listadas (esperando rival o en juego). |
-| `POST /api/rooms` | Crea una sala: `{ nickname, name?, private?, clientId? }`. |
+| `POST /api/rooms` | Crea una sala: `{ nickname, name?, private?, turnSeconds?, size?, twilight?, clientId? }`. `twilight: false` quita la Furia del Ocaso; si no se envía, está activa. |
 | `GET /api/rooms/:id` | Una sala, pública o privada. Es lo que usa la página de invitación. |
 | `POST /api/quick-join` | Devuelve la sala que más lleva esperando rival, o crea una: `{ nickname, clientId? }`. |
 | `WS /api/lobby` | Lista en vivo: una instantánea al conectar y después solo los cambios. |
@@ -25,7 +25,7 @@ Los errores HTTP siempre tienen la forma `{ error: { code, message, retryAfterMs
 
 1. **Espera.** Alguien crea la sala y se sienta (`join` con apodo y héroe, o `'random'`). La sala aparece en el lobby mientras ese jugador siga conectado.
 2. **Partida.** Al sentarse el segundo jugador empieza la partida con una semilla impredecible. Cada jugada pasa por `applyAction`; el servidor usa el asiento del socket, nunca el `player` que diga el cliente. Cada jugador recibe `getPlayerView` y `redactEvents` para su asiento: la mano y el mazo del rival nunca salen del servidor.
-3. **Reloj.** Cada turno dura 30 s. Si se agota, el servidor juega `timeout` (el motor juega la carta más barata que el jugador pueda pagar, o descarta una al azar si no puede pagar ninguna). Tres tiempos agotados seguidos del mismo jugador cuentan como abandono.
+3. **Reloj.** Cada turno dura 30 s. Si se agota, el servidor juega `timeout` (el motor juega la carta más barata que el jugador pueda pagar, o descarta una al azar si no puede pagar ninguna). Tres tiempos agotados seguidos del mismo jugador cuentan como abandono. Si la sala tiene la Furia del Ocaso (por defecto), la partida se acelera desde el turno 21 y sigue escalando hasta que alguien gana; el resumen de la sala la anuncia con `twilight`.
 4. **Desconexión.** Si un jugador pierde la conexión conserva su asiento 60 s (20 s mientras espera rival). Vuelve con el token secreto que recibió en `welcome`; el SDK lo guarda en `localStorage`, así que también sirve recargar la página. Si se conecta desde otra pestaña, la conexión anterior se cierra con el código `4000`. Si no vuelve a tiempo, pierde la partida.
 5. **Final.** `room.ending` explica cómo terminó (`forfeit.cause`: `conceded`, `left`, `disconnected` o `inactive`) y `room.score` suma las victorias de la sala. Si los dos piden revancha empieza otra partida y abre el que perdió.
 6. **Cierre.** La sala se borra cuando se van los dos, 15 min después de la última partida, a los 30 min si nadie se une, o a los 2 min si nadie llega a sentarse.

@@ -94,6 +94,8 @@ export interface RoomRecord {
   ending: GameEnding | null;
   endedAt: number | null;
   timings: RoomTimings;
+  /** Twilight Fury; missing in rooms stored by older versions: on. */
+  twilight?: boolean;
 }
 
 /** What the lobby needs: the public summary plus whether quick join may use it. */
@@ -128,6 +130,8 @@ export interface NewRoom {
   timings: RoomTimings;
   /** Seats: 2 (default) or 3 for free-for-all. */
   size?: number;
+  /** Twilight Fury (default on). */
+  twilight?: boolean;
 }
 
 export function newRoomRecord(room: NewRoom, now: number): RoomRecord {
@@ -340,6 +344,7 @@ export class RoomCore<S> {
       createdAt: room.createdAt,
       turnSeconds: room.timings.turnSeconds,
       size: room.seats.length,
+      twilight: room.twilight !== false,
     };
   }
 
@@ -510,7 +515,7 @@ export class RoomCore<S> {
       seed: this.host.randomSeed(),
       heroes,
       ...(winner === null ? {} : { firstPlayer: (winner + 1) % seats.length }),
-      rules: { turnSeconds: room.timings.turnSeconds },
+      rules: { turnSeconds: room.timings.turnSeconds, ...(room.twilight === false ? { twilightTurn: 0 } : {}) },
     });
     seats.forEach((s, i) => {
       s.hero = heroes[i]!;

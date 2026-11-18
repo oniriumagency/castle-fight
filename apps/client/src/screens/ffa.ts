@@ -29,10 +29,11 @@ import {
   type Rules,
 } from '@cardcraft-castles/engine';
 import { h, toast } from '../app/dom';
-import { L, locale } from '../app/i18n';
+import { L, locale, t } from '../app/i18n';
 import type { Screen } from '../app/router';
 import { audio } from '../fx/audio';
 import { describeEvent } from '../game/describe';
+import { twilightLine, twilightStatus } from '../game/twilight';
 import type { OnlineSession } from '../net/online';
 import { cardFace } from '../ui/card';
 import { flow, nickname } from './flow';
@@ -403,6 +404,8 @@ export function ffaScreen(session?: OnlineSession): Screen {
     const eventLine = view.activeEvent
       ? tx(`Evento en curso: ${L(event.name)} (${view.activeEvent.turnsLeft})`, `Running event: ${L(event.name)} (${view.activeEvent.turnsLeft})`)
       : tx(`Próximo evento en el turno ${view.upcomingEvent.turn}: ${L(event.name)}`, `Next event on turn ${view.upcomingEvent.turn}: ${L(event.name)}`);
+    const fury = view.phase === 'finished' ? null : twilightStatus(view);
+    const furyLine = fury ? ` · ${t('twilightName')}: ${twilightLine(fury)}` : '';
 
     const status = view.result
       ? view.result.winner === ME
@@ -492,7 +495,7 @@ export function ffaScreen(session?: OnlineSession): Screen {
       h(
         'div.ffa-middle',
         null,
-        h('div.ffa-turn', null, h('strong', null, status), net ? h('span.ffa-clock', null, clockText()) : null, h('small', null, `${net ? '' : `${variant.name()} · `}${eventLine}`)),
+        h('div.ffa-turn', null, h('strong', null, status), net ? h('span.ffa-clock', null, clockText()) : null, h('small', null, `${net ? '' : `${variant.name()} · `}${eventLine}${furyLine}`)),
         choicePanel(view),
         h('ol.ffa-log.panel', null, log.slice(-8).map((line) => h('li', null, line))),
       ),

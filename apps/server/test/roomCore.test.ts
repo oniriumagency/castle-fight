@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEROES } from '@cardcraft-castles/engine';
+import { DEFAULT_RULES, HEROES } from '@cardcraft-castles/engine';
 import { CLOSE_CODES, DEFAULT_TIMINGS, PROTOCOL_VERSION } from '@cardcraft-castles/protocol';
 import { ROOM_LIMITS } from '../src/roomCore';
 import { makeRoom } from './helpers';
@@ -232,6 +232,19 @@ describe('reconnection', () => {
     expect(room.record.status).toBe('playing');
     expect(room.record.game!.turn).toBe(turn);
     expect(room.record.clock).toBeNull();
+  });
+
+  it('plays with the Twilight Fury unless the host turned it off', () => {
+    const on = makeRoom();
+    on.start();
+    expect(on.core.summary().twilight).toBe(true);
+    expect(on.record.game!.rules.twilightTurn).toBe(DEFAULT_RULES.twilightTurn);
+
+    const off = makeRoom({ twilight: false });
+    const { a } = off.start();
+    expect(off.core.summary().twilight).toBe(false);
+    expect(off.record.game!.rules.twilightTurn).toBe(0);
+    expect(a.last('state')!.view.rules.twilightTurn).toBe(0);
   });
 
   it('forfeits a player who does not come back in time', () => {

@@ -47,6 +47,8 @@ export interface CreateRoomInput {
   turnSeconds: number | null;
   /** Seats: 2, or 3 for free-for-all. */
   size: number;
+  /** Twilight Fury on or off. */
+  twilight: boolean;
   clientId: string | null;
   ip: string;
 }
@@ -127,6 +129,7 @@ export class Lobby extends DurableObject<Env> {
         private: false,
         turnSeconds: null,
         size: 2,
+        twilight: true,
         clientId: input.clientId,
         ip: input.ip,
       },
@@ -217,6 +220,7 @@ export class Lobby extends DurableObject<Env> {
           private: input.private,
           timings,
           size: input.size,
+          twilight: input.twilight,
         });
         if (!input.private) {
           this.owners.set(id, input.ip);
