@@ -103,10 +103,29 @@ export function heroBuffs(heroId: HeroId): { attack: number; status: number } {
 }
 
 /** Attack amounts and Burn/Frost durations among a card's effects, to tell which printed numbers they are. */
+/** Players at the table being shown: with 3+, cards read their free-for-all text. */
+let tableSize = 2;
+
+/** The board (or the free-for-all hero choice) sets this; card texts follow it. */
+export function setTableSize(players: number): void {
+  tableSize = players;
+}
+
+/** Rules text for the current table: in a free-for-all, "each rival" and the scaled numbers. */
+export function rulesOf(def: { text: LocalizedText; textFfa?: LocalizedText }): string {
+  return L(tableSize > 2 && def.textFfa ? def.textFfa : def.text);
+}
+
+/** An amount that lands on every rival at once in a free-for-all, as the engine scales it. */
+function tableAmount(n: number): number {
+  return tableSize > 2 ? Math.max(1, Math.round(n * DEFAULT_RULES.multiAllScale)) : n;
+}
+
 function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>(), status: new Set<number>() }) {
   for (const op of ops) {
-    if (op.op === 'damage') out.damage.add(op.amount);
-    else if (op.op === 'burn' || op.op === 'frost') out.status.add(op.turns);
+    if (op.op === 'damage') out.damage.add(tableAmount(op.amount));
+    else if (op.op === 'burn') out.status.add(tableAmount(op.turns));
+    else if (op.op === 'frost') out.status.add(op.turns);
     else if (op.op === 'if') {
       effectNumbers(op.then, out);
       if (op.else) effectNumbers(op.else, out);
@@ -194,7 +213,7 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
     <div class="trim"><div class="body">
       <div class="art"><img alt="" draggable="false" ${opts.lazy ? 'loading="lazy"' : ''} src="${artUrl(card.art)}"></div>
       <div class="type">${escapeHtml(L(SCHOOL_NAMES[card.school]))} · ${escapeHtml(L(RARITY_NAMES[card.rarity]))}</div>
-      <div class="rules"><span>${opts.hero ? buffHtml(rulesHtml(buffText(card.effects, L(card.text), opts.hero))) : rulesHtml(L(card.text))}</span></div>
+      <div class="rules"><span>${opts.hero ? buffHtml(rulesHtml(buffText(card.effects, rulesOf(card), opts.hero))) : rulesHtml(rulesOf(card))}</span></div>
     </div></div>
     <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(L(card.name))}</b></div>
     <div class="cost ${costClass}"><span>${cost}</span>${emblemSvg(SCHOOL_EMBLEM[card.school])}</div>
@@ -202,14 +221,14 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
     <div class="holo"></div>`;
   // Cards whose illustration is not painted yet show a plain school-coloured panel.
   el.querySelector('.art img')?.addEventListener('error', () => el.classList.add('no-art'), { once: true });
-  el.setAttribute('aria-label', `${L(card.name)}. ${cost}. ${L(card.text)}`);
+  el.setAttribute('aria-label', `${L(card.name)}. ${cost}. ${rulesOf(card)}`);
   fitName(el);
   return el;
 }
 
 /** Hero texts read "Passive: … Ultimate: …"; split them for the hero frame. */
 export function heroParts(heroId: HeroId): { passive: string; ultimate: string } {
-  const text = L(getHero(heroId).text);
+  const text = rulesOf(getHero(heroId));
   const match = /^[^:]+:\s*(.*?)\s*(?:Definitiva|Ultimate):\s*(.*)$/s.exec(text);
   return match ? { passive: match[1], ultimate: match[2] } : { passive: text, ultimate: '' };
 }
@@ -263,7 +282,7 @@ export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement
     <div class="cost solo">${emblemSvg('hero')}</div>
     <div class="gem"></div>
     <div class="holo"></div>`;
-  el.setAttribute('aria-label', `${L(hero.name)}. ${L(hero.text)}`);
+  el.setAttribute('aria-label', `${L(hero.name)}. ${rulesOf(hero)}`);
   fitName(el);
   return el;
 }

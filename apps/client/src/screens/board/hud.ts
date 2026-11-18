@@ -12,7 +12,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { artUrl, emblemSvg, iconSvg, type EmblemName } from '../../ui/assets';
-import { discardOverlay, parseHistoryEntry, ultimateHtml } from '../../ui/card';
+import { discardOverlay, parseHistoryEntry, rulesOf, ultimateHtml } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
 const RESOURCE_EMBLEM: Record<Resource, EmblemName> = { piedra: 'piedra', acero: 'acero', mana: 'mana' };
@@ -206,7 +206,7 @@ export class SidePanel {
             type: 'button',
             class: `s-${card.school} r-${card.rarity}${i === 0 ? ' newest' : ''}${discarded ? ' discarded' : ''}`,
             title: name,
-            'aria-label': `${name}: ${L(card.text)}`,
+            'aria-label': `${name}: ${rulesOf(card)}`,
             onclick: () => {
               this.onPreview(null);
               this.onInspect(entry);

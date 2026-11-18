@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, createGame, getPlayerView, legalActions, playGame, randomPolicy, eagerPolicy } from '../src/index';
+import { CARDS, DEFAULT_RULES, applyAction, createGame, getPlayerView, legalActions, playGame, randomPolicy, eagerPolicy } from '../src/index';
 import { mustApply, setHand } from '../src/testing';
-import type { GameState, Rules } from '../src/types';
+import type { EffectOp, GameState, Rules } from '../src/types';
 
 /** A 3-player game on turn 1, player 0 to move, everyone level and rich. */
 function threeWay(rules: Partial<Rules> = {}): GameState {
@@ -128,4 +128,26 @@ describe('three players', () => {
       }
     });
   }
+});
+
+describe('free-for-all rules text', () => {
+  const flat = (ops: readonly EffectOp[]): EffectOp[] => ops.flatMap((o) => (o.op === 'if' ? [o, ...flat(o.then), ...flat(o.else ?? [])] : [o]));
+  const scaled = (n: number): number => Math.max(1, Math.round(n * DEFAULT_RULES.multiAllScale));
+
+  it('every card that reaches the rivals has a 3-player text with the scaled numbers', () => {
+    for (const card of CARDS) {
+      const ops = flat(card.effects);
+      const rival = ops.some((o) => ['damage', 'stealResource', 'drainResources', 'burn', 'loseWorker', 'stealWorker', 'frost', 'revealHand', 'peekAndDiscard', 'discardRandom', 'swapWalls', 'destroyEnchantment', 'copyLast'].includes(o.op));
+      if (!rival) continue;
+      expect(card.textFfa, card.id).toBeDefined();
+      for (const op of ops) {
+        if (op.op === 'damage' && op.amount > 0 && !op.perDiscard) {
+          expect(card.textFfa!.es, card.id).toContain(`${scaled(op.amount)} de daño`);
+          expect(card.textFfa!.en, card.id).toMatch(new RegExp(`\\b${scaled(op.amount)} (piercing )?damage`));
+        }
+        if (op.op === 'stealResource' || op.op === 'drainResources') expect(card.textFfa!.es, card.id).toContain(String(scaled(op.amount)));
+        if (op.op === 'burn') expect(card.textFfa!.es, card.id).toContain(`${scaled(op.turns)} turnos`);
+      }
+    }
+  });
 });

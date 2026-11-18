@@ -111,6 +111,7 @@ export const CARDS: readonly CardDef[] = design.cards.map((c) => ({
   cost: c.cost,
   name: c.name,
   text: c.text,
+  ...('textFfa' in c && c.textFfa ? { textFfa: c.textFfa } : {}),
   art: c.art,
   effects: CARD_EFFECTS[c.id]!,
 }));
@@ -119,6 +120,7 @@ export const HEROES: readonly HeroDef[] = design.heroes.map((h) => ({
   id: h.id,
   name: h.name,
   text: h.text,
+  ...('textFfa' in h && h.textFfa ? { textFfa: h.textFfa } : {}),
   art: h.art,
   ...HERO_EFFECTS[h.id]!,
 }));

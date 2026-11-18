@@ -1,4 +1,4 @@
-export type MusicTrack = 'menu' | 'battle' | 'victory' | 'defeat' | null;
+export type MusicTrack = 'menu' | 'battle' | 'twilight' | 'victory' | 'defeat' | null;
 
 interface TrackInfo {
   /** File in `public/music/`. */
@@ -7,11 +7,16 @@ interface TrackInfo {
   gain: number;
   /** Fade-in in seconds. */
   fadeIn: number;
+  /** Fade-out of the previous track when this one starts (default FADE_OUT). */
+  crossfade?: number;
 }
 
 const TRACKS: Record<Exclude<MusicTrack, null>, TrackInfo> = {
   menu: { file: 'celtic-morning.mp3', gain: 1, fadeIn: 2 },
   battle: { file: 'diversity.mp3', gain: 0.8, fadeIn: 1.5 },
+  // Twilight Fury: replaces the battle music when it falls, with a slow crossfade.
+  // The file is mastered much louder (-11 LUFS against -17): hence the low gain.
+  twilight: { file: 'to-the-balustrade.mp3', gain: 0.42, fadeIn: 3, crossfade: 3 },
   victory: { file: 'celtic-morning.mp3', gain: 1, fadeIn: 1 },
   defeat: { file: 'to-the-fallen.mp3', gain: 0.7, fadeIn: 1 },
 };
@@ -122,7 +127,7 @@ export class MusicPlayer {
       this.ramp(cur, this.level(), 0.8);
       return;
     }
-    if (cur) this.fadeOut(cur);
+    if (cur) this.fadeOut(cur, info?.crossfade ?? FADE_OUT);
     this.current = null;
     if (!info) return;
     const deck = this.decks.find((d) => d !== cur) ?? this.decks[0];
@@ -140,7 +145,7 @@ export class MusicPlayer {
   /** 0..1: the battle music swells a little as the end gets close. */
   setTension(value: number): void {
     this.tension = value;
-    if (this.current && this.wanted === 'battle') this.ramp(this.current, this.level(), 1.2);
+    if (this.current && (this.wanted === 'battle' || this.wanted === 'twilight')) this.ramp(this.current, this.level(), 1.2);
   }
 
   /** Starts the current track again if the browser paused it (refused autoplay, phone in the background). */
@@ -152,7 +157,7 @@ export class MusicPlayer {
   private level(): number {
     if (!this.wanted) return 0;
     const base = TRACKS[this.wanted].gain;
-    return this.wanted === 'battle' ? base * (1 + this.tension ** 1.3 * TENSION_BOOST) : base;
+    return this.wanted === 'battle' || this.wanted === 'twilight' ? base * (1 + this.tension ** 1.3 * TENSION_BOOST) : base;
   }
 
   private ramp(deck: Deck, value: number, seconds: number): void {
@@ -162,13 +167,13 @@ export class MusicPlayer {
     deck.out.gain.linearRampToValueAtTime(value, now + seconds);
   }
 
-  private fadeOut(deck: Deck): void {
-    this.ramp(deck, 0, FADE_OUT);
+  private fadeOut(deck: Deck, seconds = FADE_OUT): void {
+    this.ramp(deck, 0, seconds);
     const token = ++deck.token;
     window.setTimeout(() => {
       if (deck.token !== token) return;
       deck.el.pause();
       deck.file = null;
-    }, FADE_OUT * 1000 + 200);
+    }, seconds * 1000 + 200);
   }
 }

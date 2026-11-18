@@ -220,6 +220,10 @@
         "es": "+12 Castillo. El rival revela su mano hasta tu próximo turno.",
         "en": "+12 Castle. Your opponent reveals their hand until your next turn."
       },
+      "textFfa": {
+        "es": "+12 Castillo. Tus rivales revelan su mano hasta tu próximo turno.",
+        "en": "+12 Castle. Your rivals reveal their hands until your next turn."
+      },
       "art": "cards/torre-vigia.jpg"
     },
     {
@@ -400,6 +404,10 @@
         "es": "5 de daño.",
         "en": "5 damage."
       },
+      "textFfa": {
+        "es": "3 de daño a cada rival.",
+        "en": "3 damage to each rival."
+      },
       "art": "cards/escaramuza.jpg"
     },
     {
@@ -414,6 +422,10 @@
       "text": {
         "es": "13 de daño.",
         "en": "13 damage."
+      },
+      "textFfa": {
+        "es": "8 de daño a cada rival.",
+        "en": "8 damage to each rival."
       },
       "art": "cards/carga-de-lanceros.jpg"
     },
@@ -430,6 +442,10 @@
         "es": "5 de daño, dos veces.",
         "en": "5 damage, twice."
       },
+      "textFfa": {
+        "es": "3 de daño a cada rival, dos veces.",
+        "en": "3 damage to each rival, twice."
+      },
       "art": "cards/doble-salva.jpg"
     },
     {
@@ -445,6 +461,10 @@
         "es": "10 de daño perforante.",
         "en": "10 piercing damage."
       },
+      "textFfa": {
+        "es": "6 de daño perforante a cada rival.",
+        "en": "6 piercing damage to each rival."
+      },
       "art": "cards/saetas-negras.jpg"
     },
     {
@@ -459,6 +479,10 @@
       "text": {
         "es": "10 de daño. Doble contra la Muralla.",
         "en": "10 damage. Double against the Wall."
+      },
+      "textFfa": {
+        "es": "6 de daño a cada rival. Doble contra la Muralla.",
+        "en": "6 damage to each rival. Double against the Wall."
       },
       "art": "cards/ariete-de-hierro.jpg"
     },
@@ -490,6 +514,10 @@
         "es": "Roba 5 del recurso que más tenga el rival.",
         "en": "Steal 5 of the resource your opponent has most of."
       },
+      "textFfa": {
+        "es": "Roba 3 del recurso que más tenga cada rival.",
+        "en": "Steal 3 of the resource each rival has most of."
+      },
       "art": "cards/saqueo-nocturno.jpg"
     },
     {
@@ -504,6 +532,10 @@
       "text": {
         "es": "22 de daño.",
         "en": "22 damage."
+      },
+      "textFfa": {
+        "es": "13 de daño a cada rival.",
+        "en": "13 damage to each rival."
       },
       "art": "cards/carga-de-caballeria.jpg"
     },
@@ -520,6 +552,10 @@
         "es": "7 de daño. Combo: +8 de daño.",
         "en": "7 damage. Combo: +8 damage."
       },
+      "textFfa": {
+        "es": "4 de daño a cada rival. Combo: +5 de daño.",
+        "en": "4 damage to each rival. Combo: +5 damage."
+      },
       "art": "cards/hostigamiento.jpg"
     },
     {
@@ -534,6 +570,10 @@
       "text": {
         "es": "13 de daño solo a la Muralla.",
         "en": "13 damage to the Wall only."
+      },
+      "textFfa": {
+        "es": "8 de daño solo a la Muralla de cada rival.",
+        "en": "8 damage to each rival's Wall only."
       },
       "art": "cards/zapadores.jpg"
     },
@@ -550,6 +590,10 @@
         "es": "25 de daño.",
         "en": "25 damage."
       },
+      "textFfa": {
+        "es": "15 de daño a cada rival.",
+        "en": "15 damage to each rival."
+      },
       "art": "cards/catapulta.jpg"
     },
     {
@@ -564,6 +608,10 @@
       "text": {
         "es": "15 de daño perforante.",
         "en": "15 piercing damage."
+      },
+      "textFfa": {
+        "es": "9 de daño perforante a cada rival.",
+        "en": "9 piercing damage to each rival."
       },
       "art": "cards/balista-de-asedio.jpg"
     },
@@ -580,6 +628,10 @@
         "es": "Mira la mano del rival y descarta una de sus cartas.",
         "en": "Look at your opponent's hand and discard one of their cards."
       },
+      "textFfa": {
+        "es": "Cada rival descarta su carta más cara.",
+        "en": "Each rival discards their most expensive card."
+      },
       "art": "cards/espia-en-la-corte.jpg"
     },
     {
@@ -594,6 +646,10 @@
       "text": {
         "es": "Destruye un encantamiento rival y hace 8 de daño.",
         "en": "Destroy an enemy enchantment and deal 8 damage."
+      },
+      "textFfa": {
+        "es": "Destruye el encantamiento más duradero de cada rival y hace 5 de daño a cada uno.",
+        "en": "Destroy each rival's longest-lasting enchantment and deal 5 damage to each."
       },
       "art": "cards/sabotaje.jpg"
     },
@@ -625,6 +681,10 @@
         "es": "10 de daño. Si el rival jugó Construcción en su último turno, 20 de daño.",
         "en": "10 damage. If your opponent played Construction last turn, 20 damage."
       },
+      "textFfa": {
+        "es": "6 de daño a cada rival. Si algún rival jugó Construcción en su último turno, 12 de daño.",
+        "en": "6 damage to each rival. If any rival played Construction last turn, 12 damage."
+      },
       "art": "cards/emboscada.jpg"
     },
     {
@@ -639,6 +699,10 @@
       "text": {
         "es": "37 de daño.",
         "en": "37 damage."
+      },
+      "textFfa": {
+        "es": "22 de daño a cada rival.",
+        "en": "22 damage to each rival."
       },
       "art": "cards/trabuquete-colosal.jpg"
     },
@@ -655,6 +719,10 @@
         "es": "El rival pierde 1 trabajador del tipo que más tenga (mínimo 1).",
         "en": "Your opponent loses 1 worker of the type they have most of (minimum 1)."
       },
+      "textFfa": {
+        "es": "Cada rival pierde 1 trabajador del tipo que más tenga (mínimo 1).",
+        "en": "Each rival loses 1 worker of the type they have most of (minimum 1)."
+      },
       "art": "cards/motin.jpg"
     },
     {
@@ -669,6 +737,10 @@
       "text": {
         "es": "17 de daño perforante y 10 de daño a la Muralla.",
         "en": "17 piercing damage and 10 damage to the Wall."
+      },
+      "textFfa": {
+        "es": "10 de daño perforante y 6 de daño a la Muralla de cada rival.",
+        "en": "10 piercing damage and 6 damage to the Wall of each rival."
       },
       "art": "cards/torre-de-asedio.jpg"
     },
@@ -685,6 +757,10 @@
         "es": "27 de daño y después 13 de daño perforante.",
         "en": "27 damage, then 13 piercing damage."
       },
+      "textFfa": {
+        "es": "16 de daño y después 8 de daño perforante a cada rival.",
+        "en": "16 damage and then 8 piercing damage to each rival."
+      },
       "art": "cards/hueste-imparable.jpg"
     },
     {
@@ -699,6 +775,10 @@
       "text": {
         "es": "Descarta hasta 3 cartas. 4 de daño por cada una.",
         "en": "Discard up to 3 cards. 4 damage for each."
+      },
+      "textFfa": {
+        "es": "Descarta hasta 3 cartas. Daño a cada rival: 2, 5 o 7 por 1, 2 o 3 cartas.",
+        "en": "Discard up to 3 cards. Damage to each rival: 2, 5 or 7 for 1, 2 or 3 cards."
       },
       "art": "cards/tierra-quemada.jpg"
     },
@@ -715,6 +795,10 @@
         "es": "5 de daño. Descarta 1 carta, roba 1 y juega otra carta este turno.",
         "en": "5 damage. Discard 1 card, draw 1 and play another card this turn."
       },
+      "textFfa": {
+        "es": "3 de daño a cada rival. Descarta 1 carta, roba 1 y juega otra carta este turno.",
+        "en": "3 damage to each rival. Discard 1 card, draw 1 and play another card this turn."
+      },
       "art": "cards/relevo-de-tropas.jpg"
     },
     {
@@ -729,6 +813,10 @@
       "text": {
         "es": "Descarta toda tu mano. 6 de daño por cada carta descartada.",
         "en": "Discard your whole hand. 6 damage for each card discarded."
+      },
+      "textFfa": {
+        "es": "Descarta toda tu mano. Por cada carta descartada, 3,6 de daño a cada rival (redondeado).",
+        "en": "Discard your whole hand. For each card discarded, 3.6 damage to each rival (rounded)."
       },
       "art": "cards/todo-o-nada.jpg"
     },
@@ -745,6 +833,10 @@
         "es": "5 de daño perforante.",
         "en": "5 piercing damage."
       },
+      "textFfa": {
+        "es": "3 de daño perforante a cada rival.",
+        "en": "3 piercing damage to each rival."
+      },
       "art": "cards/chispa-arcana.jpg"
     },
     {
@@ -759,6 +851,10 @@
       "text": {
         "es": "Quemadura al rival durante 4 turnos (3 de daño por turno).",
         "en": "Burn on your opponent for 4 turns (3 damage per turn)."
+      },
+      "textFfa": {
+        "es": "Quemadura a cada rival durante 2 turnos (3 de daño por turno).",
+        "en": "Burn on each rival for 2 turns (3 damage per turn)."
       },
       "art": "cards/lluvia-de-ascuas.jpg"
     },
@@ -789,6 +885,10 @@
       "text": {
         "es": "Escarcha: un recurso del rival no produce durante 2 turnos.",
         "en": "Frost: one of your opponent's resources does not produce for 2 turns."
+      },
+      "textFfa": {
+        "es": "Escarcha: el recurso que más produce cada rival no produce durante 2 turnos.",
+        "en": "Frost: each rival's top-producing resource does not produce for 2 turns."
       },
       "art": "cards/aliento-de-escarcha.jpg"
     },
@@ -865,6 +965,10 @@
         "es": "El rival pierde 3 de cada recurso.",
         "en": "Your opponent loses 3 of each resource."
       },
+      "textFfa": {
+        "es": "Cada rival pierde 2 de cada recurso.",
+        "en": "Each rival loses 2 of each resource."
+      },
       "art": "cards/drenaje.jpg"
     },
     {
@@ -895,6 +999,10 @@
         "es": "Intercambia tu Muralla con la del rival.",
         "en": "Swap your Wall with your opponent's."
       },
+      "textFfa": {
+        "es": "Intercambia tu Muralla con la más alta de tus rivales.",
+        "en": "Swap your Wall with your rivals' tallest one."
+      },
       "art": "cards/trueque-de-destinos.jpg"
     },
     {
@@ -910,6 +1018,10 @@
         "es": "Copia el efecto de la última carta que jugó el rival.",
         "en": "Copy the effect of the last card your opponent played."
       },
+      "textFfa": {
+        "es": "Copia el efecto de la última carta que jugó un rival.",
+        "en": "Copy the effect of the last card a rival played."
+      },
       "art": "cards/espejismo.jpg"
     },
     {
@@ -924,6 +1036,10 @@
       "text": {
         "es": "Encantamiento (3 turnos): las cartas de Asalto del rival cuestan 2 más.",
         "en": "Enchantment (3 turns): your opponent's Assault cards cost 2 more."
+      },
+      "textFfa": {
+        "es": "Encantamiento (3 turnos): las cartas de Asalto de tus rivales cuestan 2 más.",
+        "en": "Enchantment (3 turns): your rivals' Assault cards cost 2 more."
       },
       "art": "cards/maldicion-de-oxido.jpg"
     },
@@ -955,6 +1071,10 @@
         "es": "10 de daño perforante y 10 de daño a la Muralla.",
         "en": "10 piercing damage and 10 damage to the Wall."
       },
+      "textFfa": {
+        "es": "6 de daño perforante y 6 de daño a la Muralla de cada rival.",
+        "en": "6 piercing damage and 6 damage to the Wall of each rival."
+      },
       "art": "cards/rayo-bifurcado.jpg"
     },
     {
@@ -969,6 +1089,10 @@
       "text": {
         "es": "Destruye un encantamiento rival. Gana 2 Maná.",
         "en": "Destroy an enemy enchantment. Gain 2 Mana."
+      },
+      "textFfa": {
+        "es": "Destruye el encantamiento más duradero de cada rival. Gana 2 Maná.",
+        "en": "Destroy each rival's longest-lasting enchantment. Gain 2 Mana."
       },
       "art": "cards/disipar.jpg"
     },
@@ -985,6 +1109,10 @@
         "es": "15 de daño y Quemadura durante 4 turnos.",
         "en": "15 damage and Burn for 4 turns."
       },
+      "textFfa": {
+        "es": "9 de daño y Quemadura durante 2 turnos a cada rival.",
+        "en": "9 damage and Burn for 2 turns on each rival."
+      },
       "art": "cards/tormenta-de-ceniza.jpg"
     },
     {
@@ -999,6 +1127,10 @@
       "text": {
         "es": "Escarcha: ningún recurso del rival produce durante 1 turno y pierde 1 carta al azar.",
         "en": "Frost: none of your opponent's resources produce for 1 turn and they discard 1 random card."
+      },
+      "textFfa": {
+        "es": "Escarcha: ningún recurso de tus rivales produce durante 1 turno y cada uno pierde 1 carta al azar.",
+        "en": "Frost: none of your rivals' resources produce for 1 turn and each discards 1 random card."
       },
       "art": "cards/prision-de-hielo.jpg"
     },
@@ -1030,6 +1162,10 @@
         "es": "17 de daño a la Muralla y 17 de daño perforante.",
         "en": "17 damage to the Wall and 17 piercing damage."
       },
+      "textFfa": {
+        "es": "10 de daño a la Muralla y 10 de daño perforante a cada rival.",
+        "en": "10 damage to the Wall and 10 piercing damage to each rival."
+      },
       "art": "cards/cometa-del-ocaso.jpg"
     },
     {
@@ -1060,6 +1196,10 @@
         "es": "Descarta hasta 3 cartas. 4 de daño perforante por cada una.",
         "en": "Discard up to 3 cards. 4 piercing damage for each."
       },
+      "textFfa": {
+        "es": "Descarta hasta 3 cartas. Daño perforante a cada rival: 2, 5 o 7 por 1, 2 o 3 cartas.",
+        "en": "Discard up to 3 cards. Piercing damage to each rival: 2, 5 or 7 for 1, 2 or 3 cards."
+      },
       "art": "cards/grimorio-en-llamas.jpg"
     },
     {
@@ -1074,6 +1214,10 @@
       "text": {
         "es": "El rival descarta 2 cartas al azar y recibe 6 de daño perforante.",
         "en": "The opponent discards 2 random cards and takes 6 piercing damage."
+      },
+      "textFfa": {
+        "es": "Cada rival descarta 2 cartas al azar y recibe 4 de daño perforante.",
+        "en": "Each rival discards 2 random cards and takes 4 piercing damage."
       },
       "art": "cards/quema-de-pergaminos.jpg"
     }
@@ -1101,6 +1245,10 @@
         "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 10 de daño.",
         "en": "Passive: your attacks deal +2 damage. Ultimate: 10 damage."
       },
+      "textFfa": {
+        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 6 de daño a cada rival.",
+        "en": "Passive: your attacks deal +2 damage. Ultimate: 6 damage to each rival."
+      },
       "art": "heroes/mariscal.jpg"
     },
     {
@@ -1112,6 +1260,10 @@
       "text": {
         "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura, Escarcha total y 3 de daño perforante al rival.",
         "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn, full Frost and 3 piercing damage on your opponent."
+      },
+      "textFfa": {
+        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura, Escarcha total y 2 de daño perforante a cada rival.",
+        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn, full Frost and 2 piercing damage on each rival."
       },
       "art": "heroes/hechicera.jpg"
     },
@@ -1137,6 +1289,10 @@
         "es": "Pasiva: al descartar, roba 4 recursos del rival. Definitiva: roba 1 trabajador del rival y hace 10 de daño perforante.",
         "en": "Passive: when you discard, steal 4 resources from your opponent. Ultimate: steal 1 of your opponent's workers and deal 10 piercing damage."
       },
+      "textFfa": {
+        "es": "Pasiva: al descartar, roba 4 recursos al rival con el Castillo más alto. Definitiva: cada rival pierde 1 trabajador (tú ganas 1) y recibe 6 de daño perforante.",
+        "en": "Passive: when you discard, steal 4 resources from the rival with the highest Castle. Ultimate: each rival loses 1 worker (you gain 1) and takes 6 piercing damage."
+      },
       "art": "heroes/saboteadora.jpg"
     },
     {
@@ -1160,8 +1316,8 @@
         "en": "Thunderstorm"
       },
       "text": {
-        "es": "Ambas Murallas pierden 8.",
-        "en": "Both Walls lose 8."
+        "es": "Todas las Murallas pierden 8.",
+        "en": "Every Wall loses 8."
       },
       "art": "events/tormenta.jpg"
     },
