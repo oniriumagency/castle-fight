@@ -75,7 +75,7 @@ Con la IA en nivel normal, 10.800 partidas (`pnpm balance --games 300 --seed 33`
 
 | | |
 | --- | --- |
-| Duración | Con la Furia del Ocaso (por defecto): 24,5 turnos de media entre los dos jugadores (mediana 25; el 10 % pasa de 33). Sin ella: 35 de media (mediana 30; el 10 % pasa de 64) |
+| Duración | Con la Furia del Ocaso (por defecto): 24,2 turnos de media entre los dos jugadores (mediana 25; el 10 % pasa de 32). Sin ella: 35 de media (mediana 30; el 10 % pasa de 64) |
 | Quien sale primero gana | 50,4 % |
 | Finales | Con la Furia: 91 % derribando el Castillo rival, 9 % construyendo hasta 100. Sin ella: 82 % y 18 % |
 

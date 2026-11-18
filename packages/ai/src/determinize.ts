@@ -155,6 +155,8 @@ export function determinize(view: PlayerView, rng: RngHolder): GameState | null 
     rng: rng.rng,
     seq: view.seq,
     turn: view.turn,
+    round: view.round,
+    firstSeat: view.firstSeat,
     active: view.active,
     phase: view.phase,
     actionsLeft: view.actionsLeft,

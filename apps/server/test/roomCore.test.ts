@@ -238,13 +238,13 @@ describe('reconnection', () => {
     const on = makeRoom();
     on.start();
     expect(on.core.summary().twilight).toBe(true);
-    expect(on.record.game!.rules.twilightTurn).toBe(DEFAULT_RULES.twilightTurn);
+    expect(on.record.game!.rules.twilightRound).toBe(DEFAULT_RULES.twilightRound);
 
     const off = makeRoom({ twilight: false });
     const { a } = off.start();
     expect(off.core.summary().twilight).toBe(false);
-    expect(off.record.game!.rules.twilightTurn).toBe(0);
-    expect(a.last('state')!.view.rules.twilightTurn).toBe(0);
+    expect(off.record.game!.rules.twilightRound).toBe(0);
+    expect(a.last('state')!.view.rules.twilightRound).toBe(0);
   });
 
   it('forfeits a player who does not come back in time', () => {

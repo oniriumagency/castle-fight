@@ -164,7 +164,7 @@ export interface CreateRoomRequest {
   clientId?: string;
   /** Seats: 2 (default) or 3 for a free-for-all room. */
   size?: number;
-  /** Twilight Fury (on by default): from turn 21 the war escalates so the game ends soon. */
+  /** Twilight Fury (on by default): from round 11 the war escalates so the game ends soon. */
   twilight?: boolean;
 }
 

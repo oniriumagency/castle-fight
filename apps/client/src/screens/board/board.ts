@@ -101,6 +101,8 @@ class BoardScreen implements Screen {
   private readonly timer = h('div.timer', { hidden: true });
   private readonly eventChip = h('button.event-chip', { type: 'button' });
   private readonly twilightChip = h('button.twilight-chip', { type: 'button', hidden: true });
+  /** The view being animated towards (`view` only moves once its events have played). */
+  private incoming: PlayerView | null = null;
   private readonly layer = h('div.inspect-layer');
   private readonly logList = h('ol.log-list');
   private readonly logPanel: HTMLElement;
@@ -493,7 +495,7 @@ class BoardScreen implements Screen {
         const kinds = update.events.map((e) => e.type);
         const gen = ++this.animGen;
         const timedOut = await Promise.race([
-          this.animate(update).then(
+          ((this.incoming = update.view), this.animate(update)).then(
             () => false,
             (error: unknown) => {
               console.error('Board animation failed', error);
@@ -656,7 +658,7 @@ class BoardScreen implements Screen {
 
     // Battle event chip.
     this.renderEventChip(view);
-    this.renderTwilightChip(view);
+    this.renderTwilightChip(this.incoming ?? view);
   }
 
   private renderTwilightChip(view: PlayerView): void {
@@ -667,7 +669,7 @@ class BoardScreen implements Screen {
     if (view.phase !== 'finished') audio.music(status && status.level > 0 ? 'twilight' : 'battle');
     if (!status) return;
     this.twilightChip.classList.toggle('active', status.level > 0);
-    this.twilightChip.classList.toggle('last', status.level > 0 && status.turns === 0);
+    this.twilightChip.classList.toggle('last', status.level === 0 && status.next <= 1);
     const line = twilightLine(status);
     this.twilightChip.replaceChildren(
       html(iconSvg('sunset')),
@@ -893,7 +895,7 @@ class BoardScreen implements Screen {
         break;
       case 'twilightRose': {
         const values = this.view ? twilightValues(this.view.rules) : { atk: 0, wall: 0 };
-        if (this.view) this.renderTwilightChip(this.view);
+        if (this.incoming) this.renderTwilightChip(this.incoming);
         const rising = fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
         // When it falls, its card is shown like a battle event; later levels get a banner.
         if (e.level === 1 && this.view) await this.revealCard(twilightCardFor(this.view.rules, { className: 'event-reveal' }), `${t('twilightName')} · ${t('twilightTableLevel')} 1`);

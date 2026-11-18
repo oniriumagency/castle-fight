@@ -95,11 +95,13 @@ export interface Rules {
   /** 3+ players: whoever knocks a castle down gains this much of each resource. */
   eliminationBounty: number;
   /**
-   * Twilight Fury: from the start of this turn the war escalates so long games
-   * end. 0 (or missing, in saves from older versions) turns it off.
+   * Twilight Fury: from the start of this round the war escalates so long
+   * games end. A round is every living player taking one turn, so it falls at
+   * the same point of the game with 2 or 3 players. 0 (or missing, in saves
+   * from older versions) turns it off.
    */
-  twilightTurn: number;
-  /** Twilight Fury: its level rises by one every this many turns. */
+  twilightRound: number;
+  /** Twilight Fury: its level rises by one every this many rounds. */
   twilightEvery: number;
   /** Twilight Fury: extra damage of every attack, per level. */
   twilightAttackBonus: number;
@@ -109,11 +111,6 @@ export interface Rules {
   twilightKeepErosion: number;
   /** Twilight Fury: extra Castle every card that builds it raises, per level. */
   twilightBuildBonus: number;
-  /**
-   * Twilight Fury: this many turns after it starts the game is decided at the
-   * end of the turn (highest Castle, then Wall, wins). 0: no deadline.
-   */
-  twilightTurns: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -418,9 +415,7 @@ export type GameOverReason =
   | 'keepDestroyed'
   | 'concede'
   /** `rules.turnLimit` was reached; the higher Keep (then Wall) wins. */
-  | 'turnLimit'
-  /** The Twilight Fury deadline was reached; the higher Keep (then Wall) wins. */
-  | 'twilight';
+  | 'turnLimit';
 
 export interface GameResult {
   /** `null` is a draw (only possible on `turnLimit`). */
@@ -437,6 +432,13 @@ export interface GameState {
   seq: number;
   /** Turn number, starting at 1. Each player's turn counts as one. */
   turn: number;
+  /**
+   * Round number, starting at 1: it goes up when play comes back round to
+   * the first seat (extra turns do not count). Missing in older saves.
+   */
+  round?: number;
+  /** Seat that moved first; rounds are counted from it. Missing in older saves. */
+  firstSeat?: PlayerId;
   active: PlayerId;
   phase: GamePhase;
   /** Cards the active player may still play or discard this turn. */
@@ -479,8 +481,9 @@ export interface BoardPlayer {
  */
 export interface Board {
   rules: Rules;
-  /** Turn number (drives the Twilight Fury). */
   turn: number;
+  /** Round number (drives the Twilight Fury). Missing in older saves: derived from `turn`. */
+  round?: number;
   active: PlayerId;
   phase: GamePhase;
   players: BoardPlayer[];
@@ -557,10 +560,10 @@ export type GameEvent =
   /** The next battle event was announced. */
   | { type: 'battleEventForecast'; eventId: BattleEventId; turn: number }
   /**
-   * The Twilight Fury began or grew (`level` 1, 2, 3...). `deadline` is the
-   * turn at whose end the game is decided, or 0 if it has none.
+   * The Twilight Fury began or grew (`level` 1, 2, 3...), at the start of a
+   * round.
    */
-  | { type: 'twilightRose'; level: number; deadline: number }
+  | { type: 'twilightRose'; level: number }
   /** Start-of-turn production. `frozen` lists resources that did not produce. */
   | { type: 'produced'; player: PlayerId; gained: ResourceMap; frozen: Resource[] }
   /** `delta` is the actual change (already clamped at 0). */
@@ -697,6 +700,9 @@ export interface PlayerView {
   rules: Rules;
   seq: number;
   turn: number;
+  round: number;
+  /** Seat that moved first (rounds are counted from it). */
+  firstSeat: PlayerId;
   active: PlayerId;
   phase: GamePhase;
   actionsLeft: number;
