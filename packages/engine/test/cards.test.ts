@@ -471,6 +471,10 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.turn).toBe(2);
     expect(state.extraTurn).toBe(true);
     expect(eventsOf(result.events, 'turnStarted')[0]).toMatchObject({ player: ME, extraTurn: true });
+    // The extra turn starts like any other: the workers produce again.
+    const produced = eventsOf(result.events, 'produced');
+    expect(produced).toHaveLength(1);
+    expect(produced[0]).toMatchObject({ player: ME, gained: state.players[ME].workers });
     state = pass(state);
     expect(state.active).toBe(OPP);
     expect(state.extraTurn).toBe(false);

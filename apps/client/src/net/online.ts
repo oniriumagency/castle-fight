@@ -98,6 +98,10 @@ export class OnlineSession extends BaseSession implements MatchSession {
     }
   }
 
+  resync(): void {
+    this.connection.sync();
+  }
+
   idle(): void {
     // The server owns the clock.
   }

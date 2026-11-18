@@ -83,7 +83,7 @@ Las cartas que afectan a «el rival» siguen `rules.multiTargeting`:
 
 ### Reloj de turno
 
-El motor no tiene reloj. El servidor programa una alarma de `rules.turnSeconds` (30 s) al empezar cada turno (`state.turn` cambia) y, si salta, aplica `{ type: 'timeout' }`: las elecciones pendientes toman su opción por defecto, se descarta una carta al azar si el jugador aún no había jugado y el turno termina. El servidor nunca debe aceptar `timeout` de un cliente.
+El motor no tiene reloj. El servidor programa una alarma de `rules.turnSeconds` (30 s) al empezar cada turno (`state.turn` cambia) y, si salta, aplica `{ type: 'timeout' }`: las elecciones pendientes toman su opción por defecto, si el jugador aún no había jugado, juega la carta más barata que pueda pagar (al azar entre las de igual coste; sus elecciones también toman la opción por defecto), o descarta una al azar si no puede pagar ninguna, y el turno termina. El servidor nunca debe aceptar `timeout` de un cliente.
 
 ### Registro de eventos
 
