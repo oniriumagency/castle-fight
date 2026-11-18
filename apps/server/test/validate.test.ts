@@ -81,6 +81,10 @@ describe('parseRoomClientMessage', () => {
     expect(parseRoomClientMessage(JSON.stringify({ ...join, hero: 'random' }))).toMatchObject({ hero: 'random' });
     expect(parseRoomClientMessage(JSON.stringify({ ...join, hero: 'arquitecta' }))).toMatchObject({ hero: 'arquitecta' });
     expect(parseRoomClientMessage(JSON.stringify({ ...join, hero: 'batman' }))).toBeNull();
+    const pid = 'ab'.repeat(12);
+    expect(parseRoomClientMessage(JSON.stringify({ ...join, hero: 'random', pid }))).toMatchObject({ pid });
+    expect(parseRoomClientMessage(JSON.stringify({ ...join, hero: 'random' }))).not.toHaveProperty('pid');
+    expect(parseRoomClientMessage(JSON.stringify({ ...join, hero: 'random', pid: 'XYZ' }))).toBeNull();
     expect(parseRoomClientMessage(JSON.stringify({ type: 'emote', emote: 'wow' }))).toEqual({ type: 'emote', emote: 'wow' });
     expect(parseRoomClientMessage(JSON.stringify({ type: 'resume', v: 2, token: 'x'.repeat(200) }))).toBeNull();
     expect(parseRoomClientMessage(JSON.stringify({ type: 'rematch', hero: 'batman' }))).toBeNull();

@@ -1240,3 +1240,156 @@ input.shake {
     display: none;
   }
 }
+
+/* ---------- Win/loss record ---------- */
+
+.record {
+  width: min(600px, 100%);
+}
+
+.record h3 {
+  font-family: var(--display);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.record-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.record-total {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.record-cells {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.record-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.record-cell strong {
+  font-family: var(--numeral);
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+.record-cell.win strong {
+  color: var(--ok);
+}
+
+.record-cell.loss strong {
+  color: var(--danger);
+}
+
+.record-cell small,
+.record-rate {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.record-nemesis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgb(227 107 90 / 70%);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgb(227 107 90 / 16%), rgb(227 182 86 / 6%));
+  box-shadow: 0 0 22px rgb(227 107 90 / 22%);
+}
+
+.record-nemesis-name {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  color: var(--gold-l);
+}
+
+.record-nemesis small {
+  color: var(--muted);
+}
+
+.record-rivals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.record-rivals li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgb(227 182 86 / 15%);
+}
+
+.record-rivals li.is-nemesis .rival-name {
+  color: #ff9b8a;
+}
+
+.record-rivals li.is-nemesis .rival-name::after {
+  content: ' ⚔';
+}
+
+.rival-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rival-games {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rival-score {
+  font-family: var(--numeral);
+  font-weight: 800;
+  font-size: 1.15rem;
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.rival-score.ahead {
+  color: var(--ok);
+}
+
+.rival-score.behind {
+  color: var(--danger);
+}
+
+.record-empty,
+.record-note {
+  color: var(--muted);
+  margin: 0;
+}
+
+.record-note {
+  font-size: 0.85rem;
+}
+
+@media (max-width: 480px) {
+  .rival-games {
+    display: none;
+  }
+}

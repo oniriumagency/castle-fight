@@ -41,6 +41,11 @@ export function cleanRoomName(raw: unknown): string | null {
   return cleanText(raw, LIMITS.roomNameMax) || null;
 }
 
+/** A public player id: 24 lowercase hex characters. */
+export function isPlayerId(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{24}$/.test(value);
+}
+
 export function isRoomId(value: unknown): value is string {
   return typeof value === 'string' && ROOM_ID_PATTERN.test(value);
 }
@@ -100,7 +105,10 @@ export function parseRoomClientMessage(text: string): RoomClientMessage | null {
   switch (raw.type) {
     case 'join':
       if (typeof raw.v !== 'number' || typeof raw.nickname !== 'string' || !isHeroChoice(raw.hero)) return null;
-      return { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero };
+      if (raw.pid !== undefined && !isPlayerId(raw.pid)) return null;
+      return raw.pid === undefined
+        ? { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero }
+        : { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero, pid: raw.pid };
     case 'resume':
       if (typeof raw.v !== 'number' || typeof raw.token !== 'string' || raw.token.length > 64) return null;
       return { type: 'resume', v: raw.v, token: raw.token };

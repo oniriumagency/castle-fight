@@ -238,7 +238,14 @@ export type ActionIntent =
 
 export type RoomClientMessage =
   /** Take a free seat. `v` is `PROTOCOL_VERSION`. */
-  | { type: 'join'; v: number; nickname: string; hero: HeroChoice }
+  | {
+      type: 'join';
+      v: number;
+      nickname: string;
+      hero: HeroChoice;
+      /** Public random id this browser keeps, so opponents can keep a head-to-head record. See `isPlayerId`. */
+      pid?: string;
+    }
   /** Take back your seat after a disconnect, with the token from `welcome`. */
   | { type: 'resume'; v: number; token: string }
   /** `player` is optional and ignored: the server uses the sender's seat. */
@@ -256,6 +263,8 @@ export type RoomClientMessage =
 
 export interface SeatInfo {
   nickname: string;
+  /** The player's public browser id (`join.pid`), or null if their client sent none. */
+  pid: string | null;
   /** Hero of the current or last game; null before the first game starts. */
   hero: HeroId | null;
   /** True while this player has a live connection. */

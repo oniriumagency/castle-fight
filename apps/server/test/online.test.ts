@@ -153,6 +153,9 @@ describe('online play', () => {
     expect(stateB.view.players[0].hand.every((c) => c.cardId === null)).toBe(true);
     expect(roomA.timeLeft()).toBeGreaterThan(25_000);
     expect(roomB.room?.seats.map((s) => s?.nickname)).toEqual(['Ana', 'Bea']);
+    // Each browser's public id reaches the other player, for the head-to-head record.
+    expect(roomB.room?.seats.map((s) => s?.pid)).toEqual([a.online.playerId, b.online.playerId]);
+    expect(a.online.playerId).not.toBe(a.online.clientId);
 
     roomA.leave();
     const ending = await next(roomB, 'room', (r) => r.status === 'finished');

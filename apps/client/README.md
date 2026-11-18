@@ -29,6 +29,12 @@ pnpm --filter @cardcraft-castles/client build
 | `screens/` | Menú, lobby, sala de espera, selección de héroe, ajustes, cómo se juega, y el tablero (`board/`). |
 | `fx/` | Sonido, música y director de efectos (ver abajo). |
 
+## Historial y némesis
+
+`game/record.ts` guarda en el navegador (`cardcraft-castles:record`) las victorias, derrotas y empates en línea y contra la IA, y el marcador contra cada rival en línea. Al sentarse, el SDK envía un id público y aleatorio del navegador (`OnlineClient.playerId`, distinto del `clientId` privado de partida rápida); el servidor lo reparte en `SeatInfo.pid`, así que el marcador sigue al rival aunque cambie de apodo. Los clientes que no envían id se cuentan por apodo. Cada partida se cuenta una sola vez (`<sala>:<partida>`), aunque se recargue la página en la pantalla de resultados.
+
+La pantalla de resultados enseña el marcador contra ese rival, y **Mi historial** en el menú los totales, la lista de rivales y el némesis: el rival con quien más has jugado, desde 3 partidas (si hay empate, el que más te ha ganado). Las partidas a dos en el mismo dispositivo no cuentan.
+
 El tablero no sabe de dónde viene la partida: recibe de la sesión una vista (`getPlayerView`) y la lista de eventos (`redactEvents`), anima los eventos uno a uno y al final se ajusta a la vista. Las cifras (Torreón para ganar, Torreón y Muralla iniciales) salen siempre de `view.rules`.
 
 ## Sonido, música y efectos visuales

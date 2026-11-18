@@ -29,7 +29,7 @@ function presenceOf(room: RoomInfo): Presence {
 
 function seatsOf(room: RoomInfo | null, fallback: [Seat, Seat]): [Seat, Seat] {
   if (!room) return fallback;
-  return room.seats.map((s, i) => (s ? { nickname: s.nickname, hero: s.hero ?? fallback[i].hero } : fallback[i])) as [Seat, Seat];
+  return room.seats.map((s, i) => (s ? { nickname: s.nickname, pid: s.pid ?? null, hero: s.hero ?? fallback[i].hero } : fallback[i])) as [Seat, Seat];
 }
 
 /** One online match, wrapping a room connection of the SDK. */
@@ -114,6 +114,11 @@ export class OnlineSession extends BaseSession implements MatchSession {
   statsKey(): string | null {
     const room = this.connection.room;
     return room ? `cardcraft-castles:stats:${this.connection.roomId}:${room.games}` : null;
+  }
+
+  gameId(): string | null {
+    const room = this.connection.room;
+    return room ? `${this.connection.roomId}:${room.games}` : null;
   }
 
   leave(): void {
