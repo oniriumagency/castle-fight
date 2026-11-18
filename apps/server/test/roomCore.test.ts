@@ -93,8 +93,23 @@ describe('seating', () => {
   it('limits the number of sockets per room', () => {
     const room = makeRoom();
     const sockets = Array.from({ length: ROOM_LIMITS.maxSockets + 1 }, () => room.connect());
-    expect(sockets.at(-1)!.closedWith?.code).toBe(CLOSE_CODES.tooManyConnections);
-    expect(sockets[0]!.open).toBe(true);
+    // The oldest socket without a seat makes way for the newcomer.
+    expect(sockets[0]!.closedWith?.code).toBe(CLOSE_CODES.tooManyConnections);
+    expect(sockets.at(-1)!.open).toBe(true);
+    expect(room.host.sockets()).toHaveLength(ROOM_LIMITS.maxSockets);
+  });
+
+  it('lets a player back into their seat when the room is crowded with spare sockets', () => {
+    const room = makeRoom();
+    const { a } = room.start();
+    const token = a.last('welcome')!.token;
+    room.drop(a);
+    const spares = Array.from({ length: ROOM_LIMITS.maxSockets - 1 }, () => room.connect());
+    const back = room.connect('ana-again');
+    expect(back.open).toBe(true);
+    expect(spares[0]!.closedWith?.code).toBe(CLOSE_CODES.tooManyConnections);
+    room.send(back, { type: 'resume', v: PROTOCOL_VERSION, token });
+    expect(back.last('welcome')?.seat).toBe(a.seat);
   });
 });
 
