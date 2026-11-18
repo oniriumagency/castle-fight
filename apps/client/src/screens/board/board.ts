@@ -451,6 +451,7 @@ class BoardScreen implements Screen {
         break;
       case 'error':
         this.awaiting = false;
+        this.discardQueue = [];
         audio.play('error');
         toast(e.message, 'warn');
         this.render();
@@ -1666,8 +1667,7 @@ class BoardScreen implements Screen {
       const btn = h(
         'button.choice-option.card-option.discard-option',
         { type: 'button', 'aria-pressed': 'false' },
-        cardFace(c.cardId!, { calm: true, hero: this.hand.context ? this.heroOf(this.hand.context.seat) : undefined }),
-        h('span.discard-mark', null, html(iconSvg('close'))),
+        markDiscarded(cardFace(c.cardId!, { calm: true, hero: this.hand.context ? this.heroOf(this.hand.context.seat) : undefined })),
       );
       btn.addEventListener('click', () => {
         const at = picked.indexOf(c.uid);
@@ -1861,13 +1861,15 @@ class BoardScreen implements Screen {
     if (!pending.options.length) return;
     // One dialog at a time: a resumed connection replays the same choice.
     this.closeChoice?.();
+    if (pending.kind === 'discardOwn') {
+      this.chooseDiscards(view, pending.options, pending.progress?.left ?? 1);
+      return;
+    }
+    this.discardQueue = [];
     const titles = {
       frostResource: t('chooseFrost'),
       discardFromHand: t('chooseDiscard'),
       destroyEnchantment: t('chooseEnchantment'),
-      discardOwn: pending.options.includes('done')
-        ? t('chooseDiscardOwnUpTo', { n: pending.progress?.left ?? 1 })
-        : t('chooseDiscardOwn', { n: pending.progress?.left ?? 1 }),
     } satisfies Record<typeof pending.kind, string>;
     const choose = (option: string): void => {
       audio.play('uiClick');
@@ -1875,14 +1877,6 @@ class BoardScreen implements Screen {
       this.act({ type: 'choose', player: view.viewer, option });
     };
     const options = pending.options.map((option) => {
-      if (pending.kind === 'discardOwn') {
-        if (option === 'done') {
-          return h('button.btn.primary.choice-done', { type: 'button', onclick: () => choose(option) }, t('discardDone'));
-        }
-        const card = view.players[view.viewer].hand.find((c) => String(c.uid) === option);
-        const face = card?.cardId ? cardFace(card.cardId, { calm: true, hero: this.heroOf(view.viewer) }) : cardBack();
-        return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, face);
-      }
       if (pending.kind === 'frostResource') {
         const rival = this.rivalOf(view.viewer, pending.target);
         const opp = view.players[rival];
@@ -1905,6 +1899,91 @@ class BoardScreen implements Screen {
       if (this.closeChoice === close) this.closeChoice = null;
       wrap.remove();
     };
+    this.closeChoice = close;
+  }
+
+  /**
+   * A card that makes you discard several of your own cards: one dialog where
+   * you tick them all, then they go one after another (the rules ask for one
+   * card per answer, so the rest are queued and answered as each prompt returns).
+   */
+  private discardQueue: string[] = [];
+
+  private chooseDiscards(view: PlayerView, offered: string[], left: number): void {
+    const viewer = view.viewer;
+    // The rest of the cards already picked in the dialog.
+    if (this.discardQueue.length) {
+      const next = this.discardQueue[0]!;
+      if (offered.includes(next)) {
+        if (this.awaiting) return;
+        this.discardQueue.shift();
+        this.act({ type: 'choose', player: viewer, option: next });
+        return;
+      }
+      this.discardQueue = [];
+    }
+    const upTo = offered.includes('done');
+    const hand = view.players[viewer].hand;
+    const uids = hand.map((c) => String(c.uid)).filter((uid) => offered.includes(uid));
+    const max = Math.min(left, uids.length);
+    const need = upTo ? 0 : max;
+    const picked: string[] = [];
+    const confirmBtn = h('button.btn.primary', { type: 'button' }) as HTMLButtonElement;
+    const options = uids.map((uid) => {
+      const card = hand.find((c) => String(c.uid) === uid);
+      const face = card?.cardId ? cardFace(card.cardId, { calm: true, hero: this.heroOf(viewer) }) : cardBack();
+      const btn = h('button.choice-option.card-option.discard-option', { type: 'button', 'aria-pressed': 'false' }, markDiscarded(face));
+      btn.addEventListener('click', () => {
+        const at = picked.indexOf(uid);
+        if (at >= 0) picked.splice(at, 1);
+        else if (picked.length < max) picked.push(uid);
+        else {
+          audio.play('error');
+          return;
+        }
+        audio.play('cardSelect');
+        refresh();
+      });
+      return { uid, btn };
+    });
+    const refresh = (): void => {
+      for (const o of options) {
+        const on = picked.includes(o.uid);
+        o.btn.classList.toggle('picked', on);
+        o.btn.setAttribute('aria-pressed', String(on));
+        o.btn.classList.toggle('locked', !on && picked.length >= max);
+      }
+      confirmBtn.textContent = upTo && picked.length === 0 ? t('discardNone') : t('discardN', { n: picked.length });
+      confirmBtn.disabled = picked.length < need;
+    };
+    const title = upTo ? (max === 1 ? t('chooseDiscardOwnUpToOne') : t('chooseDiscardOwnUpToMany', { n: max })) : max === 1 ? t('chooseDiscardOwnOne') : t('chooseDiscardOwnMany', { n: max });
+    const box = h(
+      'div.choice-box.panel.discard-box',
+      null,
+      h('h2', null, title),
+      h('p.discard-hint', null, t('chooseDiscardOwnHint')),
+      h('div.choice-options', { class: 'kind-discardOwn' }, options.map((o) => o.btn)),
+      h('div.discard-actions', null, confirmBtn),
+    );
+    const wrap = h('div.choice.discard-picker', null, box);
+    const close = (): void => {
+      if (this.closeChoice === close) this.closeChoice = null;
+      wrap.remove();
+    };
+    confirmBtn.addEventListener('click', () => {
+      if (picked.length < need) return;
+      audio.play('uiClick');
+      close();
+      const answers = picked.length ? [...picked] : ['done'];
+      // Fewer than allowed on an "up to" card: stop once these are gone.
+      if (upTo && picked.length && picked.length < left) answers.push('done');
+      const [first, ...rest] = answers;
+      this.discardQueue = rest;
+      this.act({ type: 'choose', player: viewer, option: first! });
+    });
+    refresh();
+    this.layer.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add('in'));
     this.closeChoice = close;
   }
 

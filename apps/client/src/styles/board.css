@@ -2369,45 +2369,31 @@
 }
 
 .discard-option.picked .card {
-  filter: saturate(0.55) brightness(0.75);
   transform: translateY(-6px);
+}
+
+/* The discard overlay (red tint and X) shows on the cards ticked for discarding. */
+.discard-option .discard-overlay {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.discard-option .discard-overlay .discard-x {
+  transform: scale(0.6) rotate(-8deg);
+  transition: transform 0.18s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.discard-option.picked .discard-overlay {
+  opacity: 1;
+}
+
+.discard-option.picked .discard-overlay .discard-x {
+  transform: rotate(-8deg);
 }
 
 .discard-option.locked {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.discard-mark {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 46px;
-  height: 46px;
-  margin: -23px 0 0 -23px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #b8382a;
-  color: #fff;
-  border: 2px solid #ffd2c8;
-  box-shadow: 0 0 18px rgb(255 90 60 / 70%);
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 0.15s, transform 0.15s;
-  pointer-events: none;
-  z-index: 9;
-}
-
-.discard-mark svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-.discard-option.picked .discard-mark {
-  opacity: 1;
-  transform: none;
 }
 
 .discard-actions {
@@ -2426,15 +2412,6 @@
   --w: clamp(84px, 26vw, 130px);
 }
 
-/* "Done" button of an up-to-N discard: it sits after the cards, on its own line on narrow screens. */
-.choice-done {
-  align-self: center;
-  min-width: 140px;
-  order: 1;
-}
-.kind-discardOwn {
-  align-items: center;
-}
 
 /* Phones in landscape: long texts start at the top and fade out at the bottom instead of being cut at both ends (tap shows the whole card). */
 .board.short .hand .card.compact:is(.mid-rules, .long-rules) .rules {
@@ -2720,7 +2697,7 @@
   left: 36.5%;
 }
 
-.board.ffa .side-1 .discard-overlay b {
+.board.ffa .side-1 .discard-overlay .discard-x {
   display: none;
 }
 

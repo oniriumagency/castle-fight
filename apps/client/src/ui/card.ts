@@ -12,10 +12,10 @@ import {
   type HeroId,
   type LocalizedText,
 } from '@cardcraft-castles/engine';
-import { escapeHtml, h } from '../app/dom';
-import { L, locale, t } from '../app/i18n';
+import { escapeHtml, h, html } from '../app/dom';
+import { L, locale } from '../app/i18n';
 import { settings } from '../app/settings';
-import { SCHOOL_EMBLEM, artUrl, emblemSvg } from './assets';
+import { SCHOOL_EMBLEM, artUrl, emblemSvg, iconSvg } from './assets';
 
 /**
  * Card faces drawn in DOM/CSS, following the approved frame design: metal
@@ -214,10 +214,14 @@ export function heroParts(heroId: HeroId): { passive: string; ultimate: string }
   return match ? { passive: match[1], ultimate: match[2] } : { passive: text, ultimate: '' };
 }
 
-/** Red tint and a "Discarded" stamp over a card that was thrown away rather than played. */
+/** Red tint and an X stamp, for a card that was (or is about to be) thrown away rather than played. */
+export function discardOverlay(): HTMLElement {
+  return h('span.discard-overlay', { 'aria-hidden': 'true' }, h('b.discard-x', null, html(iconSvg('close'))));
+}
+
 export function markDiscarded(el: HTMLElement): HTMLElement {
   el.classList.add('discarded');
-  el.append(h('span.discard-overlay', { 'aria-hidden': 'true' }, h('b', null, t('discardedStamp'))));
+  el.append(discardOverlay());
   return el;
 }
 
