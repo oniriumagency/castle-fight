@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
+import { ColorMatrixFilter, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import type { HeroId } from '@cardcraft-castles/engine';
 import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
@@ -221,6 +221,9 @@ export class Castle extends Container {
   private kick = 0;
   private kickPhase = 0;
   private quake = 0;
+  /** A while of shining light (an ultimate fired from this castle). */
+  private radiance: { color: number; left: number; total: number } | null = null;
+  private radianceFilter: ColorMatrixFilter | null = null;
 
   constructor(facing: 1 | -1, _textures?: CastleTextures, bannerColor = 0xc8963e, hero: string | null = null) {
     super();
@@ -339,6 +342,33 @@ export class Castle extends Container {
     this.kickPhase = 0;
   }
 
+  /** The whole castle shines, pulsing in `color`, for `ms` (its hero just fired the ultimate). */
+  radiate(color: number, ms = 2800): void {
+    this.radiance = { color, left: ms, total: ms };
+    this.radianceFilter ??= new ColorMatrixFilter();
+    this.filters = [this.radianceFilter];
+    this.tickRadiance(0);
+  }
+
+  /** Brightens the stones and washes them in the colour, with a quick rise, a pulse and a slow fade. */
+  private tickRadiance(dt: number): void {
+    const r = this.radiance;
+    const f = this.radianceFilter;
+    if (!r || !f) return;
+    r.left -= dt;
+    if (r.left <= 0) {
+      this.radiance = null;
+      this.filters = [];
+      return;
+    }
+    const t = 1 - r.left / r.total;
+    const env = Math.min(1, t / 0.06) * Math.min(1, (1 - t) / 0.4);
+    const k = env * (0.78 + 0.22 * Math.sin(t * Math.PI * 9));
+    const add = (shift: number): number => (((r.color >> shift) & 255) / 255) * 0.26 * k + 0.03 * k;
+    const b = 1 + 0.22 * k;
+    f.matrix = [b, 0, 0, 0, add(16), 0, b, 0, 0, add(8), 0, 0, b, 0, add(0), 0, 0, 0, 1, 0];
+  }
+
   /**
    * The castle's player is out: the hero's gravestone rises on the ruins
    * (`instant` for a resumed game or a layout change).
@@ -429,6 +459,7 @@ export class Castle extends Container {
       this.placeGrave();
     }
     if (this.shieldCharges > 0) this.tickShield(dt, calm);
+    if (this.radiance) this.tickRadiance(dt);
   }
 
   // -------------------------------------------------------------------------

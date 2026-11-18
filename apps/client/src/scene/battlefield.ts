@@ -567,6 +567,11 @@ export class Battlefield {
     this.castles[player].hit(color, power);
   }
 
+  /** A castle shining in a colour for a while (its hero fired the ultimate). */
+  radiateCastle(player: PlayerId, color: number, ms = 2800): void {
+    this.castles[player].radiate(color, ms);
+  }
+
   /** Persistent effects on a castle: burning, frozen, close to falling. */
   setAura(player: PlayerId, aura: { burn?: number; frost?: number; danger?: number }): void {
     Object.assign(this.auras[player], aura);
