@@ -36,6 +36,7 @@ import { openSettings } from '../settingsModal';
 import { Hand, blockReason, inspectPanel, type InspectPanel } from './hand';
 import { CastlePlaque, SidePanel } from './hud';
 import { showResults } from './results';
+import { UltimateMode } from './ultimateMode';
 import { muteButton } from '../../ui/muteButton';
 
 type StateUpdate = Extract<SessionEvent, { type: 'state' }>;
@@ -88,6 +89,7 @@ class BoardScreen implements Screen {
   private readonly panels: SidePanel[];
   private readonly plaques: CastlePlaque[];
   private readonly hand = new Hand();
+  private readonly ultMode = new UltimateMode();
   /** Each rival's hand (by side; side 0 has none). */
   private readonly oppHands: HTMLElement[];
   private readonly stage = h('div.play-stage');
@@ -191,6 +193,8 @@ class BoardScreen implements Screen {
       ...this.oppHands.slice(1),
       this.stage,
       this.hand.el,
+      this.ultMode.button,
+      this.ultMode.aura,
       this.floaters,
       this.banner,
       this.statusBar,
@@ -199,8 +203,12 @@ class BoardScreen implements Screen {
       this.curtain,
     );
 
+    this.ultMode.onUse = () => {
+      const view = this.view;
+      if (view && this.canAct() && view.players[view.viewer].ultimateReady) this.act({ type: 'ultimate', player: view.viewer });
+    };
+    this.ultMode.pulse = () => fx.ultimateAura(this.fxContext(), this.ultMode.button.classList.contains('usable'));
     for (const panel of this.panels) {
-      panel.onUltimate = () => this.act({ type: 'ultimate', player: this.view?.viewer ?? 0 });
       panel.onInspect = (entry) => {
         const { cardId, discarded } = parseHistoryEntry(entry);
         this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded);
@@ -260,6 +268,7 @@ class BoardScreen implements Screen {
     window.removeEventListener('keydown', this.onKey);
     this.closeInspect?.();
     this.session.leave();
+    this.ultMode.destroy();
     void this.field.setMood(skyFor(null), 600);
     for (const side of this.sides()) {
       this.field.setShield(side, 0);
@@ -347,7 +356,8 @@ class BoardScreen implements Screen {
       peek = 0;
       this.hand.mode = 'scroll';
     } else if (short) {
-      cardW = Math.min((w - 40) / 6.25, (hgt * 0.4) / 1.4);
+      // With the ultimate ready, the hero button takes about 0.82 of a card next to the hand.
+      cardW = this.el.classList.contains('ult-on') ? Math.min((w - 54) / 7.07, (hgt * 0.4) / 1.4) : Math.min((w - 40) / 6.25, (hgt * 0.4) / 1.4);
       peek = 0.05;
       this.hand.mode = 'row';
     } else {
@@ -589,6 +599,14 @@ class BoardScreen implements Screen {
     // Hand of the player looking at the screen.
     const handSeat = this.handSeat ?? view.viewer;
     this.hand.el.classList.toggle('concealed', !this.curtain.hidden || handSeat !== view.viewer);
+    // Ultimate ready: golden aura and the hero button next to the hand.
+    const mineNow = this.shown[handSeat];
+    const ultReady = !!mineNow?.ultimateReady && this.curtain.hidden && handSeat === view.viewer && view.phase !== 'finished';
+    if (mineNow) this.ultMode.update(mineNow.hero, ultReady, ultReady && canAct);
+    if (this.el.classList.contains('ult-on') !== ultReady) {
+      this.el.classList.toggle('ult-on', ultReady);
+      this.layout();
+    }
     this.hand.render(this.handModel, { view, seat: handSeat, canAct });
     this.refreshInspect?.();
 
@@ -1104,8 +1122,7 @@ class BoardScreen implements Screen {
         this.render();
         if (e.ready && !wasReady) {
           this.panels[this.sideOf(e.player)].pulse('.portrait');
-          this.panels[this.sideOf(e.player)].pulse('.ult-btn');
-          fx.ultimateReady(e.player, ctx, this.session.isLocal(e.player));
+                    fx.ultimateReady(e.player, ctx, this.session.isLocal(e.player));
           if (this.session.isLocal(e.player)) toast(t('ultimateReadyToast'), 'info', 4200);
         }
         break;
@@ -1198,8 +1215,21 @@ class BoardScreen implements Screen {
     await anim.finished.catch(() => undefined);
     const landed = card.getBoundingClientRect();
     this.playBurst(cardId, combo);
+    if (getCard(cardId).rarity === 'legendaria') this.showLegendaryCall(landed);
     await fx.cardLanded(cardId, { x: landed.left + landed.width / 2, y: landed.top + landed.height / 2 }, combo, this.fxContext());
     await wait(combo ? 520 : 380);
+  }
+
+  /** "¡Legendaria!" bursting out over a legendary card as it lands. */
+  private showLegendaryCall(at: DOMRect): void {
+    const call = h(
+      'div.legend-call',
+      { 'aria-hidden': 'true', style: `left:${at.left + at.width / 2}px;top:${at.top + Math.min(at.height * 0.22, 90)}px` },
+      h('div.legend-call-rays'),
+      h('strong', { 'data-text': t('legendaryCall') }, t('legendaryCall')),
+    );
+    this.floaters.appendChild(call);
+    setTimeout(() => call.remove(), 2200);
   }
 
   /** Light behind a card as it lands, in its school and rarity colours. */
@@ -1422,7 +1452,6 @@ class BoardScreen implements Screen {
     this.banner.after(fxEl);
     const r = fxEl.getBoundingClientRect();
     fx.ultimateReadyBanner(seat, this.fxContext(), r.left + r.width / 2, r.top + r.height / 2);
-    this.panels[this.sideOf(seat)].pulse('.ult-btn');
     setTimeout(() => fxEl.remove(), 2600);
   }
 

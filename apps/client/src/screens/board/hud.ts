@@ -46,16 +46,10 @@ export class SidePanel {
   private readonly piles: HTMLElement;
   private readonly presence: HTMLElement;
   private readonly bubble: HTMLElement;
-  private readonly ultBtn: HTMLButtonElement;
-  private readonly ultTitle: HTMLElement;
-  private readonly ultHint: HTMLElement;
-  private readonly ultEffect: HTMLElement;
-  private readonly ultMeter: HTMLElement;
   private readonly history: HTMLElement;
   private historyKey = '';
   private heroId = '';
   private lastKey = '';
-  onUltimate: () => void = () => {};
   onInspect: (cardId: string) => void = () => {};
   onInspectHero: (heroId: string) => void = () => {};
   /** The mouse is on a card of the history: show it large next to `anchor` (null: hide). */
@@ -75,28 +69,8 @@ export class SidePanel {
     this.ring = this.portrait.querySelector('circle.fill')!;
     this.ring.dataset.c = String(circumference);
     this.heroImg = this.portrait.querySelector('img')!;
-    this.portrait.addEventListener('click', () => {
-      if (this.portrait.classList.contains('ready') && this.portrait.classList.contains('usable')) this.onUltimate();
-      else this.onInspectHero(this.heroId);
-    });
-
-    // A plain button under the portrait says what the ultimate does, how it
-    // charges and when it can be used, so nobody has to guess the portrait is clickable.
-    this.ultTitle = h('b.ult-btn-title');
-    this.ultHint = h('small.ult-btn-hint');
-    this.ultEffect = h('span.ult-btn-effect');
-    this.ultMeter = h('i');
-    this.ultBtn = h(
-      'button.ult-btn',
-      { type: 'button' },
-      h('span.ult-btn-icon', null, html(iconSvg('combo'))),
-      h('span.ult-btn-text', null, this.ultTitle, this.ultHint, this.ultEffect),
-      h('span.ult-btn-meter', null, this.ultMeter),
-    ) as HTMLButtonElement;
-    this.ultBtn.addEventListener('click', () => {
-      if (this.ultBtn.classList.contains('usable')) this.onUltimate();
-      else this.onInspectHero(this.heroId);
-    });
+    // The ultimate is fired from the hero button next to the hand; the portrait shows the hero.
+    this.portrait.addEventListener('click', () => this.onInspectHero(this.heroId));
 
     this.history = h('div.played-history', { 'aria-label': t('playedHistory') });
 
@@ -129,7 +103,6 @@ export class SidePanel {
       // The middle castle's panel (free-for-all) stands in the right column under the other rival's, so it shares its look.
       { class: side === 2 ? 'side-2 side-1' : `side-${side}` },
       h('div.who', null, this.portrait, h('div.names', null, this.name, this.heroName), this.bubble),
-      this.ultBtn,
       this.presence,
       resources,
       this.statuses,
@@ -161,40 +134,13 @@ export class SidePanel {
     const progress = p.ultimateReady ? 1 : Math.min(1, p.ultimateCharge / Math.max(1, p.ultimateThreshold));
     this.ring.style.strokeDashoffset = String(c * (1 - progress));
     this.portrait.classList.toggle('ready', p.ultimateReady);
-    this.portrait.classList.toggle('usable', info.canUltimate);
     const label = this.portrait.querySelector('.ult-label')!;
-    label.textContent = p.ultimateReady ? (info.canUltimate ? t('useUltimate') : t('ultimateReady')) : `${p.ultimateCharge}/${p.ultimateThreshold}`;
+    label.textContent = p.ultimateReady ? t('ultimateReady') : `${p.ultimateCharge}/${p.ultimateThreshold}`;
     const progressText = t('ultimateProgress', { charge: p.ultimateCharge, threshold: p.ultimateThreshold });
-    this.portrait.title = p.ultimateReady ? t('ultimateReady') : progressText;
+    const effect = document.createElement('span');
+    effect.innerHTML = ultimateHtml(p.hero);
+    this.portrait.title = `${p.ultimateReady ? t('ultimateReady') : progressText}\n${t('ultimate')}: ${effect.textContent ?? ''}`;
     this.portrait.setAttribute('aria-label', `${L(getHero(p.hero).name)}. ${this.portrait.title}`);
-
-    const left = Math.max(0, p.ultimateThreshold - p.ultimateCharge);
-    let title: string;
-    let hint: string;
-    if (info.canUltimate) {
-      title = t('useUltimate');
-      hint = t('ultimateFree');
-    } else if (p.ultimateReady) {
-      title = t('ultimateReady');
-      hint = info.mine ? t('ultimateOnYourTurn') : t('ultimateRivalReady');
-    } else {
-      title = `${t('ultimate')} ${p.ultimateCharge}/${p.ultimateThreshold}`;
-      hint = info.mine ? t('ultimateCharges', { n: left }) : t('ultimateRivalCharges', { n: left });
-    }
-    const ultKey = `${title}|${hint}|${p.hero}`;
-    if (this.ultBtn.dataset.key !== ultKey) {
-      this.ultBtn.dataset.key = ultKey;
-      this.ultTitle.textContent = title;
-      this.ultHint.textContent = hint;
-      this.ultEffect.innerHTML = ultimateHtml(p.hero);
-      const plain = this.ultEffect.textContent ?? '';
-      this.ultBtn.title = `${t('ultimate')}: ${plain}\n${t('ultimateHow')}`;
-      this.ultBtn.setAttribute('aria-label', `${title}. ${hint}. ${plain}`);
-    }
-    this.ultMeter.style.width = `${Math.round(progress * 100)}%`;
-    this.ultBtn.classList.toggle('ready', p.ultimateReady);
-    this.ultBtn.classList.toggle('usable', info.canUltimate);
-    this.ultBtn.classList.toggle('mine', info.mine);
 
     for (const res of RESOURCES) {
       const r = this.rows.get(res)!;
