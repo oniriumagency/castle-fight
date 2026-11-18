@@ -4,7 +4,7 @@ import type { GameEvent, GameState } from '../src/index';
 import { choose, discardCard, eventsOf, playCard, scenario, setHand, type ScenarioOptions } from '../src/testing';
 
 /**
- * One test per card. Scenarios start with both players at Keep 30, Wall 10,
+ * One test per card. Scenarios start with both players at Keep 50, Wall 15,
  * 50 of each resource and 2 of each worker; player 0 ("me") is to move and,
  * unless `keepTurn: false`, keeps the turn after playing one card.
  */
@@ -26,20 +26,20 @@ const CARD_TESTS: Record<string, () => void> = {
   // ----- Construcción ------------------------------------------------------
   'hilada-de-piedra': () => {
     const { state } = play('hilada-de-piedra');
-    expect(state.players[ME].wall).toBe(13);
+    expect(state.players[ME].wall).toBe(20);
     expect(state.players[ME].resources.piedra).toBe(48);
   },
   parapeto: () => {
-    expect(play('parapeto').state.players[ME].wall).toBe(16);
+    expect(play('parapeto').state.players[ME].wall).toBe(25);
   },
   'bastida-de-granito': () => {
-    expect(play('bastida-de-granito').state.players[ME].wall).toBe(22);
+    expect(play('bastida-de-granito').state.players[ME].wall).toBe(35);
   },
   cimientos: () => {
-    expect(play('cimientos').state.players[ME].keep).toBe(33);
+    expect(play('cimientos').state.players[ME].keep).toBe(57);
   },
   'andamio-real': () => {
-    expect(play('andamio-real').state.players[ME].keep).toBe(38);
+    expect(play('andamio-real').state.players[ME].keep).toBe(67);
   },
   'gremio-de-canteros': () => {
     const { state } = play('gremio-de-canteros');
@@ -51,22 +51,22 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   almenas: () => {
     const { state } = play('almenas');
-    expect(state.players[ME].wall).toBe(14);
-    expect(state.players[ME].keep).toBe(32);
+    expect(state.players[ME].wall).toBe(22);
+    expect(state.players[ME].keep).toBe(55);
   },
   puntales: () => {
-    expect(play('puntales').state.players[ME].wall).toBe(12);
+    expect(play('puntales').state.players[ME].wall).toBe(18);
     // Combo: the previous card played was also Construction.
     const combo = play('puntales', { you: { comboSchool: 'construccion' } });
-    expect(combo.state.players[ME].wall).toBe(17);
+    expect(combo.state.players[ME].wall).toBe(26);
     expect(eventsOf(combo.events, 'cardPlayed')[0]!.combo).toBe(true);
     // A card of another school does not trigger it.
-    expect(play('puntales', { you: { comboSchool: 'asalto' } }).state.players[ME].wall).toBe(12);
+    expect(play('puntales', { you: { comboSchool: 'asalto' } }).state.players[ME].wall).toBe(18);
   },
   'reparaciones-de-urgencia': () => {
-    expect(play('reparaciones-de-urgencia').state.players[ME].keep).toBe(33);
-    expect(play('reparaciones-de-urgencia', { you: { keep: 20 } }).state.players[ME].keep).toBe(23);
-    expect(play('reparaciones-de-urgencia', { you: { keep: 19 } }).state.players[ME].keep).toBe(26);
+    expect(play('reparaciones-de-urgencia').state.players[ME].keep).toBe(57);
+    expect(play('reparaciones-de-urgencia', { you: { keep: 35 } }).state.players[ME].keep).toBe(42);
+    expect(play('reparaciones-de-urgencia', { you: { keep: 34 } }).state.players[ME].keep).toBe(49);
   },
   'fragua-del-gremio': () => {
     const { state } = play('fragua-del-gremio');
@@ -78,7 +78,7 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'torre-vigia': () => {
     let { state } = play('torre-vigia', { keepTurn: false });
-    expect(state.players[ME].keep).toBe(35);
+    expect(state.players[ME].keep).toBe(62);
     expect(state.players[OPP].handRevealed).toBe(true);
     // It lasts through the opponent's turn and ends when mine starts.
     expect(state.active).toBe(OPP);
@@ -89,58 +89,58 @@ const CARD_TESTS: Record<string, () => void> = {
   contrafuertes: () => {
     let { state } = play('contrafuertes', { keepTurn: false });
     expect(state.players[ME].enchantments).toEqual([{ cardId: 'contrafuertes', turnsLeft: 4, fresh: false }]);
-    // Each attack that hits my Wall deals 2 less: 6 -> 4.
+    // Each attack that hits my Wall deals 3 less: 13 -> 10.
     setHand(state, OPP, ['carga-de-lanceros', 'saetas-negras']);
     state.actionsLeft = 2;
     state = playCard(state, 'carga-de-lanceros').state;
-    expect(state.players[ME].wall).toBe(6);
+    expect(state.players[ME].wall).toBe(5);
     // Piercing damage does not touch the Wall, so it is not reduced.
     state = playCard(state, 'saetas-negras').state;
-    expect(state.players[ME].keep).toBe(26);
+    expect(state.players[ME].keep).toBe(40);
   },
   'fortaleza-viva': () => {
     let { state } = play('fortaleza-viva', { keepTurn: false });
-    expect(state.players[ME].keep).toBe(30);
-    // +2 Keep at the start of each of my next 5 turns, then it expires.
+    expect(state.players[ME].keep).toBe(50);
+    // +5 Keep at the start of each of my next 5 turns, then it expires.
     for (let i = 1; i <= 5; i++) {
       state = pass(state);
       expect(state.active).toBe(ME);
-      expect(state.players[ME].keep).toBe(30 + 2 * i);
+      expect(state.players[ME].keep).toBe(50 + 5 * i);
       state = pass(state);
     }
     expect(state.players[ME].enchantments).toEqual([]);
     state = pass(state);
-    expect(state.players[ME].keep).toBe(40);
+    expect(state.players[ME].keep).toBe(75);
   },
   'puente-levadizo': () => {
     let { state } = play('puente-levadizo', { keepTurn: false });
-    expect(state.players[ME].wall).toBe(14);
+    expect(state.players[ME].wall).toBe(23);
     expect(state.players[ME].drawbridge).toBe(true);
     // Piercing damage is treated as normal damage until my next turn.
     setHand(state, OPP, ['saetas-negras']);
     state = playCard(state, 'saetas-negras').state;
-    expect(state.players[ME].wall).toBe(10);
-    expect(state.players[ME].keep).toBe(30);
+    expect(state.players[ME].wall).toBe(13);
+    expect(state.players[ME].keep).toBe(50);
     expect(state.active).toBe(ME);
     expect(state.players[ME].drawbridge).toBe(false);
   },
   'maestro-de-obras': () => {
     const { state } = play('maestro-de-obras');
     expect(state.players[ME].workers.piedra).toBe(3);
-    expect(state.players[ME].wall).toBe(16);
+    expect(state.players[ME].wall).toBe(25);
   },
   'bastion-ciclopeo': () => {
-    expect(play('bastion-ciclopeo').state.players[ME].wall).toBe(32);
+    expect(play('bastion-ciclopeo').state.players[ME].wall).toBe(52);
   },
   'aguja-celeste': () => {
-    expect(play('aguja-celeste').state.players[ME].keep).toBe(46);
+    expect(play('aguja-celeste').state.players[ME].keep).toBe(83);
   },
   'ciudadela-eterna': () => {
     const { state } = play('ciudadela-eterna', {
       you: { burn: 3, frost: { piedra: 2, acero: 0, mana: 1 } },
     });
-    expect(state.players[ME].keep).toBe(45);
-    expect(state.players[ME].wall).toBe(25);
+    expect(state.players[ME].keep).toBe(83);
+    expect(state.players[ME].wall).toBe(40);
     expect(state.players[ME].burn).toBe(0);
     expect(state.players[ME].frost).toEqual({ piedra: 0, acero: 0, mana: 0 });
   },
@@ -148,35 +148,38 @@ const CARD_TESTS: Record<string, () => void> = {
   // ----- Asalto ------------------------------------------------------------
   escaramuza: () => {
     const { state } = play('escaramuza');
-    expect(state.players[OPP].wall).toBe(8);
+    expect(state.players[OPP].wall).toBe(10);
     expect(state.players[ME].resources.acero).toBe(49);
   },
   'carga-de-lanceros': () => {
-    expect(play('carga-de-lanceros').state.players[OPP].wall).toBe(4);
+    expect(play('carga-de-lanceros').state.players[OPP].wall).toBe(2);
   },
   'doble-salva': () => {
     const { state, events } = play('doble-salva');
-    expect(state.players[OPP].wall).toBe(6);
+    expect(state.players[OPP].wall).toBe(5);
     expect(eventsOf(events, 'damage')).toHaveLength(2);
     // Two separate hits: a Shield only stops the first.
     const shielded = play('doble-salva', { opponent: { shield: 1 } });
-    expect(shielded.state.players[OPP].wall).toBe(8);
+    expect(shielded.state.players[OPP].wall).toBe(10);
     expect(shielded.state.players[OPP].shield).toBe(0);
   },
   'saetas-negras': () => {
     const { state } = play('saetas-negras');
-    expect(state.players[OPP].wall).toBe(10);
-    expect(state.players[OPP].keep).toBe(26);
+    expect(state.players[OPP].wall).toBe(15);
+    expect(state.players[OPP].keep).toBe(40);
   },
   'ariete-de-hierro': () => {
-    // 5 damage, each point removes 2 Wall.
-    const full = play('ariete-de-hierro').state.players[OPP];
-    expect([full.wall, full.keep]).toEqual([0, 30]);
-    // Wall 4: two points bring it down, the other three reach the Keep.
+    // 10 damage, each point removes 2 Wall: five points bring down a Wall of 10.
+    const full = play('ariete-de-hierro', { opponent: { wall: 10 } }).state.players[OPP];
+    expect([full.wall, full.keep]).toEqual([0, 45]);
+    // Wall 4: two points bring it down, the other eight reach the Keep.
     const low = play('ariete-de-hierro', { opponent: { wall: 4 } }).state.players[OPP];
-    expect([low.wall, low.keep]).toEqual([0, 27]);
+    expect([low.wall, low.keep]).toEqual([0, 42]);
+    // An odd Wall takes a whole point for its last stone: 8 for a Wall of 15.
+    const odd = play('ariete-de-hierro').state.players[OPP];
+    expect([odd.wall, odd.keep]).toEqual([0, 48]);
     const none = play('ariete-de-hierro', { opponent: { wall: 0 } }).state.players[OPP];
-    expect(none.keep).toBe(25);
+    expect(none.keep).toBe(40);
   },
   'leva-de-herreros': () => {
     expect(play('leva-de-herreros').state.players[ME].workers.acero).toBe(3);
@@ -186,8 +189,8 @@ const CARD_TESTS: Record<string, () => void> = {
     const { state } = play('saqueo-nocturno', {
       opponent: { resources: { piedra: 3, acero: 5, mana: 9 } },
     });
-    expect(state.players[OPP].resources).toEqual({ piedra: 3, acero: 5, mana: 5 });
-    expect(state.players[ME].resources.mana).toBe(54);
+    expect(state.players[OPP].resources).toEqual({ piedra: 3, acero: 5, mana: 4 });
+    expect(state.players[ME].resources.mana).toBe(55);
     // It cannot steal more than there is.
     const poor = play('saqueo-nocturno', { opponent: { resources: { piedra: 1, acero: 2, mana: 0 } } });
     expect(poor.state.players[OPP].resources.acero).toBe(0);
@@ -195,25 +198,25 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'carga-de-caballeria': () => {
     const target = play('carga-de-caballeria', { opponent: { wall: 4 } }).state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([0, 24]);
+    expect([target.wall, target.keep]).toEqual([0, 32]);
   },
   hostigamiento: () => {
-    expect(play('hostigamiento').state.players[OPP].wall).toBe(7);
-    expect(play('hostigamiento', { you: { comboSchool: 'asalto' } }).state.players[OPP].wall).toBe(3);
+    expect(play('hostigamiento').state.players[OPP].wall).toBe(8);
+    expect(play('hostigamiento', { you: { comboSchool: 'asalto' } }).state.players[OPP].wall).toBe(0);
   },
   zapadores: () => {
-    expect(play('zapadores').state.players[OPP].wall).toBe(4);
+    expect(play('zapadores').state.players[OPP].wall).toBe(2);
     // Wall only: nothing carries over to the Keep.
     const low = play('zapadores', { opponent: { wall: 3 } }).state.players[OPP];
-    expect([low.wall, low.keep]).toEqual([0, 30]);
+    expect([low.wall, low.keep]).toEqual([0, 50]);
   },
   catapulta: () => {
     const target = play('catapulta').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([0, 28]);
+    expect([target.wall, target.keep]).toEqual([0, 40]);
   },
   'balista-de-asedio': () => {
     const target = play('balista-de-asedio').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([10, 23]);
+    expect([target.wall, target.keep]).toEqual([15, 35]);
   },
   'espia-en-la-corte': () => {
     const opponentHand = ['escaramuza', 'trabuquete-colosal', 'parapeto'];
@@ -252,8 +255,8 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.pending!.options).toEqual(['fortaleza-viva', 'contrafuertes']);
     state = choose(state, 'fortaleza-viva').state;
     expect(state.players[OPP].enchantments.map((e) => e.cardId)).toEqual(['contrafuertes']);
-    expect(state.players[OPP].wall).toBe(9);
-    // Without enchantments it is just 3 damage.
+    expect(state.players[OPP].wall).toBe(10);
+    // Without enchantments it is just 8 damage.
     expect(play('sabotaje').state.players[OPP].wall).toBe(7);
   },
   'estandarte-de-guerra': () => {
@@ -261,22 +264,22 @@ const CARD_TESTS: Record<string, () => void> = {
     state.actionsLeft = 3;
     state = playCard(state, 'estandarte-de-guerra').state;
     expect(state.players[ME].enchantments[0]).toMatchObject({ cardId: 'estandarte-de-guerra', turnsLeft: 4 });
-    // +2 on every hit.
+    // +3 on every hit.
     state = playCard(state, 'escaramuza').state;
-    expect(state.players[OPP].wall).toBe(6);
+    expect(state.players[OPP].wall).toBe(7);
     state = playCard(state, 'doble-salva').state;
     expect(state.players[OPP].wall).toBe(0);
-    expect(state.players[OPP].keep).toBe(28);
+    expect(state.players[OPP].keep).toBe(41);
   },
   emboscada: () => {
     expect(play('emboscada').state.players[OPP].wall).toBe(5);
-    const punished = play('emboscada', { opponent: { schoolsLastTurn: ['construccion'] } });
-    expect(punished.state.players[OPP].wall).toBe(0);
+    const punished = play('emboscada', { opponent: { schoolsLastTurn: ['construccion'] } }).state.players[OPP];
+    expect([punished.wall, punished.keep]).toEqual([0, 45]);
     expect(play('emboscada', { opponent: { schoolsLastTurn: ['arcano'] } }).state.players[OPP].wall).toBe(5);
   },
   'trabuquete-colosal': () => {
     const target = play('trabuquete-colosal').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([0, 20]);
+    expect([target.wall, target.keep]).toEqual([0, 28]);
   },
   motin: () => {
     const { state } = play('motin', { opponent: { workers: { piedra: 2, acero: 4, mana: 3 } } });
@@ -287,32 +290,34 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'torre-de-asedio': () => {
     const target = play('torre-de-asedio').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([6, 22]);
+    expect([target.wall, target.keep]).toEqual([5, 33]);
   },
   'hueste-imparable': () => {
     const { state, events } = play('hueste-imparable');
-    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([0, 16]);
+    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([0, 25]);
     expect(eventsOf(events, 'damage').map((e) => e.kind)).toEqual(['normal', 'piercing']);
   },
 
   // ----- Arcano ------------------------------------------------------------
   'chispa-arcana': () => {
     const target = play('chispa-arcana').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([10, 28]);
+    expect([target.wall, target.keep]).toEqual([15, 45]);
   },
   'lluvia-de-ascuas': () => {
     let { state } = play('lluvia-de-ascuas', { keepTurn: false });
-    // Burn ticks at the start of the burned player's turn: 3 turns, 2 damage each.
+    // Burn ticks at the start of the burned player's turn: 4 turns, 3 damage each.
     expect(state.active).toBe(OPP);
-    expect(state.players[OPP].wall).toBe(8);
-    expect(state.players[OPP].burn).toBe(2);
+    expect(state.players[OPP].wall).toBe(12);
+    expect(state.players[OPP].burn).toBe(3);
+    state = pass(pass(state));
+    expect(state.players[OPP].wall).toBe(9);
     state = pass(pass(state));
     expect(state.players[OPP].wall).toBe(6);
     state = pass(pass(state));
-    expect(state.players[OPP].wall).toBe(4);
+    expect(state.players[OPP].wall).toBe(3);
     expect(state.players[OPP].burn).toBe(0);
     state = pass(pass(state));
-    expect(state.players[OPP].wall).toBe(4);
+    expect(state.players[OPP].wall).toBe(3);
   },
   'egida-lunar': () => {
     let { state } = play('egida-lunar', { keepTurn: false });
@@ -321,7 +326,7 @@ const CARD_TESTS: Record<string, () => void> = {
     const result = playCard(state, 'trabuquete-colosal');
     state = result.state;
     expect(eventsOf(result.events, 'damage')[0]).toMatchObject({ blocked: true, wallLoss: 0, keepLoss: 0 });
-    expect([state.players[ME].wall, state.players[ME].keep, state.players[ME].shield]).toEqual([10, 30, 0]);
+    expect([state.players[ME].wall, state.players[ME].keep, state.players[ME].shield]).toEqual([15, 50, 0]);
   },
   'aliento-de-escarcha': () => {
     let { state } = play('aliento-de-escarcha', {
@@ -361,7 +366,7 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.actionsLeft).toBe(1);
   },
   'brote-de-cristal': () => {
-    expect(play('brote-de-cristal').state.players[ME].keep).toBe(35);
+    expect(play('brote-de-cristal').state.players[ME].keep).toBe(60);
   },
   drenaje: () => {
     const { state } = play('drenaje', { opponent: { resources: { piedra: 10, acero: 3, mana: 1 } } });
@@ -371,7 +376,7 @@ const CARD_TESTS: Record<string, () => void> = {
     const { state } = play('purificacion', { you: { burn: 4, frost: { piedra: 1, acero: 1, mana: 1 } } });
     expect(state.players[ME].burn).toBe(0);
     expect(state.players[ME].frost).toEqual({ piedra: 0, acero: 0, mana: 0 });
-    expect(state.players[ME].keep).toBe(32);
+    expect(state.players[ME].keep).toBe(55);
   },
   'trueque-de-destinos': () => {
     const { state } = play('trueque-de-destinos', { you: { wall: 2 }, opponent: { wall: 31 } });
@@ -381,7 +386,7 @@ const CARD_TESTS: Record<string, () => void> = {
   espejismo: () => {
     // Copies the effect of the opponent's last card.
     const copy = play('espejismo', { opponent: { lastPlayedCard: 'catapulta' } });
-    expect([copy.state.players[OPP].wall, copy.state.players[OPP].keep]).toEqual([0, 28]);
+    expect([copy.state.players[OPP].wall, copy.state.players[OPP].keep]).toEqual([0, 40]);
     expect(copy.state.players[ME].resources).toEqual({ piedra: 50, acero: 50, mana: 44 });
     expect(copy.state.players[ME].lastPlayedCard).toBe('catapulta');
     // A copied enchantment is mine and keeps its own name.
@@ -423,7 +428,7 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'rayo-bifurcado': () => {
     const target = play('rayo-bifurcado').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([5, 25]);
+    expect([target.wall, target.keep]).toEqual([5, 40]);
   },
   disipar: () => {
     const { state } = play('disipar', {
@@ -436,7 +441,7 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'tormenta-de-ceniza': () => {
     const { state } = play('tormenta-de-ceniza');
-    expect(state.players[OPP].wall).toBe(4);
+    expect(state.players[OPP].wall).toBe(0);
     expect(state.players[OPP].burn).toBe(4);
   },
   'prision-de-hielo': () => {
@@ -466,7 +471,7 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'cometa-del-ocaso': () => {
     const target = play('cometa-del-ocaso').state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([0, 20]);
+    expect([target.wall, target.keep]).toEqual([0, 33]);
   },
 };
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_RULES,
   effectiveCost,
   getPlayerView,
   isComboActive,
@@ -74,7 +75,7 @@ describe('player view', () => {
       hand: ['parapeto', 'trabuquete-colosal', 'puntales'],
       heroes: ['arquitecta', 'guardian'],
       resources: 5,
-      you: { comboSchool: 'construccion', ultimateCharge: 20 },
+      you: { comboSchool: 'construccion', ultimateCharge: DEFAULT_RULES.ultimateCharge },
     });
     const mine = getPlayerView(state, ME);
     expect(legalActions(mine)).toEqual(legalActions(state));
@@ -86,8 +87,9 @@ describe('player view', () => {
   });
 
   it('exposes what the UI needs about the ultimate and the next event', () => {
-    const view = getPlayerView(scenario({ you: { ultimateCharge: 20 } }), OPP);
-    expect(view.players[ME]).toMatchObject({ ultimateCharge: 20, ultimateThreshold: 20, ultimateReady: true });
+    const charge = DEFAULT_RULES.ultimateCharge;
+    const view = getPlayerView(scenario({ you: { ultimateCharge: charge } }), OPP);
+    expect(view.players[ME]).toMatchObject({ ultimateCharge: charge, ultimateThreshold: charge, ultimateReady: true });
     expect(view.players[OPP].ultimateReady).toBe(false);
     expect(view.upcomingEvent.turn).toBe(9);
   });
