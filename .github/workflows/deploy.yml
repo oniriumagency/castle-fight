@@ -69,7 +69,9 @@ jobs:
             "$SITE_URL/api/health"
 
       - name: Check that the page is the game
-        run: curl --fail --silent --show-error "$SITE_URL/" | grep --quiet '<title>Cardcraft: Castles</title>'
+        run: |
+          curl --fail --silent --show-error --output "$RUNNER_TEMP/index.html" "$SITE_URL/"
+          grep --quiet '<title>Cardcraft: Castles</title>' "$RUNNER_TEMP/index.html"
 
       - name: Play a whole online game against the published server
         run: pnpm --filter @cardcraft-castles/server smoke "$SITE_URL" --private
