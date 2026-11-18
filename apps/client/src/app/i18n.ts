@@ -51,6 +51,18 @@ const STRINGS = {
   secondsLong: { es: '{n} segundos', en: '{n} seconds' },
   noTimeLimit: { es: 'Sin límite', en: 'No limit' },
   playedHistory: { es: 'Últimas cartas jugadas', en: 'Last cards played' },
+  twilightName: { es: 'Furia del Ocaso', en: 'Twilight Fury' },
+  twilightToggleHint: {
+    es: 'Desde el turno {start} la guerra se recrudece: la partida acaba en unos 9 minutos.',
+    en: 'From turn {start} the war escalates: the game ends in about 9 minutes.',
+  },
+  twilightTag: { es: 'Ocaso', en: 'Twilight' },
+  twilightSoon: { es: 'Llega en {n} turno(s)', en: 'Falls in {n} turn(s)' },
+  twilightNow: { es: 'Nivel {level} · fin en {n} turno(s)', en: 'Level {level} · ends in {n} turn(s)' },
+  twilightLevel: { es: 'Nivel {level} · sube en {n}', en: 'Level {level} · rises in {n}' },
+  twilightLast: { es: 'Nivel {level} · último turno', en: 'Level {level} · last turn' },
+  twilightRose: { es: 'Nivel {level}: ataques +{atk}, Muralla −{wall} por turno', en: 'Level {level}: attacks +{atk}, Wall −{wall} per turn' },
+  logTwilight: { es: 'La Furia del Ocaso sube a nivel {level}', en: 'The Twilight Fury rises to level {level}' },
   privateRoom: { es: 'Privada (solo con enlace)', en: 'Private (link only)' },
   watchFull: { es: 'Llena', en: 'Full' },
   roomWaiting: { es: 'Esperando rival', en: 'Waiting for opponent' },
@@ -203,6 +215,7 @@ const STRINGS = {
   reasonYouFell: { es: 'Tu Castillo cayó. Los rivales siguen luchando.', en: 'Your Castle fell. The rivals fight on.' },
   waitingOthers: { es: 'Esperando a los demás…', en: 'Waiting for the others…' },
   reasonTurnLimit: { es: 'Se alcanzó el límite de turnos.', en: 'The turn limit was reached.' },
+  reasonTwilight: { es: 'Cayó el Ocaso: gana el Castillo más alto.', en: 'Twilight fell: the highest Castle wins.' },
   statTurns: { es: 'Turnos', en: 'Turns' },
   statDamage: { es: 'Daño causado', en: 'Damage dealt' },
   statBuilt: { es: 'Piedra levantada', en: 'Stone raised' },
@@ -298,6 +311,10 @@ const STRINGS = {
   rulesExtras: {
     es: 'Los <b>encantamientos</b> se quedan en mesa varios turnos (máximo {max}). Las cartas con <b>Combo</b> ganan un extra si tu carta anterior era de la misma escuela (no vale si descartaste entre medias); solo esas cartas tienen Combo. Cada {every} turnos llega un <b>evento de batalla</b> que afecta a los dos.',
     en: '<b>Enchantments</b> stay on the table for several turns (up to {max}). Cards with <b>Combo</b> get a bonus when your previous card was from the same school (a discard in between breaks it); only those cards have Combo. Every {every} turns a <b>battle event</b> hits both players.',
+  },
+  rulesTwilight: {
+    es: 'Si la partida se alarga, en el turno {start} cae la <b>Furia del Ocaso</b> (se puede quitar al crear una sala online). Cada {step} turnos sube de nivel, y por cada nivel los ataques hacen +{atk}, las cartas que levantan el Castillo dan +{build}, y al empezar tu turno pierdes {wall} de Muralla y {keep} de Castillo. Sigue subiendo hasta que alguien gane con las reglas de siempre.',
+    en: 'If the game drags on, on turn {start} the <b>Twilight Fury</b> falls (it can be turned off when creating an online room). It rises a level every {step} turns, and for each level attacks deal +{atk}, cards that raise your Castle give +{build}, and at the start of your turn you lose {wall} Wall and {keep} Castle. It keeps rising until someone wins by the usual rules.',
   },
   rulesControls: {
     es: 'Toca una carta para verla grande y jugarla o descartarla. En ordenador también puedes arrastrarla, o usar las teclas 1 a 6, Intro para jugar, Supr para descartar y U para la definitiva.',

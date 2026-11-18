@@ -30,6 +30,8 @@ export {
   effectiveCost,
   costResource,
   attackBonus,
+  twilightDeadline,
+  twilightLevel,
   wallDamageReduction,
   isSchoolBanned,
   other,

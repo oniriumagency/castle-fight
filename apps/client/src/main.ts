@@ -18,6 +18,7 @@ import './styles/board.css';
 
 import { toast } from './app/dom';
 import { t } from './app/i18n';
+import { initErrorReporting } from './app/errorReport';
 import { initInstall } from './app/install';
 import { initLandscapeOnly } from './app/orientation';
 import { settings } from './app/settings';
@@ -38,6 +39,7 @@ function applyDocumentSettings(): void {
 async function boot(): Promise<void> {
   applyDocumentSettings();
   settings.subscribe(applyDocumentSettings);
+  initErrorReporting();
   initInstall();
   initLandscapeOnly();
   await initStage();

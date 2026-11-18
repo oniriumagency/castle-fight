@@ -1,10 +1,11 @@
 import { DEFAULT_RULES } from '@cardcraft-castles/engine';
+import { twilightValues } from '../game/twilight';
 import { h, html } from '../app/dom';
 import { t, type StringKey } from '../app/i18n';
 import { modal } from '../app/router';
 import { cardFace } from '../ui/card';
 
-const SECTIONS: StringKey[] = ['rulesGoal', 'rulesTurn', 'rulesSchools', 'rulesDamage', 'rulesHeroes', 'rulesExtras', 'rulesControls'];
+const SECTIONS: StringKey[] = ['rulesGoal', 'rulesTurn', 'rulesSchools', 'rulesDamage', 'rulesHeroes', 'rulesExtras', 'rulesTwilight', 'rulesControls'];
 
 /** Short rules, with three example cards (one per school). */
 export function openHowToPlay(): void {
@@ -13,6 +14,7 @@ export function openHowToPlay(): void {
     hand: DEFAULT_RULES.handSize,
     max: DEFAULT_RULES.maxEnchantments,
     every: DEFAULT_RULES.eventEveryTurns,
+    ...twilightValues(DEFAULT_RULES),
   };
   modal(() =>
     h(

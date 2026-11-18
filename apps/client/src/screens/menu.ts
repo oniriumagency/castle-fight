@@ -65,18 +65,10 @@ export function menuScreen(): Screen {
 
     const [first, second] = GAME_TITLE.split(':');
     el.replaceChildren(
+      // Left: who you are, what to play, and the rest.
       h(
         'div.menu-main',
         null,
-        h(
-          'header.logo',
-          null,
-          html(
-            '<svg class="logo-emblem" viewBox="0 0 120 150" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M60 4l52 71-52 71L8 75z"/><path d="M60 22l38 53-38 53-38-53z" stroke-width="1.4"/><path d="M42 104V62h-5V46h8v6h7v-6h16v6h7v-6h8v16h-5v42z" fill="currentColor" fill-opacity=".22"/><path d="M54 104V88a6 6 0 0112 0v16"/><path d="M60 46V30l12 5-12 5"/></svg>',
-          ),
-          h('h1', null, h('span.logo-main', null, first), h('span.logo-sub', null, (second ?? '').trim())),
-          h('p.tagline', null, t('tagline')),
-        ),
         h('label.field.nick', null, t('nickname'), nickname),
         h(
           'nav.modes',
@@ -112,7 +104,21 @@ export function menuScreen(): Screen {
         ),
         h('footer.menu-foot', null, t('version')),
       ),
-      showcase(),
+      // Right: the game's title above the showcase cards.
+      h(
+        'div.menu-side',
+        null,
+        h(
+          'header.logo',
+          null,
+          html(
+            '<svg class="logo-emblem" viewBox="0 0 120 150" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M60 4l52 71-52 71L8 75z"/><path d="M60 22l38 53-38 53-38-53z" stroke-width="1.4"/><path d="M42 104V62h-5V46h8v6h7v-6h16v6h7v-6h8v16h-5v42z" fill="currentColor" fill-opacity=".22"/><path d="M54 104V88a6 6 0 0112 0v16"/><path d="M60 46V30l12 5-12 5"/></svg>',
+          ),
+          h('h1', null, h('span.logo-main', null, first), h('span.logo-sub', null, (second ?? '').trim())),
+          h('p.tagline', null, t('tagline')),
+        ),
+        showcase(),
+      ),
     );
   };
 

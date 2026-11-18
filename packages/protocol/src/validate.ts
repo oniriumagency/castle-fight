@@ -140,6 +140,11 @@ export function cleanRoomSize(raw: unknown): number {
   return typeof raw === 'number' && (ROOM_SIZES as readonly number[]).includes(raw) ? raw : 2;
 }
 
+/** Twilight Fury is on unless the host turned it off explicitly. */
+export function cleanTwilight(raw: unknown): boolean {
+  return raw !== false;
+}
+
 /** A turn length a host may choose (one of `TURN_SECONDS_OPTIONS`), or null. */
 export function cleanTurnSeconds(raw: unknown): number | null {
   return typeof raw === 'number' && (TURN_SECONDS_OPTIONS as readonly number[]).includes(raw) ? raw : null;

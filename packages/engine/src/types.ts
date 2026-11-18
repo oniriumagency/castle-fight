@@ -94,6 +94,26 @@ export interface Rules {
   leaderExtraDamage: number;
   /** 3+ players: whoever knocks a castle down gains this much of each resource. */
   eliminationBounty: number;
+  /**
+   * Twilight Fury: from the start of this turn the war escalates so long games
+   * end. 0 (or missing, in saves from older versions) turns it off.
+   */
+  twilightTurn: number;
+  /** Twilight Fury: its level rises by one every this many turns. */
+  twilightEvery: number;
+  /** Twilight Fury: extra damage of every attack, per level. */
+  twilightAttackBonus: number;
+  /** Twilight Fury: Wall the active player loses at the start of their turn, per level. */
+  twilightErosion: number;
+  /** Twilight Fury: Keep the active player loses at the start of their turn, per level (never below 1). */
+  twilightKeepErosion: number;
+  /** Twilight Fury: extra Castle every card that builds it raises, per level. */
+  twilightBuildBonus: number;
+  /**
+   * Twilight Fury: this many turns after it starts the game is decided at the
+   * end of the turn (highest Castle, then Wall, wins). 0: no deadline.
+   */
+  twilightTurns: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +399,9 @@ export type GameOverReason =
   | 'keepDestroyed'
   | 'concede'
   /** `rules.turnLimit` was reached; the higher Keep (then Wall) wins. */
-  | 'turnLimit';
+  | 'turnLimit'
+  /** The Twilight Fury deadline was reached; the higher Keep (then Wall) wins. */
+  | 'twilight';
 
 export interface GameResult {
   /** `null` is a draw (only possible on `turnLimit`). */
@@ -438,6 +460,8 @@ export interface BoardPlayer {
  */
 export interface Board {
   rules: Rules;
+  /** Turn number (drives the Twilight Fury). */
+  turn: number;
   active: PlayerId;
   phase: GamePhase;
   players: BoardPlayer[];
@@ -502,7 +526,7 @@ export interface VisibleCard {
   cardId: CardId | null;
 }
 
-export type ChangeReason = EffectSource | { kind: 'production' | 'hero' | 'battleEvent'; id: string };
+export type ChangeReason = EffectSource | { kind: 'production' | 'hero' | 'battleEvent' | 'twilight'; id: string };
 
 export type GameEvent =
   | { type: 'gameStarted'; firstPlayer: PlayerId; heroes: HeroId[] }
@@ -513,6 +537,11 @@ export type GameEvent =
   | { type: 'battleEventEnded'; eventId: BattleEventId }
   /** The next battle event was announced. */
   | { type: 'battleEventForecast'; eventId: BattleEventId; turn: number }
+  /**
+   * The Twilight Fury began or grew (`level` 1, 2, 3...). `deadline` is the
+   * turn at whose end the game is decided, or 0 if it has none.
+   */
+  | { type: 'twilightRose'; level: number; deadline: number }
   /** Start-of-turn production. `frozen` lists resources that did not produce. */
   | { type: 'produced'; player: PlayerId; gained: ResourceMap; frozen: Resource[] }
   /** `delta` is the actual change (already clamped at 0). */

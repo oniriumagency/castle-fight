@@ -149,6 +149,8 @@ export interface RoomSummary {
   createdAt: number;
   /** Seconds per turn in this room. */
   turnSeconds: number;
+  /** Twilight Fury: long games escalate until they end. Absent from old servers: on. */
+  twilight?: boolean;
 }
 
 export interface CreateRoomRequest {
@@ -162,6 +164,8 @@ export interface CreateRoomRequest {
   clientId?: string;
   /** Seats: 2 (default) or 3 for a free-for-all room. */
   size?: number;
+  /** Twilight Fury (on by default): from turn 21 the war escalates so the game ends soon. */
+  twilight?: boolean;
 }
 
 /** Room sizes a host can pick: a duel or a 3-player free-for-all. */

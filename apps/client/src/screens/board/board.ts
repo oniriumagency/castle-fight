@@ -4,6 +4,7 @@ import {
   getBattleEvent,
   getCard,
   getHero,
+  twilightLevel,
   type GameEvent,
   type HeroId,
   type PlayerId,
@@ -22,11 +23,13 @@ import { battlefield } from '../../app/stage';
 import { audio } from '../../fx/audio';
 import { fx, type FxContext } from '../../fx/director';
 import { describeEvent } from '../../game/describe';
+import { twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
+import { reportProblem } from '../../app/errorReport';
 import { skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
@@ -56,6 +59,10 @@ const HISTORY_SIZE = 3;
 
 /** One state update's animations may take this long at most; then the board shows the result. */
 const MAX_ANIMATION_MS = 20_000;
+/** A gap this long between watchdog runs while the tab is visible means the page froze. */
+const STALL_MS = 5000;
+/** The player's own turn with the board locked this long is reported. */
+const BLOCKED_REPORT_MS = 30_000;
 /** An action unanswered for this long no longer blocks the board. */
 const AWAIT_ANSWER_MS = 6000;
 
@@ -91,6 +98,7 @@ class BoardScreen implements Screen {
   private readonly turnLabel = h('div.turn-label');
   private readonly timer = h('div.timer', { hidden: true });
   private readonly eventChip = h('button.event-chip', { type: 'button' });
+  private readonly twilightChip = h('button.twilight-chip', { type: 'button', hidden: true });
   private readonly layer = h('div.inspect-layer');
   private readonly logList = h('ol.log-list');
   private readonly logPanel: HTMLElement;
@@ -166,11 +174,16 @@ class BoardScreen implements Screen {
       this.inspectCard(id, this.discardHero, this.discardTopDiscarded);
     });
     this.eventChip.addEventListener('click', () => this.inspectEvent());
+    this.twilightChip.addEventListener('click', () => {
+      if (!this.view) return;
+      audio.play('uiClick');
+      toast(t('rulesTwilight', twilightValues(this.view.rules)).replace(/<[^>]+>/g, ''), 'info', 9000);
+    });
 
     this.el = h(
       'div.board',
       { class: `mode-${session.kind}${this.count > 2 ? ' ffa' : ''}` },
-      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), this.eventChip, h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
+      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), h('div.event-box', null, this.eventChip, this.twilightChip), h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
       this.panels[0].el,
       // Free-for-all: the rivals' panels stack in one column, so either can grow without covering the other.
       this.count > 2 ? h('div.rival-column', null, ...this.panels.slice(1).map((p) => p.el)) : this.panels[1].el,
@@ -450,10 +463,19 @@ class BoardScreen implements Screen {
       while (this.queue.length && !this.destroyed) {
         const update = this.queue.shift()!;
         // An animation that never ends (a paused or throttled tab) must not freeze the board.
-        await Promise.race([
-          this.animate(update).catch((error: unknown) => console.error('Board animation failed', error)),
-          new Promise<void>((resolve) => setTimeout(resolve, MAX_ANIMATION_MS)),
+        const kinds = update.events.map((e) => e.type);
+        const timedOut = await Promise.race([
+          this.animate(update).then(
+            () => false,
+            (error: unknown) => {
+              console.error('Board animation failed', error);
+              reportProblem('animationError', error, { events: kinds.slice(0, 40), ...this.snapshot() });
+              return false;
+            },
+          ),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(true), MAX_ANIMATION_MS)),
         ]);
+        if (timedOut) reportProblem('animationTimeout', 'An update took too long to animate', { events: kinds.slice(0, 40), ...this.snapshot() });
         this.view = update.view;
         this.shown = update.view.players.map(clonePlayer);
         this.shownActive = update.view.active;
@@ -591,6 +613,22 @@ class BoardScreen implements Screen {
 
     // Battle event chip.
     this.renderEventChip(view);
+    this.renderTwilightChip(view);
+  }
+
+  private renderTwilightChip(view: PlayerView): void {
+    const status = view.phase === 'finished' ? null : twilightStatus(view);
+    this.twilightChip.hidden = !status;
+    this.el.classList.toggle('twilight', !!status && status.level > 0);
+    if (!status) return;
+    this.twilightChip.classList.toggle('active', status.level > 0);
+    this.twilightChip.classList.toggle('last', status.level > 0 && status.turns === 0);
+    const line = twilightLine(status);
+    this.twilightChip.replaceChildren(
+      html(iconSvg('sunset')),
+      h('span.event-text', null, h('strong', null, t('twilightName')), h('small', null, line)),
+    );
+    this.twilightChip.title = `${t('twilightName')}: ${line}`;
   }
 
   private renderOppHand(seat: PlayerId): void {
@@ -721,7 +759,7 @@ class BoardScreen implements Screen {
       this.field.setMaxPoints(view.rules.keepWin);
       for (const plaque of this.plaques) plaque.setKeepWin(view.rules.keepWin);
       this.field.setHeroes(this.sides().map((side) => view.players[this.seatOfSide(side)].hero));
-      void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
+      void this.field.setMood(skyFor(view.activeEvent?.id ?? null, twilightLevel(view)), 400);
     }
     if (!starting && this.discardPile.querySelector('.pile-empty')) {
       // Resumed mid-game: show the last card played, by whoever played most recently.
@@ -763,7 +801,7 @@ class BoardScreen implements Screen {
       this.handModel = [...view.players[view.viewer].hand];
     }
     this.setShields(view);
-    void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
+    void this.field.setMood(skyFor(view.activeEvent?.id ?? null, twilightLevel(view)), 400);
   }
 
   private heights(seat: PlayerId): { keep: number; wall: number } {
@@ -801,8 +839,16 @@ class BoardScreen implements Screen {
         void fx.battleEvent(e.eventId, ctx);
         break;
       case 'battleEventEnded':
-        void fx.battleEventEnded(ctx);
+        void fx.battleEventEnded(ctx, this.view ? twilightLevel(this.view) : 0);
         break;
+      case 'twilightRose': {
+        const values = this.view ? twilightValues(this.view.rules) : { atk: 0, wall: 0 };
+        this.showBanner(t('twilightName'), t('twilightRose', { level: e.level, atk: values.atk! * e.level, wall: values.wall! * e.level }));
+        if (this.view) this.renderTwilightChip(this.view);
+        await fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
+        if (this.view?.activeEvent) void ctx.field.setMood(skyFor(this.view.activeEvent.id), 400);
+        break;
+      }
       case 'produced': {
         const p = shown[e.player];
         for (const res of RESOURCES) p.resources[res] += e.gained[res];
@@ -1453,9 +1499,12 @@ class BoardScreen implements Screen {
    * again. Either one used to leave both players looking at "Wait for your turn".
    */
   private watchdog(): void {
-    if (this.destroyed || this.busy) return;
+    if (this.destroyed) return;
+    this.watchHealth();
+    if (this.busy) return;
     if (this.awaiting) {
       if (Date.now() - this.awaitingSince < AWAIT_ANSWER_MS) return;
+      reportProblem('noAnswer', 'The server did not answer an action', this.snapshot());
       this.awaiting = false;
       this.session.resync?.();
       this.render();
@@ -1464,6 +1513,57 @@ class BoardScreen implements Screen {
     const view = this.view;
     if (!view || this.closeChoice || this.curtain.hidden !== true) return;
     if (view.phase === 'choice' && view.pending?.player === view.viewer && this.session.isLocal(view.viewer)) this.maybeChoose();
+  }
+
+  /** Last watchdog run, to notice the page itself stalling. */
+  private lastWatch = 0;
+  private wasVisible = false;
+  /** Since when it has been this player's turn without the board letting them act. */
+  private blockedSince = 0;
+
+  /**
+   * Report (once per page load) a board that stays locked on the player's own
+   * turn, or a page that stopped running for seconds, with what the board was
+   * doing, so the next freeze can be told apart from the others.
+   */
+  private watchHealth(): void {
+    const now = Date.now();
+    const visible = document.visibilityState === 'visible';
+    // Only while the tab stays in front: background tabs are allowed to sleep.
+    if (this.lastWatch && visible && this.wasVisible && now - this.lastWatch > STALL_MS) {
+      reportProblem('stall', `The page stopped for ${now - this.lastWatch} ms`, this.snapshot());
+    }
+    this.lastWatch = now;
+    this.wasVisible = visible;
+    const v = this.view;
+    const myTurn = !!v && v.phase !== 'finished' && v.active === v.viewer && this.session.isLocal(v.viewer);
+    if (!myTurn || this.canAct() || !visible) {
+      this.blockedSince = 0;
+      return;
+    }
+    if (!this.blockedSince) this.blockedSince = now;
+    else if (now - this.blockedSince > BLOCKED_REPORT_MS) {
+      reportProblem('boardLocked', 'Own turn, but the board does not let the player act', this.snapshot());
+    }
+  }
+
+  /** What the board is doing, for problem reports. */
+  private snapshot(): Record<string, unknown> {
+    const v = this.view;
+    return {
+      session: this.session.kind,
+      turn: v?.turn,
+      phase: v?.phase,
+      active: v?.active,
+      viewer: v?.viewer,
+      pending: v?.pending ? { player: v.pending.player, kind: (v.pending as { kind?: string }).kind, options: v.pending.options.length } : null,
+      busy: this.busy,
+      awaiting: this.awaiting,
+      queued: this.queue.length,
+      curtain: this.curtain.hidden !== true,
+      choiceOpen: !!this.closeChoice,
+      dialogs: Array.from(this.layer.children, (el) => el.className).slice(0, 10),
+    };
   }
 
   private tryPlay(uid: number): void {

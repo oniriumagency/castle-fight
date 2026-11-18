@@ -45,21 +45,33 @@
 
 /* ---------- Main menu ---------- */
 
+/* Left: nickname, game modes and the rest. Right: the title above a fan of showcase cards. */
 .menu-screen {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(20px, 5vw, 80px);
+  gap: clamp(28px, 6vw, 110px);
   padding: max(16px, var(--safe-t)) max(16px, var(--safe-r)) max(16px, var(--safe-b)) max(16px, var(--safe-l));
-  background: radial-gradient(80% 90% at 30% 50%, rgb(8 6 16 / 70%), rgb(8 6 16 / 10%) 70%);
+  background: radial-gradient(70% 90% at 28% 50%, rgb(8 6 16 / 72%), rgb(8 6 16 / 12%) 72%);
   overflow-y: auto;
 }
 
 .menu-main {
-  width: min(440px, 100%);
+  width: min(430px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+.menu-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.menu-side .logo {
+  position: relative;
+  z-index: 2;
 }
 
 .logo {
@@ -72,7 +84,7 @@
 }
 
 .logo-emblem {
-  width: 64px;
+  width: 52px;
   height: auto;
   filter: drop-shadow(0 0 14px rgb(255 190 80 / 45%));
 }
@@ -120,7 +132,7 @@
   align-items: center;
   gap: 14px;
   width: 100%;
-  padding: 12px 16px;
+  padding: 11px 16px;
   border: 1px solid var(--gold-d);
   border-radius: 10px;
   background: linear-gradient(100deg, rgb(58 46 30 / 92%), rgb(22 18 30 / 92%));
@@ -167,16 +179,23 @@
   font-size: 0.95rem;
 }
 
+.modes {
+  gap: 9px;
+}
+
 .menu-secondary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: center;
 }
 
 .menu-secondary .btn {
-  flex: 1 1 auto;
+  flex: 1 1 140px;
   font-size: 0.82rem;
+}
+
+.menu-secondary .btn.icon-only {
+  flex: 0 0 auto;
 }
 
 .menu-foot {
@@ -189,16 +208,16 @@
 .menu-fan {
   position: relative;
   width: 440px;
-  height: 420px;
+  height: 380px;
   flex: none;
   perspective: 1200px;
 }
 
 .menu-fan .card {
-  --w: 230px;
+  --w: 220px;
   position: absolute;
-  left: calc(50% - 115px);
-  top: 20px;
+  left: calc(50% - 110px);
+  top: 14px;
   transform-origin: 50% 120%;
   transform: rotate(calc(var(--i) * 14deg)) translateY(calc(var(--i) * var(--i) * 12px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   z-index: calc(10 - var(--i) * var(--i));
@@ -221,32 +240,82 @@
   text-align: center;
 }
 
+/* Not much height on a laptop: smaller cards so everything fits without scrolling. */
+@media (max-height: 820px) {
+  .menu-fan {
+    height: 320px;
+  }
+
+  .menu-fan .card {
+    --w: 186px;
+    left: calc(50% - 93px);
+  }
+
+  .mode-btn {
+    padding: 9px 14px;
+  }
+}
+
 @media (max-width: 920px), (max-height: 560px) {
   .menu-fan {
     display: none;
   }
 }
 
-@media (max-height: 560px) and (orientation: landscape) {
+/* Narrow and tall (tablet upright): the title on top, the menu below. */
+@media (max-width: 920px) and (min-height: 561px) {
   .menu-screen {
-    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 18px;
   }
 
-  .menu-main {
-    width: min(760px, 100%);
+  .menu-side {
+    order: -1;
+  }
+}
+
+/* Phones in landscape: title, nickname and the rest on the left, the game modes on the right. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .menu-screen {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+    justify-content: stretch;
     column-gap: 22px;
     row-gap: 10px;
+    padding-left: max(16px, var(--safe-l), calc((100% - 820px) / 2));
+    padding-right: max(16px, var(--safe-r), calc((100% - 820px) / 2));
+  }
+
+  .menu-main,
+  .menu-side {
+    display: contents;
   }
 
   .logo {
-    grid-row: span 2;
-    justify-content: center;
+    grid-column: 1;
+    grid-row: 1;
   }
 
   .logo-emblem {
-    width: 44px;
+    width: 40px;
+  }
+
+  .nick {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .menu-secondary {
+    grid-column: 1;
+    grid-row: 3;
+    align-content: start;
+  }
+
+  .menu-secondary .btn {
+    flex-basis: 120px;
   }
 
   .modes {
@@ -262,14 +331,6 @@
   .mode-icon {
     width: 38px;
     height: 38px;
-  }
-
-  .nick {
-    grid-column: 1;
-  }
-
-  .menu-secondary {
-    grid-column: 1 / -1;
   }
 
   .menu-foot {
@@ -661,6 +722,34 @@ label.check input {
   accent-color: var(--gold);
 }
 
+.twilight-toggle {
+  align-items: flex-start;
+}
+
+.twilight-toggle input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.twilight-toggle span svg {
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  color: #ff9a5a;
+}
+
+.twilight-toggle small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.room-info small svg {
+  vertical-align: -2px;
+}
+
 input.shake {
   animation: shake 0.4s;
 }
@@ -954,9 +1043,6 @@ input.shake {
   .menu-screen {
     padding-top: 10px;
     padding-bottom: 10px;
-  }
-
-  .menu-main {
     row-gap: 6px;
   }
 

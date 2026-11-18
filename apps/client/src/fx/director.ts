@@ -454,8 +454,18 @@ export const fx = {
     }
   },
 
-  async battleEventEnded(ctx: FxContext): Promise<void> {
-    await ctx.field.setMood(skyFor(null), ms(1400));
+  async battleEventEnded(ctx: FxContext, twilight = 0): Promise<void> {
+    await ctx.field.setMood(skyFor(null, twilight), ms(1400));
+  },
+
+  /** The Twilight Fury begins or rises: the sky bleeds and the ground shakes. */
+  async twilightRose(level: number, ctx: FxContext): Promise<void> {
+    const field = ctx.field;
+    audio.play('event');
+    audio.duck(0.45, 1800);
+    void field.setMood(skyFor(null, level), ms(1800));
+    field.shake(6 + level * 2);
+    await wait(900);
   },
 
   timeUp(): void {
