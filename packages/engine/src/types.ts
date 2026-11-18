@@ -233,6 +233,8 @@ export interface CardDef {
   cost: number;
   name: LocalizedText;
   text: LocalizedText;
+  /** Rules text for 3+ players, where the card hits every rival with scaled numbers (absent: same as `text`). */
+  textFfa?: LocalizedText;
   /** Art path relative to `art/`. */
   art: string;
   effects: EffectOp[];
@@ -257,6 +259,8 @@ export interface HeroDef {
   id: HeroId;
   name: LocalizedText;
   text: LocalizedText;
+  /** Rules text for 3+ players (absent: same as `text`). */
+  textFfa?: LocalizedText;
   art: string;
   passive: HeroPassive;
   ultimate: EffectOp[];
