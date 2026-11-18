@@ -93,15 +93,25 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   contrafuertes: () => {
     let { state } = play('contrafuertes', { keepTurn: false });
-    expect(state.players[ME].enchantments).toEqual([{ cardId: 'contrafuertes', turnsLeft: 4, fresh: false }]);
-    // Each attack that hits my Wall deals 3 less: 13 -> 10.
+    expect(state.players[ME].enchantments).toEqual([{ cardId: 'contrafuertes', turnsLeft: 0, charges: 4, fresh: false }]);
+    // Each attack that hits my Wall deals 3 less (13 -> 10) and spends a charge.
     setHand(state, OPP, ['carga-de-lanceros', 'saetas-negras']);
     state.actionsLeft = 2;
     state = playCard(state, 'carga-de-lanceros').state;
     expect(state.players[ME].wall).toBe(5);
-    // Piercing damage does not touch the Wall, so it is not reduced.
+    expect(state.players[ME].enchantments[0]!.charges).toBe(3);
+    // Piercing damage does not touch the Wall, so it is not reduced and spends nothing.
     state = playCard(state, 'saetas-negras').state;
     expect(state.players[ME].keep).toBe(40);
+    expect(state.players[ME].enchantments[0]!.charges).toBe(3);
+    // The last charge goes with the next attack on the Wall, which is still reduced.
+    const again = play('contrafuertes', { keepTurn: false }).state;
+    again.players[ME].enchantments[0]!.charges = 1;
+    setHand(again, OPP, ['carga-de-lanceros']);
+    const last = playCard(again, 'carga-de-lanceros');
+    expect(last.state.players[ME].wall).toBe(5);
+    expect(last.state.players[ME].enchantments).toEqual([]);
+    expect(eventsOf(last.events, 'enchantmentRemoved')[0]).toMatchObject({ cardId: 'contrafuertes', reason: 'spent' });
   },
   'fortaleza-viva': () => {
     // No battle event in the way: one landing on turn 9 would change the Keep.
@@ -271,16 +281,23 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(play('sabotaje').state.players[OPP].wall).toBe(7);
   },
   'estandarte-de-guerra': () => {
-    let state = scenario({ hand: ['estandarte-de-guerra', 'escaramuza', 'doble-salva'] });
-    state.actionsLeft = 3;
+    let state = scenario({ hand: ['estandarte-de-guerra', 'escaramuza', 'doble-salva', 'escaramuza', 'escaramuza'] });
+    state.actionsLeft = 5;
     state = playCard(state, 'estandarte-de-guerra').state;
-    expect(state.players[ME].enchantments[0]).toMatchObject({ cardId: 'estandarte-de-guerra', turnsLeft: 4 });
-    // +3 on every hit.
+    expect(state.players[ME].enchantments[0]).toMatchObject({ cardId: 'estandarte-de-guerra', charges: 4 });
+    // +3 on every hit, and every hit spends a charge.
     state = playCard(state, 'escaramuza').state;
     expect(state.players[OPP].wall).toBe(7);
     state = playCard(state, 'doble-salva').state;
     expect(state.players[OPP].wall).toBe(0);
     expect(state.players[OPP].keep).toBe(41);
+    expect(state.players[ME].enchantments[0]!.charges).toBe(1);
+    // The fourth attack still gets +3 and uses it up; the fifth deals the printed 5.
+    state = playCard(state, 'escaramuza').state;
+    expect(state.players[OPP].keep).toBe(33);
+    expect(state.players[ME].enchantments).toEqual([]);
+    state = playCard(state, 'escaramuza').state;
+    expect(state.players[OPP].keep).toBe(28);
   },
   emboscada: () => {
     expect(play('emboscada').state.players[OPP].wall).toBe(5);

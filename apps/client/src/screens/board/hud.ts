@@ -3,6 +3,7 @@ import {
   RESOURCE_NAMES,
   TERMS,
   WORKER_NAMES,
+  enchantmentLife,
   getCard,
   getHero,
   type PlayerPublicState,
@@ -228,11 +229,11 @@ export class SidePanel {
             type: 'button',
             class: `s-${card.school}`,
             'data-card': e.cardId,
-            title: `${L(card.name)} · ${t('turnsLeft', { n: e.turnsLeft })}`,
+            title: `${L(card.name)} · ${e.charges !== undefined ? t('attacksLeft', { n: e.charges }) : t('turnsLeft', { n: e.turnsLeft })}`,
             onclick: () => this.onInspect(e.cardId),
           },
           h('img', { src: artUrl(card.art), alt: L(card.name), draggable: 'false', onerror: hideMissingArt }),
-          h('span.enchant-turns', null, String(e.turnsLeft)),
+          h('span.enchant-turns', null, String(enchantmentLife(e))),
         );
         return el;
       }),

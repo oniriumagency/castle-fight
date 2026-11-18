@@ -138,6 +138,7 @@ const STRINGS = {
   drawbridgeUp: { es: 'Puente levadizo: el daño perforante cuenta como normal', en: 'Drawbridge: piercing damage counts as normal' },
   handVisible: { es: 'Mano revelada', en: 'Hand revealed' },
   turnsLeft: { es: '{n} turno(s)', en: '{n} turn(s)' },
+  attacksLeft: { es: '{n} ataque(s)', en: '{n} attack(s)' },
   upcomingEvent: { es: 'En {n} turno(s)', en: 'In {n} turn(s)' },
   upcomingNow: { es: 'Al empezar el próximo turno', en: 'At the start of next turn' },
   activeEvent: { es: 'Activo: {n} turno(s) más', en: 'Active: {n} more turn(s)' },

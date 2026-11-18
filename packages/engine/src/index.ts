@@ -30,6 +30,7 @@ export {
   effectiveCost,
   costResource,
   attackBonus,
+  enchantmentLife,
   twilightDeadline,
   twilightLevel,
   wallDamageReduction,

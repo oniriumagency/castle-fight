@@ -212,6 +212,11 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
   // Enchantments last for the owner's next N turns: the turn they are played
   // on does not count.
   for (const enchantment of [...self.enchantments]) {
+    // Enchantments counted in attacks are spent by attacks, not by turns.
+    if (enchantment.charges !== undefined) {
+      enchantment.fresh = false;
+      continue;
+    }
     if (enchantment.fresh) {
       enchantment.fresh = false;
       continue;

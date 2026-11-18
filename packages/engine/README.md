@@ -107,7 +107,7 @@ Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. To
 - *Escudo*: cada carga bloquea un golpe. Se acumulan hasta 3 y no caducan.
 - Purificación y Ciudadela Eterna quitan Quemadura y Escarcha.
 
-**Encantamientos.** Máximo 2 por jugador. Uno nuevo sustituye al más antiguo, y volver a jugar el mismo reinicia su duración. Un encantamiento de N turnos dura los N turnos siguientes de su dueño (el turno en que se juega no cuenta), así que también cubre N turnos del rival.
+**Encantamientos.** Máximo 2 por jugador. Uno nuevo sustituye al más antiguo, y volver a jugar el mismo reinicia su duración. Un encantamiento de N turnos dura los N turnos siguientes de su dueño (el turno en que se juega no cuenta), así que también cubre N turnos del rival. Los que tocan los ataques (Estandarte de Guerra y Contrafuertes) no cuentan turnos sino ataques: cada ataque al que suman o restan gasta una carga (`charges`, evento `enchantmentCharge`) y al gastar la última desaparecen (`reason: 'spent'`). El Estandarte gasta la carga aunque un Escudo bloquee el golpe; Contrafuertes solo cuando el golpe alcanza la Muralla.
 
 **Combo.** Una carta con Combo recibe su bonificación si la última carta que jugaste es de la misma escuela. Descartar rompe la cadena.
 

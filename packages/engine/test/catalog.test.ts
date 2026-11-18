@@ -59,7 +59,13 @@ describe('catalog', () => {
     for (const card of CARDS) {
       const op = card.effects.find((e) => e.op === 'enchant');
       if (op?.op !== 'enchant') continue;
-      expect(card.text.en, card.id).toContain(`(${op.turns} turns)`);
+      if (op.charges !== undefined) {
+        expect(card.text.en, card.id).toContain(`(${op.charges} attacks)`);
+        expect(card.text.es, card.id).toContain(`(${op.charges} ataques)`);
+        expect(op.turns, card.id).toBeUndefined();
+      } else {
+        expect(card.text.en, card.id).toContain(`(${op.turns} turns)`);
+      }
     }
   });
 

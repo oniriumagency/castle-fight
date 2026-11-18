@@ -232,8 +232,8 @@
         "en": "Buttresses"
       },
       "text": {
-        "es": "Encantamiento (4 turnos): tu Muralla recibe 3 de daño menos por ataque.",
-        "en": "Enchantment (4 turns): your Wall takes 3 less damage per attack."
+        "es": "Encantamiento (4 ataques): los próximos 4 ataques contra tu Muralla hacen 3 de daño menos.",
+        "en": "Enchantment (4 attacks): the next 4 attacks against your Wall deal 3 less damage."
       },
       "art": "cards/contrafuertes.jpg"
     },
@@ -607,8 +607,8 @@
         "en": "War Banner"
       },
       "text": {
-        "es": "Encantamiento (4 turnos): tus ataques hacen +3 de daño.",
-        "en": "Enchantment (4 turns): your attacks deal +3 damage."
+        "es": "Encantamiento (4 ataques): tus próximos 4 ataques hacen +3 de daño.",
+        "en": "Enchantment (4 attacks): your next 4 attacks deal +3 damage."
       },
       "art": "cards/estandarte-de-guerra.jpg"
     },

@@ -5,6 +5,7 @@ import type {
   CardId,
   ChangeReason,
   DamageKind,
+  Enchantment,
   GameEvent,
   GameOverReason,
   GameState,
@@ -139,6 +140,33 @@ export function attackBonus(state: Board, player: PlayerId): number {
   let bonus = getHero(p.hero).passive.attackBonus ?? 0;
   for (const e of p.enchantments) bonus += getEnchantmentModifiers(e.cardId)?.attackBonus ?? 0;
   return bonus + twilightLevel(state) * (state.rules.twilightAttackBonus ?? 0);
+}
+
+/** How long an enchantment still lasts: attacks left, or owner turns left. */
+export function enchantmentLife(e: Enchantment): number {
+  return e.charges ?? e.turnsLeft;
+}
+
+/**
+ * Spend one charge of each of `player`'s enchantments counted in attacks that
+ * has `modifier`, and remove the ones that run out.
+ */
+function spendCharges(
+  state: GameState,
+  events: GameEvent[],
+  player: PlayerId,
+  modifier: 'attackBonus' | 'wallDamageReduction',
+): void {
+  const p = state.players[player];
+  for (const e of [...p.enchantments]) {
+    if (e.charges === undefined || !getEnchantmentModifiers(e.cardId)?.[modifier]) continue;
+    e.charges -= 1;
+    events.push({ type: 'enchantmentCharge', player, cardId: e.cardId, charges: e.charges });
+    if (e.charges <= 0) {
+      p.enchantments.splice(p.enchantments.indexOf(e), 1);
+      events.push({ type: 'enchantmentRemoved', player, cardId: e.cardId, reason: 'spent' });
+    }
+  }
 }
 
 /**
@@ -347,6 +375,8 @@ export function dealDamage(
 
   if (options.attack) {
     amount += attackBonus(state, source);
+    // The attack is made even if a Shield blocks it.
+    spendCharges(state, events, source, 'attackBonus');
     // Free-for-all: the leader is everyone's target, so it takes a little more.
     if (state.rules.leaderExtraDamage && isMultiplayer(state) && leaderOf(state) === target) {
       amount += state.rules.leaderExtraDamage;
@@ -371,7 +401,11 @@ export function dealDamage(
   if (kind === 'piercing' && t.drawbridge) kind = 'normal';
 
   if (options.attack && kind !== 'piercing' && t.wall > 0) {
-    amount = Math.max(0, amount - wallDamageReduction(state, target));
+    const reduction = wallDamageReduction(state, target);
+    if (reduction > 0) {
+      amount = Math.max(0, amount - reduction);
+      spendCharges(state, events, target, 'wallDamageReduction');
+    }
   }
 
   const mult = options.wallMultiplier ?? 1;
