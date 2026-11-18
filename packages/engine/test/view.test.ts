@@ -93,6 +93,6 @@ describe('player view', () => {
     const view = getPlayerView(scenario({ you: { ultimateCharge: charge } }), OPP);
     expect(view.players[ME]).toMatchObject({ ultimateCharge: charge, ultimateThreshold: charge, ultimateReady: true });
     expect(view.players[OPP].ultimateReady).toBe(false);
-    expect(view.upcomingEvent.turn).toBe(9);
+    expect(view.upcomingEvent.round).toBe(5);
   });
 });

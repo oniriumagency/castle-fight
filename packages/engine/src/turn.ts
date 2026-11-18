@@ -31,7 +31,7 @@ function fireBattleEvent(state: GameState, events: GameEvent[]): void {
   const effect = getBattleEvent(id).effect;
   const reason = { kind: 'battleEvent' as const, id };
   const lasting = effect.kind === 'halfCost' || effect.kind === 'banSchool';
-  events.push({ type: 'battleEventStarted', eventId: id, turns: lasting ? effect.turns : null });
+  events.push({ type: 'battleEventStarted', eventId: id, rounds: lasting ? effect.rounds : null });
 
   const both: PlayerId[] = [state.active, ...opponents(state, state.active)];
   switch (effect.kind) {
@@ -61,19 +61,40 @@ function fireBattleEvent(state: GameState, events: GameEvent[]): void {
       break;
     case 'halfCost':
     case 'banSchool':
-      state.activeEvent = { id, turnsLeft: effect.turns };
+      // It always fires as a round starts, so it lasts whole rounds: every castle gets the same turns.
+      state.activeEvent = { id, untilRound: roundOf(state) + effect.rounds - 1 };
       break;
   }
 
   state.upcomingEvent = {
     id: rollBattleEvent(state, id),
-    turn: state.turn + state.rules.eventEveryTurns,
+    round: roundOf(state) + eventEveryRounds(state.rules),
   };
   events.push({
     type: 'battleEventForecast',
     eventId: state.upcomingEvent.id,
-    turn: state.upcomingEvent.turn,
+    round: state.upcomingEvent.round,
   });
+}
+
+/** Rounds between battle events (saves from before rounds counted turns: two per round). */
+function eventEveryRounds(rules: GameState['rules']): number {
+  return rules.eventEveryRounds ?? Math.max(1, Math.ceil((rules.eventEveryTurns ?? 8) / 2));
+}
+
+/** True when the announced battle event fires on this turn. */
+function eventDue(state: GameState): boolean {
+  const next = state.upcomingEvent;
+  if (next.round === undefined) return state.turn >= (next.turn ?? Infinity);
+  return roundOf(state) >= next.round;
+}
+
+/** A lasting battle event ends once its last round is over. */
+function endBattleEvent(state: GameState, events: GameEvent[]): void {
+  const active = state.activeEvent;
+  if (!active || active.untilRound === undefined || roundOf(state) <= active.untilRound) return;
+  events.push({ type: 'battleEventEnded', eventId: active.id });
+  state.activeEvent = null;
 }
 
 /**
@@ -164,7 +185,8 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
   }
 
   // 2. Battle event, then the Twilight Fury.
-  if (state.turn >= state.upcomingEvent.turn) fireBattleEvent(state, events);
+  endBattleEvent(state, events);
+  if (eventDue(state)) fireBattleEvent(state, events);
   twilight(state, events, player, furyBefore);
 
   // 3. Burn. It is not an attack: no bonuses, and Shield does not stop it.
@@ -250,8 +272,9 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
     }
   }
 
-  if (state.activeEvent) {
-    state.activeEvent.turnsLeft -= 1;
+  // Saves from before events counted rounds still count their turns down.
+  if (state.activeEvent && state.activeEvent.untilRound === undefined) {
+    state.activeEvent.turnsLeft = (state.activeEvent.turnsLeft ?? 1) - 1;
     if (state.activeEvent.turnsLeft <= 0) {
       events.push({ type: 'battleEventEnded', eventId: state.activeEvent.id });
       state.activeEvent = null;

@@ -4,6 +4,7 @@ import {
   getBattleEvent,
   getCard,
   getHero,
+  roundOf,
   twilightLevel,
   type GameEvent,
   type HeroId,
@@ -735,10 +736,16 @@ class BoardScreen implements Screen {
     const active = view.activeEvent;
     const id = active ? active.id : view.upcomingEvent.id;
     const ev = getBattleEvent(id);
-    const turnsAway = view.upcomingEvent.turn - view.turn;
-    const sub = active ? t('activeEvent', { n: active.turnsLeft }) : turnsAway <= 1 ? t('upcomingNow') : t('upcomingEvent', { n: turnsAway });
+    // Events count rounds (one turn for each castle standing). Old saves still count turns.
+    const round = roundOf(view);
+    const next = view.upcomingEvent;
+    const roundsAway = next.round !== undefined ? next.round - round : Math.ceil(((next.turn ?? view.turn) - view.turn) / view.players.length);
+    const roundsLeft = active ? (active.untilRound !== undefined ? active.untilRound - round + 1 : Math.ceil((active.turnsLeft ?? 1) / view.players.length)) : 0;
+    const sub = active
+      ? roundsLeft <= 1 ? t('activeEventLast') : t('activeEvent', { n: roundsLeft })
+      : roundsAway <= 1 ? t('upcomingNow') : t('upcomingEvent', { n: roundsAway });
     this.eventChip.classList.toggle('active', !!active);
-    this.eventChip.classList.toggle('soon', !active && turnsAway <= 2);
+    this.eventChip.classList.toggle('soon', !active && roundsAway <= 1);
     this.eventChip.replaceChildren(
       h('img', { src: artUrl(ev.art), alt: '' }),
       h('span.event-text', null, h('strong', null, L(ev.name)), h('small', null, sub)),

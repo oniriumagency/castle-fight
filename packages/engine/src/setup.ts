@@ -69,7 +69,7 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
     extraTurn: false,
     pending: null,
     activeEvent: null,
-    upcomingEvent: { id: '', turn: rules.eventEveryTurns + 1 },
+    upcomingEvent: { id: '', round: rules.eventEveryRounds + 1 },
     nextUid: 1,
     result: null,
   } as unknown as GameState;
@@ -85,7 +85,7 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
 
   const events: GameEvent[] = [
     { type: 'gameStarted', firstPlayer, heroes: options.heroes.slice() },
-    { type: 'battleEventForecast', eventId: state.upcomingEvent.id, turn: state.upcomingEvent.turn },
+    { type: 'battleEventForecast', eventId: state.upcomingEvent.id, round: state.upcomingEvent.round },
   ];
   for (let p = 0; p < n; p++) drawCards(state, events, p, rules.handSize);
   startTurn(state, events, firstPlayer, false);

@@ -72,7 +72,7 @@ describe('catalog', () => {
   it('looks things up by id', () => {
     expect(getCard('catapulta').name.en).toBe('Catapult');
     expect(getHero('guardian').name.es).toBe('El Guardián');
-    expect(getBattleEvent('eclipse').effect).toEqual({ kind: 'halfCost', school: 'arcano', turns: 2 });
+    expect(getBattleEvent('eclipse').effect).toEqual({ kind: 'halfCost', school: 'arcano', rounds: 1 });
     expect(isCardId('catapulta')).toBe(true);
     expect(isCardId('dragon')).toBe(false);
     expect(() => getCard('dragon')).toThrow(/Unknown card/);

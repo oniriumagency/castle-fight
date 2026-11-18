@@ -4,8 +4,8 @@ import type { BattleEventEffect, BattleEventId } from '../types';
 export const BATTLE_EVENT_EFFECTS: Record<BattleEventId, BattleEventEffect> = {
   tormenta: { kind: 'bothLoseWall', amount: 8 },
   mercado: { kind: 'bothGainResources', amount: 5 },
-  eclipse: { kind: 'halfCost', school: 'arcano', turns: 2 },
+  eclipse: { kind: 'halfCost', school: 'arcano', rounds: 1 },
   terremoto: { kind: 'bothLoseKeep', amount: 7 },
   cosecha: { kind: 'bothGainRandomWorker' },
-  tregua: { kind: 'banSchool', school: 'asalto', turns: 2 },
+  tregua: { kind: 'banSchool', school: 'asalto', rounds: 1 },
 };

@@ -61,8 +61,13 @@ export interface Rules {
   turnSeconds: number;
   /** Enchantments a player can have at once. */
   maxEnchantments: number;
-  /** A global battle event fires after every this many turns. */
-  eventEveryTurns: number;
+  /**
+   * A global battle event fires at the start of every this many rounds (a
+   * round is one turn for each castle standing).
+   */
+  eventEveryRounds: number;
+  /** Saves from before events counted rounds: every this many turns. */
+  eventEveryTurns?: number;
   /** Copies of each card in a player's deck, by rarity. */
   deckCopies: Record<Rarity, number>;
   /** Damage dealt by Burn at the start of the burned player's turn. */
@@ -271,9 +276,25 @@ export type BattleEventEffect =
   | { kind: 'bothGainResources'; amount: number }
   | { kind: 'bothGainRandomWorker' }
   /** For `turns` turns, cards of `school` cost half (rounded up). */
-  | { kind: 'halfCost'; school: School; turns: number }
-  /** For `turns` turns, cards of `school` cannot be played. */
-  | { kind: 'banSchool'; school: School; turns: number };
+  | { kind: 'halfCost'; school: School; rounds: number }
+  /** For `rounds` rounds, cards of `school` cannot be played. */
+  | { kind: 'banSchool'; school: School; rounds: number };
+
+/** A lasting battle event in play: it runs through the end of round `untilRound`. */
+export interface ActiveEvent {
+  id: BattleEventId;
+  untilRound: number;
+  /** Saves from before events counted rounds: turns left instead. */
+  turnsLeft?: number;
+}
+
+/** The next battle event: it fires as round `round` starts. */
+export interface UpcomingEvent {
+  id: BattleEventId;
+  round: number;
+  /** Saves from before events counted rounds: the turn it fires on instead. */
+  turn?: number;
+}
 
 export interface BattleEventDef {
   id: BattleEventId;
@@ -443,9 +464,9 @@ export interface GameState {
   players: PlayerState[];
   pending: PendingChoice | null;
   /** Battle event with a lasting effect that is currently running. */
-  activeEvent: { id: BattleEventId; turnsLeft: number } | null;
-  /** The next battle event and the turn at whose start it fires. Public. */
-  upcomingEvent: { id: BattleEventId; turn: number };
+  activeEvent: ActiveEvent | null;
+  /** The next battle event and the round at whose start it fires. Public. */
+  upcomingEvent: UpcomingEvent;
   nextUid: number;
   result: GameResult | null;
 }
@@ -483,7 +504,7 @@ export interface Board {
   phase: GamePhase;
   players: BoardPlayer[];
   pending: { player: PlayerId; options: string[] } | null;
-  activeEvent: { id: BattleEventId; turnsLeft: number } | null;
+  activeEvent: ActiveEvent | null;
   /** Present on a `PlayerView` only. */
   viewer?: PlayerId;
 }
@@ -549,11 +570,11 @@ export type GameEvent =
   | { type: 'gameStarted'; firstPlayer: PlayerId; heroes: HeroId[] }
   | { type: 'turnStarted'; player: PlayerId; turn: number; extraTurn: boolean }
   | { type: 'turnEnded'; player: PlayerId; turn: number }
-  /** A global battle event fired. `turns` is set for lasting events. */
-  | { type: 'battleEventStarted'; eventId: BattleEventId; turns: number | null }
+  /** A global battle event fired. `rounds` is set for lasting events. */
+  | { type: 'battleEventStarted'; eventId: BattleEventId; rounds: number | null }
   | { type: 'battleEventEnded'; eventId: BattleEventId }
   /** The next battle event was announced. */
-  | { type: 'battleEventForecast'; eventId: BattleEventId; turn: number }
+  | { type: 'battleEventForecast'; eventId: BattleEventId; round: number }
   /**
    * The Twilight Fury began or grew (`level` 1, 2, 3...), at the start of a
    * round.
@@ -707,7 +728,7 @@ export interface PlayerView {
   /** Indexed by `PlayerId`, like `GameState.players`. */
   players: PlayerPublicState[];
   pending: PendingChoiceView | null;
-  activeEvent: { id: BattleEventId; turnsLeft: number } | null;
-  upcomingEvent: { id: BattleEventId; turn: number };
+  activeEvent: ActiveEvent | null;
+  upcomingEvent: UpcomingEvent;
   result: GameResult | null;
 }

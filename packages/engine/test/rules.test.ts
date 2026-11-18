@@ -47,7 +47,7 @@ describe('setup', () => {
     expect(state.players[1].resources).toEqual({ piedra: 10, acero: 10, mana: 10 });
     expect(state.players[0].resources).toEqual({ piedra: 8, acero: 8, mana: 8 });
     expect(events[0]).toMatchObject({ type: 'gameStarted', firstPlayer: 1 });
-    expect(state.upcomingEvent.turn).toBe(9);
+    expect(state.upcomingEvent.round).toBe(5);
   });
 
   it('builds the deck with copies by rarity', () => {
@@ -353,7 +353,7 @@ describe('enchantments', () => {
 
   it('lasts for the owner\'s next N turns and protects during N opponent turns', () => {
     let state = playCard(
-      scenario({ hand: ['fortaleza-viva'], keepTurn: false, rules: { eventEveryTurns: 1000 } }),
+      scenario({ hand: ['fortaleza-viva'], keepTurn: false, rules: { eventEveryRounds: 1000 } }),
       'fortaleza-viva',
     ).state;
     let protectedTurns = 0;
@@ -367,7 +367,7 @@ describe('enchantments', () => {
 
   it('an enchantment counted in attacks does not wear off with turns', () => {
     let state = playCard(
-      scenario({ hand: ['contrafuertes'], keepTurn: false, rules: { eventEveryTurns: 1000, twilightRound: 0 } }),
+      scenario({ hand: ['contrafuertes'], keepTurn: false, rules: { eventEveryRounds: 1000, twilightRound: 0 } }),
       'contrafuertes',
     ).state;
     for (let i = 0; i < 8; i++) state = pass(pass(state));

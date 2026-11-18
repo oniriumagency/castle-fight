@@ -13,7 +13,7 @@ export function openHowToPlay(): void {
     win: DEFAULT_RULES.keepWin,
     hand: DEFAULT_RULES.handSize,
     max: DEFAULT_RULES.maxEnchantments,
-    every: DEFAULT_RULES.eventEveryTurns,
+    every: DEFAULT_RULES.eventEveryRounds,
     ...twilightValues(DEFAULT_RULES),
   };
   modal(() =>
