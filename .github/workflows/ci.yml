@@ -40,3 +40,6 @@ jobs:
 
       - name: Random-playout report
         run: pnpm sim --games 1000
+
+      - name: AI balance report
+        run: pnpm balance --games 60

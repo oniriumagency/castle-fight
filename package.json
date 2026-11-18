@@ -11,6 +11,8 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "sim": "pnpm --filter @cardcraft-castles/engine sim",
+    "balance": "pnpm --filter @cardcraft-castles/ai balance",
+    "ladder": "pnpm --filter @cardcraft-castles/ai ladder",
     "dev:client": "pnpm --filter @cardcraft-castles/client dev",
     "dev:server": "pnpm --filter @cardcraft-castles/server dev"
   }
