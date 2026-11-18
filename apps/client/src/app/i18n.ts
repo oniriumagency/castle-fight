@@ -15,6 +15,8 @@ const STRINGS = {
   playOnlineHint: { es: 'Crea una sala o únete a una abierta', en: 'Create a room or join an open one' },
   playLocal: { es: 'Dos jugadores', en: 'Two players' },
   playLocalHint: { es: 'Por turnos en este dispositivo', en: 'Take turns on this device' },
+  playFfa: { es: 'Todos contra todos', en: 'Free-for-all' },
+  playFfaHint: { es: 'Prototipo: tú contra dos IA', en: 'Prototype: you against two AIs' },
   howToPlay: { es: 'Cómo se juega', en: 'How to play' },
   settings: { es: 'Ajustes', en: 'Settings' },
   nickname: { es: 'Tu apodo', en: 'Your nickname' },

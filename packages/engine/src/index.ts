@@ -21,10 +21,23 @@ export {
   isComboActive,
   isBoostActive,
   playBlocker,
+  choosesTargets,
+  cardNeedsTarget,
 } from './actions';
 export { getPlayerView, redactEvents } from './view';
-export { isConditionMet } from './effects';
-export { effectiveCost, costResource, attackBonus, wallDamageReduction, isSchoolBanned, other, ultimateThreshold } from './core';
+export { isConditionMet, effectsNeedTarget } from './effects';
+export {
+  effectiveCost,
+  costResource,
+  attackBonus,
+  wallDamageReduction,
+  isSchoolBanned,
+  other,
+  opponents,
+  alivePlayers,
+  leaderOf,
+  ultimateThreshold,
+} from './core';
 
 export {
   CARDS,

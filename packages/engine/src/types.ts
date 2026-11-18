@@ -19,7 +19,8 @@ export type PlayerId = number;
 /**
  * How cards that hit "the opponent" work when there are 3 or more players.
  *  - `choose`: the player picks one rival per card (the `target` of the action).
- *  - `all`: the card hits every living rival, scaled by `rules.multiAllScale`.
+ *  - `all` (default): the card hits every living rival, scaled by `rules.multiAllScale`.
+ *    No alliances are possible: hitting one rival always hits the other too.
  */
 export type MultiTargeting = 'choose' | 'all';
 export type Locale = 'es' | 'en';

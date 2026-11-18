@@ -70,6 +70,17 @@ Las cartas de una mano se identifican por `uid`, un número que se asigna al rob
 
 Cuatro efectos piden una decisión: qué recurso congelar (Aliento de Escarcha), qué carta descartar tras mirar la mano rival (Espía en la Corte), qué encantamiento destruir (Sabotaje, Disipar) y qué cartas de tu propia mano descartar (`discardOwn`, por ejemplo Ofrenda Arcana o Tierra Quemada). Los descartes propios se eligen de uno en uno; `pending.progress` dice cuántos llevas y cuántos quedan como máximo, y cuando el efecto dice «hasta N» la primera opción es `'done'`, que termina antes. Al jugarlos, `state.phase` pasa a `'choice'` y `state.pending` trae `kind` y `options`. El jugador responde con `{ type: 'choose', option }` y el efecto continúa. Si solo hay una opción válida se toma sola, y si no hay ninguna esa parte del efecto no hace nada. La primera opción de la lista es siempre la que se aplica por defecto si se agota el tiempo.
 
+### Todos contra todos (prototipo de 3 jugadores)
+
+`createGame` acepta 3 héroes. Se juega en círculo y un castillo cuyo Torreón cae a 0 queda eliminado (`playerEliminated`) y deja de jugar. Gana el último en pie o el primero que completa su Torreón. Con 2 jugadores nada cambia.
+
+Las cartas que afectan a «el rival» siguen `rules.multiTargeting`:
+
+- `all` (por defecto): golpean a todos los rivales vivos. Daño, robos, drenajes y turnos de Quemadura se multiplican por `rules.multiAllScale` (0,6), con redondeo y un mínimo de 1. Las elecciones sobre el rival toman su opción por defecto para cada uno. Cuando solo queda un rival, todo vuelve al 100 %.
+- `choose`: cada carta apunta a un rival (`target` en `play` y `ultimate`; `legalActions` da una acción por rival).
+
+`rules.leaderExtraDamage` suma daño a cada ataque contra el Torreón más alto y `rules.eliminationBounty` da recursos a quien derriba un castillo. Ambos valen 0 por defecto. `pnpm --filter @cardcraft-castles/ai ffa` compara las variantes con la IA.
+
 ### Reloj de turno
 
 El motor no tiene reloj. El servidor programa una alarma de `rules.turnSeconds` (30 s) al empezar cada turno (`state.turn` cambia) y, si salta, aplica `{ type: 'timeout' }`: las elecciones pendientes toman su opción por defecto, se descarta una carta al azar si el jugador aún no había jugado y el turno termina. El servidor nunca debe aceptar `timeout` de un cliente.

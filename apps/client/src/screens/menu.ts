@@ -81,6 +81,7 @@ export function menuScreen(): Screen {
           modeButton('sword', t('playAi'), t('playAiHint'), () => flow.heroSelect('ai')),
           modeButton('globe', t('playOnline'), t('playOnlineHint'), () => flow.lobby()),
           modeButton('users', t('playLocal'), t('playLocalHint'), () => flow.heroSelect('local')),
+          modeButton('sword', t('playFfa'), t('playFfaHint'), () => flow.ffa()),
         ),
         h(
           'div.menu-secondary',

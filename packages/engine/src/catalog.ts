@@ -57,7 +57,7 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   minWorkers: 1,
   eventKeepFloor: 1,
   turnLimit: 200,
-  multiTargeting: 'choose',
+  multiTargeting: 'all',
   multiAllScale: 0.6,
   leaderExtraDamage: 0,
   eliminationBounty: 0,
