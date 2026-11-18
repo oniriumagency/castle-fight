@@ -53,6 +53,11 @@ function clonePlayer(p: PlayerPublicState): PlayerPublicState {
 /** Cards shown in each player's played history. */
 const HISTORY_SIZE = 3;
 
+/** One state update's animations may take this long at most; then the board shows the result. */
+const MAX_ANIMATION_MS = 20_000;
+/** An action unanswered for this long no longer blocks the board. */
+const AWAIT_ANSWER_MS = 6000;
+
 const wait = (base: number): Promise<void> => new Promise((r) => setTimeout(r, base * animScale()));
 
 export function boardScreen(session: MatchSession): Screen {
@@ -95,6 +100,10 @@ class BoardScreen implements Screen {
   private queue: StateUpdate[] = [];
   private busy = false;
   private awaiting = false;
+  /** When the last action went out, to notice an answer that never comes. */
+  private awaitingSince = 0;
+  /** Closes the open choice dialog, if any. */
+  private closeChoice: (() => void) | null = null;
   private deadline: number | null = null;
   private lastTick = -1;
   private curtainFor: PlayerId | null = null;
@@ -204,6 +213,7 @@ class BoardScreen implements Screen {
       if (!document.hidden) return;
       this.tickTimer();
       this.tickPresence();
+      this.watchdog();
     }, 250);
   }
 
@@ -387,7 +397,11 @@ class BoardScreen implements Screen {
     try {
       while (this.queue.length && !this.destroyed) {
         const update = this.queue.shift()!;
-        await this.animate(update);
+        // An animation that never ends (a paused or throttled tab) must not freeze the board.
+        await Promise.race([
+          this.animate(update).catch((error: unknown) => console.error('Board animation failed', error)),
+          new Promise<void>((resolve) => setTimeout(resolve, MAX_ANIMATION_MS)),
+        ]);
         this.view = update.view;
         this.shown = [clonePlayer(update.view.players[0]), clonePlayer(update.view.players[1])];
         this.shownActive = update.view.active;
@@ -619,6 +633,7 @@ class BoardScreen implements Screen {
     if (starting) {
       this.resultsShown = false;
       this.closeEvent = null;
+      this.closeChoice = null;
       this.layer.replaceChildren();
       this.curtainFor = null;
       this.logList.replaceChildren();
@@ -1286,8 +1301,30 @@ class BoardScreen implements Screen {
     this.closeInspect?.();
     this.hand.select(null);
     this.awaiting = action.type !== 'concede';
+    this.awaitingSince = Date.now();
     this.render();
     this.session.act(action);
+  }
+
+  /**
+   * Never leave the player locked out. An action whose answer never came (the
+   * connection dropped as it went out) stops blocking the board after a few
+   * seconds and the board asks the server for the current state; a choice
+   * whose dialog was closed without an answer (the server refused it) opens
+   * again. Either one used to leave both players looking at "Wait for your turn".
+   */
+  private watchdog(): void {
+    if (this.destroyed || this.busy) return;
+    if (this.awaiting) {
+      if (Date.now() - this.awaitingSince < AWAIT_ANSWER_MS) return;
+      this.awaiting = false;
+      this.session.resync?.();
+      this.render();
+      return;
+    }
+    const view = this.view;
+    if (!view || this.closeChoice || this.curtain.hidden !== true) return;
+    if (view.phase === 'choice' && view.pending?.player === view.viewer && this.session.isLocal(view.viewer)) this.maybeChoose();
   }
 
   private tryPlay(uid: number): void {
@@ -1492,6 +1529,8 @@ class BoardScreen implements Screen {
     const pending = view.pending;
     if (view.phase !== 'choice' || !pending || pending.player !== view.viewer || !this.session.isLocal(view.viewer)) return;
     if (!pending.options.length) return;
+    // One dialog at a time: a resumed connection replays the same choice.
+    this.closeChoice?.();
     const titles = {
       frostResource: t('chooseFrost'),
       discardFromHand: t('chooseDiscard'),
@@ -1531,7 +1570,11 @@ class BoardScreen implements Screen {
     const wrap = h('div.choice', null, box);
     this.layer.appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add('in'));
-    const close = (): void => wrap.remove();
+    const close = (): void => {
+      if (this.closeChoice === close) this.closeChoice = null;
+      wrap.remove();
+    };
+    this.closeChoice = close;
   }
 
   private showCurtain(seat: PlayerId): void {

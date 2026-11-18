@@ -65,6 +65,8 @@ export interface MatchSession {
    * reload (online games resume mid-match). Null when there is nothing to keep.
    */
   statsKey?(): string | null;
+  /** Ask for the current state again (online: the server resends it). */
+  resync?(): void;
   /** Quick reactions; only present when the session supports them. */
   emote?(emote: string): void;
   leave(): void;
