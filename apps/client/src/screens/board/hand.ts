@@ -119,7 +119,11 @@ export class Hand {
     this.ctx = ctx;
     const keep = new Map(this.slots.map((s) => [s.uid, s]));
     const next: Slot[] = [];
+    const seen = new Set<number>();
     for (const card of cards) {
+      // Each card once: a uid twice would leave a stuck copy behind.
+      if (seen.has(card.uid)) continue;
+      seen.add(card.uid);
       let slot = keep.get(card.uid);
       if (slot && slot.cardId !== card.cardId) {
         slot.el.remove();
@@ -142,6 +146,11 @@ export class Hand {
     }
     for (const gone of keep.values()) gone.el.remove();
     this.slots = next;
+    // Anything else left in the hand (a card element that lost its slot) goes too.
+    const live = new Set(next.map((s) => s.el));
+    for (const child of Array.from(this.el.children)) {
+      if (child.classList.contains('hand-card') && !live.has(child as HTMLElement)) child.remove();
+    }
     if (this.preview && !this.slots.some((s) => s.uid === this.preview!.uid)) this.hidePreview();
     if (this.selected !== null && !this.slots.some((s) => s.uid === this.selected)) this.select(null);
     this.refreshStates();
