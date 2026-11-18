@@ -1,6 +1,6 @@
 import type { BattleEventId, GameEvent, HeroId, PlayerId, School } from '@cardcraft-castles/engine';
 import { getCard } from '@cardcraft-castles/engine';
-import { animScale } from '../app/settings';
+import { animScale, settings } from '../app/settings';
 import type { Battlefield, ProjectileStyle } from '../scene/battlefield';
 import { heroColor, skyFor } from '../ui/theme';
 import { audio, type Cue } from './audio';
@@ -116,6 +116,40 @@ function impact(field: Battlefield, at: Point, lost: number, color: number, styl
   if (big) field.burst(at.x, at.y + 40, { count: 8, texture: 'smoke', color: 0x6c5e4c, speed: 2.2, gravity: -0.015, size: 90, life: 2200, alpha: 0.55 });
 }
 
+/** The card being resolved is a legendary. */
+function legendaryNow(): boolean {
+  return currentCard !== null && getCard(currentCard).rarity === 'legendaria';
+}
+
+/** Castles already wrapped in holy fire by the current card (once per castle). */
+const blessed = new Set<string>();
+
+/**
+ * A legendary card that strengthens a castle wraps it in sacred fire: gold
+ * and orange flames that rise without burning, a warm column of light and
+ * embers floating up for a moment.
+ */
+function holyFire(seat: PlayerId, ctx: FxContext): void {
+  const key = `${currentCard}:${seat}`;
+  if (blessed.has(key)) return;
+  blessed.add(key);
+  const field = ctx.field;
+  const side = ctx.side(seat);
+  const base = field.anchor(side, 'base');
+  const keep = field.anchor(side, 'keep');
+  const height = Math.max(80, base.y - keep.y);
+  audio.play('ultimateReady', 0.6, { pan: pan(ctx, seat), gain: 0.8 });
+  field.rays(keep.x, keep.y + height * 0.3, 0xffb43c, 520, 2000, 0.4);
+  field.flare(keep.x, keep.y + height * 0.4, 0xffa23a, 300, 1200, 0.3);
+  field.ring(base.x, base.y - 10, 0xffc65a, 200, 1000, 0.6);
+  const wave = (i: number): void => {
+    field.burst(base.x, base.y - 8, { count: 14, texture: 'flame', color: [0xffc24a, 0xffa030], colorTo: 0xff4a10, speed: 2.4, angle: -Math.PI / 2, spread: 0.3, gravity: -0.07, size: 26, life: 1000, alpha: 0.7, area: { w: 180, h: 12 } });
+    field.burst(base.x, base.y - height * 0.4, { count: 8, texture: 'glow', color: [0xffc65a, 0xffe07a], speed: 1.2, angle: -Math.PI / 2, spread: 1, gravity: -0.05, size: 14, life: 1400, alpha: 0.8, area: { w: 170, h: height * 0.8 } });
+    if (i === 1) field.burst(keep.x, keep.y, { count: 16, texture: 'spark', color: [0xffe066, 0xffb43c], speed: 5, gravity: 0.05, drag: 0.95, size: 16, life: 700 });
+  };
+  for (let i = 0; i < 5; i++) setTimeout(() => wave(i), ms(i * 220));
+}
+
 export const fx = {
   /** A new turn: forget the last card. */
   turnStarted(mine: boolean, local: boolean): void {
@@ -131,6 +165,7 @@ export const fx = {
   /** The card lands big in the middle of the table (`at` in CSS px). */
   cardLanded(cardId: string, at: Point, combo: boolean, ctx: FxContext): Promise<void> {
     currentCard = cardId;
+    blessed.clear();
     const card = getCard(cardId);
     const color = SCHOOL_COLOR[card.school];
     const field = ctx.field;
@@ -162,6 +197,15 @@ export const fx = {
         field.shake(6);
         field.burst(at.x, at.y, { count: 50, texture: 'spark', color: [0xffe066, 0xff9a1f, 0xffffff], speed: 8, gravity: 0.06, drag: 0.95, size: 26, life: 1300 });
         field.burst(at.x, at.y, { count: 30, texture: 'flame', color: 0xffe080, colorTo: 0xff4a00, speed: 1.5, gravity: -0.05, size: 26, life: 1200, area: { w: 220, h: 300 } });
+        // A second wave: a fountain of gold and embers drifting up for a while.
+        field.ring(at.x, at.y, 0xfff1c0, 420, 1200, 0.6);
+        field.burst(at.x, at.y, { count: 40, color: [0xffe066, 0xffd27a, 0xfff4d0], speed: 5, angle: -Math.PI / 2, spread: 1.2, gravity: 0.08, drag: 0.97, size: 14, life: 1700, area: { w: 120, h: 40 } });
+        for (let i = 1; i <= 3; i++) {
+          setTimeout(() => {
+            field.burst(at.x, at.y + 60, { count: 14, texture: 'glow', color: [0xffd27a, 0xffb43c, 0xfff1c0], speed: 1.4, angle: -Math.PI / 2, spread: 1.6, gravity: -0.05, size: 18, life: 1500, area: { w: 320, h: 200 } });
+            field.burst(at.x, at.y, { count: 10, texture: 'spark', color: [0xffffff, 0xffe066], speed: 6, gravity: 0.05, drag: 0.95, size: 18, life: 800 });
+          }, ms(i * 260));
+        }
         return wait(450);
       default:
         return wait(0);
@@ -251,6 +295,7 @@ export const fx = {
   async built(seat: PlayerId, target: 'keep' | 'wall', amount: number, ctx: FxContext, heights: { keep: number; wall: number }): Promise<void> {
     const field = ctx.field;
     const side = ctx.side(seat);
+    if (legendaryNow()) holyFire(seat, ctx);
     const p = pan(ctx, seat);
     if (amount >= 15) audio.play('buildBig', 0.5, { pan: p });
     else audio.play('build', Math.min(1, amount / 14), { pan: p });
@@ -298,6 +343,7 @@ export const fx = {
       field.hitCastle(side, 0xa0e8ff, 0.2);
     } else if (kind === 'shield') {
       audio.play('shield', 0.5, { pan: p });
+      if (legendaryNow()) holyFire(seat, ctx);
       field.setShield(side, shield);
       const base = field.anchor(side, 'base');
       field.ring(at.x, base.y - (base.y - at.y) * 0.5, 0xaee8ff, 220, 800, 0.8);
@@ -364,6 +410,28 @@ export const fx = {
     field.burst(x, y, { count: 18, texture: 'glow', color: [0xffe9a8], speed: 1.2, gravity: -0.04, size: 22, life: 1600, area: { w: 380, h: 80 } });
     const at = field.anchor(ctx.side(seat), 'keep');
     field.ring(at.x, at.y, 0xffd27a, 120, 800, 0.7);
+  },
+
+  /**
+   * One beat of the golden aura while your ultimate is ready: sparks rising
+   * from the bottom and the sides of the screen, now and then a crackle of
+   * lightning along an edge. `strong`: you can fire it now.
+   */
+  ultimateAura(ctx: FxContext, strong: boolean): void {
+    if (settings.get().reducedMotion) return;
+    const field = ctx.field;
+    const w = window.innerWidth;
+    const hgt = window.innerHeight;
+    const k = strong ? 1 : 0.5;
+    field.burst(Math.random() * w, hgt + 6, { count: Math.round(7 * k), color: [0xffd27a, 0xffe9a8, 0xffb43c], speed: 3.2, angle: -Math.PI / 2, spread: 0.5, gravity: -0.05, drag: 0.985, size: 9, life: 1300, area: { w: w * 0.5, h: 10 } });
+    const left = Math.random() < 0.5;
+    field.burst(left ? 4 : w - 4, hgt * (0.35 + Math.random() * 0.6), { count: Math.round(4 * k), texture: 'glow', color: [0xffd27a, 0xfff1c0], speed: 1.6, angle: left ? -Math.PI / 2.6 : -Math.PI + Math.PI / 2.6, spread: 0.6, gravity: -0.04, size: 14, life: 1100, area: { w: 10, h: hgt * 0.3 } });
+    if (strong && Math.random() < 0.22) {
+      const top = Math.random() < 0.5;
+      const x = left ? 10 + Math.random() * 30 : w - 10 - Math.random() * 30;
+      const y0 = top ? hgt * 0.15 : hgt * (0.45 + Math.random() * 0.2);
+      field.lightning({ x, y: y0 }, { x: x + (left ? 1 : -1) * (20 + Math.random() * 40), y: y0 + 120 + Math.random() * 120 }, 0xffcf5a, 260);
+    }
   },
 
   async ultimate(seat: PlayerId, heroId: HeroId, ctx: FxContext): Promise<void> {
