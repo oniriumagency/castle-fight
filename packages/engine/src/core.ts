@@ -398,7 +398,12 @@ export function dealDamage(
     }
   }
 
-  if (kind === 'piercing' && t.drawbridge) kind = 'normal';
+  // Drawbridge: the next piercing attack is treated as normal damage, and lowers it.
+  if (kind === 'piercing' && t.drawbridge && options.attack) {
+    kind = 'normal';
+    t.drawbridge = false;
+    events.push({ type: 'drawbridgeLowered', player: target });
+  }
 
   if (options.attack && kind !== 'piercing' && t.wall > 0) {
     const reduction = wallDamageReduction(state, target);
