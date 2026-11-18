@@ -16,6 +16,7 @@ import { randomPick } from './rng';
 import { settle } from './turn';
 import type {
   Action,
+  Board,
   ActionResult,
   CardId,
   EngineError,
@@ -32,12 +33,12 @@ function fail(code: ErrorCode, message: string): EngineError {
 }
 
 /** The player who must act now, or null when the game is over. */
-export function currentPlayer(state: GameState): PlayerId | null {
+export function currentPlayer(state: Board): PlayerId | null {
   return state.phase === 'finished' ? null : state.active;
 }
 
 /** True if `player` has taken enough damage to use the hero ultimate. */
-export function isUltimateReady(state: GameState, player: PlayerId): boolean {
+export function isUltimateReady(state: Board, player: PlayerId): boolean {
   return state.players[player].ultimateCharge >= ultimateThreshold(state, player);
 }
 
@@ -46,7 +47,7 @@ export function isUltimateReady(state: GameState, player: PlayerId): boolean {
  * player played (this turn or last turn, with no discard in between) is of the
  * same school. Only cards with a Combo bonus care.
  */
-export function isComboActive(state: GameState, player: PlayerId, cardId: CardId): boolean {
+export function isComboActive(state: Board, player: PlayerId, cardId: CardId): boolean {
   return state.players[player].comboSchool === getCard(cardId).school;
 }
 
@@ -54,7 +55,7 @@ export function isComboActive(state: GameState, player: PlayerId, cardId: CardId
  * Why `player` cannot play `cardId` right now, ignoring whose turn it is.
  * Returns null when the card is playable. Useful to grey out cards in the UI.
  */
-export function playBlocker(state: GameState, player: PlayerId, cardId: CardId): EngineError | null {
+export function playBlocker(state: Board, player: PlayerId, cardId: CardId): EngineError | null {
   if (isSchoolBanned(state, cardId)) {
     return fail('schoolBanned', 'A battle event forbids cards of this school right now');
   }
@@ -213,10 +214,14 @@ export function applyAction(previous: GameState, action: Action): ActionResult {
  * Every action the player to move can take now (without `concede`, which is
  * always available, and `timeout`, which belongs to the server). Duplicate
  * cards in hand produce one action per copy.
+ *
+ * It accepts the full `GameState` or a `PlayerView`; with a view it answers
+ * for the viewer, so it is empty while the opponent is to move.
  */
-export function legalActions(state: GameState): Action[] {
+export function legalActions(state: Board): Action[] {
   if (state.phase === 'finished') return [];
   const player = state.active;
+  if (state.viewer !== undefined && state.viewer !== player) return [];
 
   if (state.phase === 'choice' && state.pending) {
     return state.pending.options.map((option) => ({ type: 'choose', player, option }));
@@ -225,7 +230,9 @@ export function legalActions(state: GameState): Action[] {
   const actions: Action[] = [];
   if (isUltimateReady(state, player)) actions.push({ type: 'ultimate', player });
   for (const card of state.players[player].hand) {
-    if (!playBlocker(state, player, card.cardId)) actions.push({ type: 'play', player, uid: card.uid });
+    if (card.cardId !== null && !playBlocker(state, player, card.cardId)) {
+      actions.push({ type: 'play', player, uid: card.uid });
+    }
   }
   for (const card of state.players[player].hand) {
     actions.push({ type: 'discard', player, uid: card.uid });

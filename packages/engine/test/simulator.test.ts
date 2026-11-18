@@ -5,6 +5,7 @@ import {
   HEROES,
   buildDeckList,
   getPlayerView,
+  legalActions,
   playGame,
   randomPolicy,
   redactEvents,
@@ -90,6 +91,8 @@ describe('random playouts', () => {
           expect(JSON.parse(JSON.stringify(view))).toEqual(view);
           const opponent = view.players[viewer === 0 ? 1 : 0];
           if (!opponent.handRevealed) expect(opponent.hand.every((c) => c.cardId === null)).toBe(true);
+          // A client can work out its own legal moves from its view alone.
+          expect(legalActions(view)).toEqual(viewer === state.active ? legalActions(state) : []);
         }
       },
     });

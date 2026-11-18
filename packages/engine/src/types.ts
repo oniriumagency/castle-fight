@@ -359,6 +359,37 @@ export interface GameState {
 }
 
 // ---------------------------------------------------------------------------
+// Board: the public part shared by `GameState` and `PlayerView`
+// ---------------------------------------------------------------------------
+
+export interface BoardPlayer {
+  hero: HeroId;
+  resources: ResourceMap;
+  enchantments: Enchantment[];
+  ultimateCharge: number;
+  ultimateUses: number;
+  lastPlayedCard: CardId | null;
+  comboSchool: School | null;
+  hand: VisibleCard[];
+}
+
+/**
+ * What the query helpers (`legalActions`, `effectiveCost`, `playBlocker`...)
+ * need to know. Both the server's `GameState` and a client's `PlayerView`
+ * fit, so the same helpers work on either side.
+ */
+export interface Board {
+  rules: Rules;
+  active: PlayerId;
+  phase: GamePhase;
+  players: [BoardPlayer, BoardPlayer];
+  pending: { player: PlayerId; options: string[] } | null;
+  activeEvent: { id: BattleEventId; turnsLeft: number } | null;
+  /** Present on a `PlayerView` only. */
+  viewer?: PlayerId;
+}
+
+// ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 
@@ -514,6 +545,7 @@ export interface PlayerPublicState {
   /** Charge needed for the next ultimate. */
   ultimateThreshold: number;
   ultimateReady: boolean;
+  ultimateUses: number;
   extraTurns: number;
   lastPlayedCard: CardId | null;
   comboSchool: School | null;

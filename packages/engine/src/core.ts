@@ -1,6 +1,7 @@
 import { RESOURCES, SCHOOL_RESOURCE, getBattleEvent, getCard, getEnchantmentModifiers, getHero } from './catalog';
 import { shuffle } from './rng';
 import type {
+  Board,
   CardId,
   ChangeReason,
   DamageKind,
@@ -67,7 +68,7 @@ export function cloneState(s: GameState): GameState {
 // ---------------------------------------------------------------------------
 
 /** Flat damage added to each attack of `player` (hero passive and enchantments). */
-export function attackBonus(state: GameState, player: PlayerId): number {
+export function attackBonus(state: Board, player: PlayerId): number {
   const p = state.players[player];
   let bonus = getHero(p.hero).passive.attackBonus ?? 0;
   for (const e of p.enchantments) bonus += getEnchantmentModifiers(e.cardId)?.attackBonus ?? 0;
@@ -75,7 +76,7 @@ export function attackBonus(state: GameState, player: PlayerId): number {
 }
 
 /** Damage removed from each attack that hits the Wall of `player`. */
-export function wallDamageReduction(state: GameState, player: PlayerId): number {
+export function wallDamageReduction(state: Board, player: PlayerId): number {
   let reduction = 0;
   for (const e of state.players[player].enchantments) {
     reduction += getEnchantmentModifiers(e.cardId)?.wallDamageReduction ?? 0;
@@ -84,17 +85,17 @@ export function wallDamageReduction(state: GameState, player: PlayerId): number 
 }
 
 /** Damage `player` must take to charge the next ultimate; it grows with every use. */
-export function ultimateThreshold(state: GameState, player: PlayerId): number {
+export function ultimateThreshold(state: Board, player: PlayerId): number {
   return state.rules.ultimateCharge + state.rules.ultimateChargeStep * state.players[player].ultimateUses;
 }
 
 /** Extra turns added to the Burn and Frost that `player` applies. */
-export function statusDurationBonus(state: GameState, player: PlayerId): number {
+export function statusDurationBonus(state: Board, player: PlayerId): number {
   return getHero(state.players[player].hero).passive.statusDurationBonus ?? 0;
 }
 
 /** True if a running battle event forbids playing this card. */
-export function isSchoolBanned(state: GameState, cardId: CardId): boolean {
+export function isSchoolBanned(state: Board, cardId: CardId): boolean {
   if (!state.activeEvent) return false;
   const effect = getBattleEvent(state.activeEvent.id).effect;
   return effect.kind === 'banSchool' && effect.school === getCard(cardId).school;
@@ -104,7 +105,7 @@ export function isSchoolBanned(state: GameState, cardId: CardId): boolean {
  * What `player` pays right now for `cardId`, after hero passives, enemy
  * enchantments and battle events. Never below 0.
  */
-export function effectiveCost(state: GameState, player: PlayerId, cardId: CardId): number {
+export function effectiveCost(state: Board, player: PlayerId, cardId: CardId): number {
   const card = getCard(cardId);
   let cost = card.cost;
 

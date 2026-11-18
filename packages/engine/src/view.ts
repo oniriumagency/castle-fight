@@ -33,6 +33,7 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: PlayerId): Pla
     ultimateCharge: p.ultimateCharge,
     ultimateThreshold: ultimateThreshold(state, player),
     ultimateReady: isUltimateReady(state, player),
+    ultimateUses: p.ultimateUses,
     extraTurns: p.extraTurns,
     lastPlayedCard: p.lastPlayedCard,
     comboSchool: p.comboSchool,

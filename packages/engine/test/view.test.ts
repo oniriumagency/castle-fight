@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { getPlayerView, redactEvents } from '../src/index';
+import {
+  effectiveCost,
+  getPlayerView,
+  isComboActive,
+  isUltimateReady,
+  legalActions,
+  playBlocker,
+  redactEvents,
+} from '../src/index';
 import { eventsOf, playCard, scenario } from '../src/testing';
 
 const ME = 0;
@@ -59,6 +67,22 @@ describe('player view', () => {
     expect(drawnForMe.cards.every((c) => c.cardId !== null)).toBe(true);
     expect(drawnForThem.cards.every((c) => c.cardId === null)).toBe(true);
     expect(drawnForThem.cards.map((c) => c.uid)).toEqual(drawnForMe.cards.map((c) => c.uid));
+  });
+
+  it('the query helpers work on a view just like on the full state', () => {
+    const state = scenario({
+      hand: ['parapeto', 'trabuquete-colosal', 'puntales'],
+      heroes: ['arquitecta', 'guardian'],
+      resources: 5,
+      you: { comboSchool: 'construccion', ultimateCharge: 20 },
+    });
+    const mine = getPlayerView(state, ME);
+    expect(legalActions(mine)).toEqual(legalActions(state));
+    expect(legalActions(getPlayerView(state, OPP))).toEqual([]);
+    expect(effectiveCost(mine, ME, 'parapeto')).toBe(3);
+    expect(playBlocker(mine, ME, 'trabuquete-colosal')!.code).toBe('cannotAfford');
+    expect(isComboActive(mine, ME, 'puntales')).toBe(true);
+    expect(isUltimateReady(mine, ME)).toBe(true);
   });
 
   it('exposes what the UI needs about the ultimate and the next event', () => {
