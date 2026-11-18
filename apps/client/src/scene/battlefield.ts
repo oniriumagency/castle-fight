@@ -114,7 +114,10 @@ function lerpColor(a: number, b: number, t: number): number {
 
 export class Battlefield {
   readonly tweens: Tweens;
-  readonly castles: [Castle, Castle];
+  /** Every castle the scene can show; only the first `count` are on the field. */
+  readonly castles: Castle[];
+  /** Castles on the field: two in a duel, three in a free-for-all. */
+  private count = 2;
   /** Layer above the castles for effects. */
   readonly fxLayer = new Container();
 
@@ -137,7 +140,8 @@ export class Battlefield {
   private readonly flareTex: Texture;
   private readonly bolts = new Graphics();
   private readonly flashOverlay = new Graphics();
-  private readonly auras: [Aura, Aura] = [
+  private readonly auras: Aura[] = [
+    { burn: 0, frost: 0, danger: 0, timer: 0 },
     { burn: 0, frost: 0, danger: 0, timer: 0 },
     { burn: 0, frost: 0, danger: 0, timer: 0 },
   ];
@@ -156,7 +160,8 @@ export class Battlefield {
   private maxPoints = DEFAULT_RULES.keepWin;
   private lastRect: FieldRect | undefined;
   private weatherTimer = 0;
-  private castleTargets: [{ keep: number; wall: number }, { keep: number; wall: number }] = [
+  private castleTargets: { keep: number; wall: number }[] = [
+    { keep: 30, wall: 10 },
     { keep: 30, wall: 10 },
     { keep: 30, wall: 10 },
   ];
@@ -185,15 +190,36 @@ export class Battlefield {
     }
     const textures = { keepStone: stoneTexture(KEEP_STONE), wallStone: stoneTexture(WALL_STONE), shade: towerShadeTexture() };
     // Each castle is drawn in its hero's style; the menu shows two contrasting ones.
-    this.castles = [new Castle(1, textures, 0xc8963e, 'arquitecta'), new Castle(-1, textures, 0xa8322d, 'mariscal')];
+    // The third castle only stands in a free-for-all: in the middle, facing the player.
+    this.castles = [
+      new Castle(1, textures, 0xc8963e, 'arquitecta'),
+      new Castle(-1, textures, 0xa8322d, 'mariscal'),
+      new Castle(-1, textures, 0x3f6fb0, 'guardian'),
+    ];
+    this.castles[2].visible = false;
 
     this.world.addChild(this.skyA, this.skyB, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
-    this.world.addChild(this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
+    this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
     this.skyB.alpha = 0;
 
     app.ticker.add((t) => this.update(t.deltaMS));
+  }
+
+  /** Two castles for a duel, three for a free-for-all (the third stands in the middle). */
+  setCount(count: number): void {
+    const next = Math.max(2, Math.min(3, count));
+    if (next === this.count) return;
+    this.count = next;
+    this.castles[2].visible = next > 2;
+    if (next === 2) this.setAura(2, { burn: 0, frost: 0, danger: 0 });
+    this.layout(this.lastRect);
+  }
+
+  /** Castles on the field. */
+  get castleCount(): number {
+    return this.count;
   }
 
   /** Lays out the scene. `field` is the free area between the HUD panels (CSS px). */
@@ -225,11 +251,14 @@ export class Battlefield {
 
     // The castles fit a winning Keep in the field, leaving room for the roof.
     const sideRoom = Math.min(rect.width * 0.23, 260);
-    const keepWidth = Math.max(34, Math.min(rect.width * 0.075, 96));
+    const three = this.count > 2;
+    const keepWidth = Math.max(three ? 28 : 34, Math.min(rect.width * (three ? 0.062 : 0.075), three ? 84 : 96));
     const unit = Math.max(1.2, (rect.height * 0.94 - keepWidth * 2.2) / this.maxPoints);
     const common = { groundY: this.groundY, unit, keepWidth, wallWidth: keepWidth * 0.42, gap: keepWidth * 0.55, maxPoints: this.maxPoints * 1.1 };
     this.castles[0].setLayout({ ...common, x: rect.left + sideRoom * 0.75 });
     this.castles[1].setLayout({ ...common, x: rect.left + rect.width - sideRoom * 0.75 });
+    // The middle castle sits a little right of centre so its Wall (facing left) stays clear of the others.
+    this.castles[2].setLayout({ ...common, x: rect.left + rect.width * 0.56 });
 
     this.flashOverlay.clear().rect(0, 0, this.width, this.height).fill({ color: 0xffffff });
     this.flashOverlay.alpha = 0;
@@ -305,15 +334,13 @@ export class Battlefield {
       });
   }
 
-  setBanners(colors: [number, number]): void {
-    this.castles[0].setBanner(colors[0]);
-    this.castles[1].setBanner(colors[1]);
+  setBanners(colors: number[]): void {
+    colors.forEach((color, i) => this.castles[i]?.setBanner(color));
   }
 
   /** Draws each castle in its hero's style (towers, roofs, stone) with the hero's banner colour. */
-  setHeroes(heroes: [string, string]): void {
-    this.castles[0].setHero(heroes[0]);
-    this.castles[1].setHero(heroes[1]);
+  setHeroes(heroes: string[]): void {
+    heroes.forEach((hero, i) => this.castles[i]?.setHero(hero));
   }
 
   /** Scene tops of every standing tower of a castle, Keep first (screen CSS px). */
@@ -322,9 +349,11 @@ export class Battlefield {
   }
 
   /** Jump straight to these heights (new game, resume, layout). */
-  setCastles(values: [{ keep: number; wall: number }, { keep: number; wall: number }]): void {
-    this.castleTargets = [{ ...values[0] }, { ...values[1] }];
-    this.castles.forEach((c, i) => c.setHeights(values[i].keep, values[i].wall));
+  setCastles(values: { keep: number; wall: number }[]): void {
+    values.forEach((v, i) => {
+      this.castleTargets[i] = { ...v };
+      this.castles[i]?.setHeights(v.keep, v.wall);
+    });
   }
 
   /** Grow or shrink one castle smoothly. */
@@ -344,7 +373,8 @@ export class Battlefield {
   domePoint(player: PlayerId, from: PlayerId): { x: number; y: number } | null {
     const d = this.castles[player].dome;
     if (!d) return null;
-    const dir = from === player ? 0 : player === 1 ? -1 : 1;
+    // The hit comes from the attacker's side of the dome.
+    const dir = from === player ? 0 : this.castles[from]!.x < this.castles[player]!.x ? -1 : 1;
     const a = (dir === 0 ? 90 : 48) * (Math.PI / 180);
     return { x: d.cx + dir * Math.cos(a) * d.rx + this.world.x, y: d.gy - Math.sin(a) * d.ry + this.world.y };
   }
@@ -767,8 +797,8 @@ export class Battlefield {
   /** Flames, frost and danger smoke on the castles. */
   private updateAuras(dt: number): void {
     if (settings.get().reducedMotion) return;
-    for (const player of [0, 1] as const) {
-      const aura = this.auras[player];
+    for (let player = 0; player < this.count; player++) {
+      const aura = this.auras[player]!;
       const dome = this.castles[player].dome;
       if (!aura.burn && !aura.danger && !aura.frost && !dome) continue;
       aura.timer += dt;

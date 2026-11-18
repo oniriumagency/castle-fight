@@ -14,7 +14,10 @@ export interface ResultsOptions {
   session: MatchSession;
   view: PlayerView;
   stats: MatchStats;
-  seatSide: (seat: PlayerId) => 0 | 1;
+  /** Seats in screen order: the player first, then the rivals. */
+  seatsBySide: PlayerId[];
+  /** Free-for-all: the player's castle fell while the rivals play on (the game is not over). */
+  fallen?: boolean;
   name: (seat: PlayerId) => string;
   onExit: () => void;
   getPresence: () => Presence | null;
@@ -55,17 +58,22 @@ function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 
 
 /** End of game: victory or defeat banner, why it ended, match statistics and what next. */
 export function showResults(o: ResultsOptions): void {
-  const result = o.view.result!;
-  const winner = result.winner;
+  const result = o.view.result ?? { winner: null, reason: 'keepDestroyed' as const };
+  const winner = o.fallen ? null : result.winner;
   const shared = o.session.kind === 'local';
+  const seats = o.seatsBySide;
+  const multi = seats.length > 2;
   let outcome: 'victory' | 'defeat' | 'draw';
-  if (winner === null) outcome = 'draw';
+  if (o.fallen) outcome = 'defeat';
+  else if (winner === null) outcome = 'draw';
   else if (shared) outcome = 'victory';
   else outcome = o.session.isLocal(winner) ? 'victory' : 'defeat';
 
-  const title = winner === null ? t('draw') : shared ? t('winsTitle', { who: o.name(winner) }) : t(outcome);
-  const loser = winner === null ? null : ((1 - winner) as PlayerId);
+  const title = o.fallen ? t('defeat') : winner === null ? t('draw') : shared ? t('winsTitle', { who: o.name(winner) }) : t(outcome);
+  const loser = winner === null || multi ? null : seats.find((s) => s !== winner)!;
   const reason = (() => {
+    if (o.fallen) return t('reasonYouFell');
+    if (multi && winner !== null && result.reason !== 'keepBuilt') return t('reasonLastStanding', { who: o.name(winner) });
     switch (result.reason) {
       case 'keepBuilt':
         return winner !== null ? t('reasonKeepBuilt', { who: o.name(winner) }) : '';
@@ -80,10 +88,13 @@ export function showResults(o: ResultsOptions): void {
     }
   })();
 
-  const seats: PlayerId[] = o.seatSide(0) === 0 ? [0, 1] : [1, 0];
-  const headToHead = keepRecord(o, seats[1], outcome);
+  // The win/loss record and head-to-head count duels only.
+  const headToHead = multi ? null : keepRecord(o, seats[1], outcome);
   const row = (label: string, value: (seat: PlayerId) => number | string): HTMLElement =>
-    h('tr', null, h('td', null, String(value(seats[0]))), h('th', { scope: 'row' }, label), h('td', null, String(value(seats[1]))));
+    multi
+      ? h('tr', null, h('th', { scope: 'row' }, label), seats.map((seat) => h('td', null, String(value(seat)))))
+      : h('tr', null, h('td', null, String(value(seats[0]))), h('th', { scope: 'row' }, label), h('td', null, String(value(seats[1]))));
+  const stat = (seat: PlayerId) => o.stats.players[seat] ?? { damageDealt: 0, built: 0, biggestHit: 0, cardsPlayed: 0, ultimates: 0 };
 
   const rematchBtn = h('button.btn.primary.big', { type: 'button' }, t('rematch'));
   const rematchNote = h('p.rematch-note');
@@ -92,14 +103,14 @@ export function showResults(o: ResultsOptions): void {
     o.session.rematch();
     if (o.session.kind === 'online') {
       rematchBtn.disabled = true;
-      rematchNote.textContent = t('waitingOpponent', { who: o.name(seats[1]) });
+      rematchNote.textContent = multi ? t('waitingOthers') : t('waitingOpponent', { who: o.name(seats[1]) });
     }
   });
 
   const hideBtn = h('button.btn.ghost', { type: 'button' }, t('viewBoard'));
   const box = h(
     'div.results-box.panel',
-    { class: outcome },
+    { class: `${outcome}${multi ? ' multi' : ''}` },
     h('div.results-crest', null, h('h1', null, title), h('p', null, reason)),
     h(
       'div.results-heroes',
@@ -107,7 +118,7 @@ export function showResults(o: ResultsOptions): void {
       seats.map((seat) =>
         h(
           'div.results-hero',
-          { class: seat === winner ? 'winner' : '', style: `--hero:${heroCss(o.view.players[seat].hero)}` },
+          { class: seat === winner ? 'winner' : o.view.players[seat].eliminated ? 'fallen' : '', style: `--hero:${heroCss(o.view.players[seat].hero)}` },
           h('img', { src: artUrl(getHero(o.view.players[seat].hero).art), alt: '' }),
           h('strong', null, o.name(seat)),
           h('small', null, L(getHero(o.view.players[seat].hero).name)),
@@ -122,11 +133,11 @@ export function showResults(o: ResultsOptions): void {
         'tbody',
         null,
         row(t('statTurns'), () => o.stats.turns || o.view.turn),
-        row(t('statDamage'), (s) => o.stats.players[s].damageDealt),
-        row(t('statBuilt'), (s) => o.stats.players[s].built),
-        row(t('statBest'), (s) => o.stats.players[s].biggestHit),
-        row(t('statCards'), (s) => o.stats.players[s].cardsPlayed),
-        row(t('statUltimates'), (s) => o.stats.players[s].ultimates),
+        row(t('statDamage'), (s) => stat(s).damageDealt),
+        row(t('statBuilt'), (s) => stat(s).built),
+        row(t('statBest'), (s) => stat(s).biggestHit),
+        row(t('statCards'), (s) => stat(s).cardsPlayed),
+        row(t('statUltimates'), (s) => stat(s).ultimates),
       ),
     ),
     rematchNote,
@@ -152,22 +163,25 @@ export function showResults(o: ResultsOptions): void {
     const timer = setInterval(() => {
       if (!wrap.isConnected) return clearInterval(timer);
       const presence = o.getPresence();
-      const opp = presence?.seats[seats[1]];
-      if (opp?.left) {
+      // Free-for-all: everyone else must stay; the first one asking is announced.
+      const others = seats.slice(1).map((seat) => ({ seat, p: presence?.seats[seat] ?? null }));
+      const asker = others.find((x) => x.p?.wantsRematch);
+      const opp = { left: others.some((x) => x.p?.left), wantsRematch: !!asker };
+      if (opp.left) {
         rematchBtn.disabled = true;
         rematchBtn.classList.remove('accept');
         rematchNote.classList.remove('request');
         rematchNote.textContent = t('connectionLost');
-      } else if (opp?.wantsRematch && !rematchBtn.disabled && !announced) {
+      } else if (opp.wantsRematch && !rematchBtn.disabled && !announced) {
         announced = true;
-        const message = t('rematchRequested', { who: o.name(seats[1]) });
+        const message = t('rematchRequested', { who: o.name(asker!.seat) });
         rematchNote.replaceChildren(html(iconSvg('sword')), h('span', null, message));
         rematchNote.classList.add('request');
         rematchBtn.textContent = t('acceptRematch');
         rematchBtn.classList.add('accept');
         audio.play('emote');
         callAttention(`⚔ ${message}`, t('acceptRematchHint'));
-      } else if (!opp?.wantsRematch && announced && !rematchBtn.disabled) {
+      } else if (!opp.wantsRematch && announced && !rematchBtn.disabled) {
         // The opponent took it back (left the results): back to the plain button.
         announced = false;
         rematchNote.replaceChildren();

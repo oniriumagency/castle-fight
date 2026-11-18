@@ -1172,8 +1172,8 @@
         "en": "Travelling Market"
       },
       "text": {
-        "es": "Ambos jugadores ganan 5 de cada recurso.",
-        "en": "Both players gain 5 of each resource."
+        "es": "Todos los jugadores ganan 5 de cada recurso.",
+        "en": "Every player gains 5 of each resource."
       },
       "art": "events/mercado.jpg"
     },
@@ -1196,8 +1196,8 @@
         "en": "Earthquake"
       },
       "text": {
-        "es": "Ambos Castillos pierden 7.",
-        "en": "Both Castles lose 7."
+        "es": "Todos los Castillos pierden 7.",
+        "en": "Every Castle loses 7."
       },
       "art": "events/terremoto.jpg"
     },
@@ -1208,8 +1208,8 @@
         "en": "Great Harvest"
       },
       "text": {
-        "es": "Ambos jugadores ganan 1 trabajador al azar.",
-        "en": "Both players gain 1 random worker."
+        "es": "Todos los jugadores ganan 1 trabajador al azar.",
+        "en": "Every player gains 1 random worker."
       },
       "art": "events/cosecha.jpg"
     },

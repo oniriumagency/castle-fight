@@ -4,7 +4,6 @@ import {
   getBattleEvent,
   getCard,
   getHero,
-  other,
   twilightLevel,
   type GameEvent,
   type HeroId,
@@ -83,10 +82,14 @@ export function boardScreen(session: MatchSession): Screen {
 class BoardScreen implements Screen {
   readonly el: HTMLElement;
   private readonly field = battlefield();
-  private readonly panels: [SidePanel, SidePanel] = [new SidePanel(0), new SidePanel(1)];
-  private readonly plaques: [CastlePlaque, CastlePlaque];
+  /** Players at the table: two in a duel, three in a free-for-all. */
+  private readonly count: number;
+  /** One per side: 0 is the player (left), 1 the right castle, 2 the middle one (free-for-all). */
+  private readonly panels: SidePanel[];
+  private readonly plaques: CastlePlaque[];
   private readonly hand = new Hand();
-  private readonly oppHand = h('div.opp-hand', { 'aria-label': 'opponent hand' });
+  /** Each rival's hand (by side; side 0 has none). */
+  private readonly oppHands: HTMLElement[];
   private readonly stage = h('div.play-stage');
   private readonly floaters = h('div.floaters', { 'aria-hidden': 'true' });
   private readonly banner = h('div.turn-banner', { 'aria-live': 'polite' });
@@ -103,7 +106,7 @@ class BoardScreen implements Screen {
   private readonly statusBar = h('div.conn-status', { hidden: true });
 
   private view: PlayerView | null = null;
-  private shown: [PlayerPublicState, PlayerPublicState] | null = null;
+  private shown: PlayerPublicState[] | null = null;
   private shownActive: PlayerId = 0;
   private handSeat: PlayerId | null = null;
   private handModel: VisibleCard[] = [];
@@ -127,10 +130,18 @@ class BoardScreen implements Screen {
   private resultsShown = false;
   private presence: Presence | null = null;
   private destroyed = false;
+  /** Free-for-all against the AI: the defeat was shown when the player's castle fell. */
+  private fallenShown = false;
 
   constructor(private readonly session: MatchSession) {
     const keepWin = DEFAULT_RULES.keepWin;
-    this.plaques = [new CastlePlaque(0, keepWin), new CastlePlaque(1, keepWin)];
+    this.count = Math.max(2, session.seats.length);
+    const sides = Array.from({ length: this.count }, (_, side) => side);
+    this.panels = sides.map((side) => new SidePanel(side));
+    this.plaques = sides.map((side) => new CastlePlaque(side, keepWin));
+    this.oppHands = sides.map((side) => h('div.opp-hand', { class: `opp-hand-${side}`, 'aria-label': 'opponent hand', hidden: side === 0 }));
+    this.history = sides.map(() => []);
+    this.shownHistory = sides.map(() => []);
     this.logPanel = h('aside.log-panel', { hidden: true }, h('h3', null, t('log')), this.logList);
 
     const menuBtn = h('button.btn.icon-only.menu-btn', { type: 'button', 'aria-label': t('menu'), onclick: () => this.openMenu() }, html(iconSvg('menu')));
@@ -171,12 +182,13 @@ class BoardScreen implements Screen {
 
     this.el = h(
       'div.board',
-      { class: `mode-${session.kind}` },
+      { class: `mode-${session.kind}${this.count > 2 ? ' ffa' : ''}` },
       h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), h('div.event-box', null, this.eventChip, this.twilightChip), h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
       this.panels[0].el,
-      this.panels[1].el,
-      h('div.board-field', null, this.plaques[0].el, this.plaques[1].el, h('div.piles', null, this.deckPile, this.discardPile)),
-      this.oppHand,
+      // Free-for-all: the rivals' panels stack in one column, so either can grow without covering the other.
+      this.count > 2 ? h('div.rival-column', null, ...this.panels.slice(1).map((p) => p.el)) : this.panels[1].el,
+      h('div.board-field', null, ...this.plaques.map((p) => p.el), h('div.piles', null, this.deckPile, this.discardPile)),
+      ...this.oppHands.slice(1),
       this.stage,
       this.hand.el,
       this.floaters,
@@ -214,7 +226,8 @@ class BoardScreen implements Screen {
   mount(): void {
     audio.music('battle');
     void preloadArt([...this.session.seats.map((s) => getHero(s.hero).art)]);
-    this.field.setHeroes([this.session.seats[this.seatOfSide(0)].hero, this.session.seats[this.seatOfSide(1)].hero]);
+    this.field.setCount(this.count);
+    this.field.setHeroes(this.sides().map((side) => this.session.seats[this.seatOfSide(side)].hero));
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
     window.addEventListener('keydown', this.onKey);
@@ -248,10 +261,12 @@ class BoardScreen implements Screen {
     this.closeInspect?.();
     this.session.leave();
     void this.field.setMood(skyFor(null), 600);
-    this.field.setShield(0, 0);
-    this.field.setShield(1, 0);
-    this.field.setAura(0, { burn: 0, frost: 0, danger: 0 });
-    this.field.setAura(1, { burn: 0, frost: 0, danger: 0 });
+    for (const side of this.sides()) {
+      this.field.setShield(side, 0);
+      this.field.setAura(side, { burn: 0, frost: 0, danger: 0 });
+    }
+    // The menu shows a duel.
+    this.field.setCount(2);
     audio.setTension(0);
   }
 
@@ -271,20 +286,34 @@ class BoardScreen implements Screen {
   /** Seat shown on the left: the local player, or player 1 on a shared device. */
   private get leftSeat(): PlayerId {
     if (this.session.kind === 'local') return 0;
-    if (this.session.isLocal(1) && !this.session.isLocal(0)) return 1;
-    return 0;
+    return this.seats().find((seat) => this.session.isLocal(seat)) ?? 0;
   }
 
-  private sideOf(seat: PlayerId): 0 | 1 {
-    return seat === this.leftSeat ? 0 : 1;
+  /** Rivals follow in turn order: the next to play on the right, the one after in the middle. */
+  private sideOf(seat: PlayerId): number {
+    return (seat - this.leftSeat + this.count) % this.count;
+  }
+
+  private sides(): number[] {
+    return this.panels.map((_, side) => side);
+  }
+
+  /** Every seat, in seat order. */
+  private seats(): PlayerId[] {
+    return this.panels.map((_, seat) => seat);
+  }
+
+  /** The rival a choice is about: the one named by the choice, or the next to play. */
+  private rivalOf(seat: PlayerId, target?: PlayerId | null): PlayerId {
+    return target ?? (seat + 1) % this.count;
   }
 
   private heroOf(seat: PlayerId): HeroId {
     return this.view?.players[seat].hero ?? this.session.seats[seat].hero;
   }
 
-  private seatOfSide(side: 0 | 1): PlayerId {
-    return side === 0 ? this.leftSeat : other(this.leftSeat);
+  private seatOfSide(side: number): PlayerId {
+    return (this.leftSeat + side) % this.count;
   }
 
   private name(seat: PlayerId): string {
@@ -339,7 +368,8 @@ class BoardScreen implements Screen {
     this.el.classList.toggle('touch', touch);
 
     const left = this.panels[0].el.getBoundingClientRect();
-    const right = this.panels[1].el.getBoundingClientRect();
+    // Free-for-all: both rivals' panels share a column on the right.
+    const right = (this.el.querySelector('.rival-column') ?? this.panels[1].el).getBoundingClientRect();
     const top = this.el.querySelector('.topbar')!.getBoundingClientRect();
     // Top of the resting hand, plus room for the castle plaques.
     const handTop = hgt - 6 - cardW * 1.4 * (1 - peek) - (phonePortrait ? 6 : 0);
@@ -351,9 +381,16 @@ class BoardScreen implements Screen {
     this.field.layout(rect);
     const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
     Object.assign(fieldEl.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
-    for (const side of [0, 1] as const) {
+    for (const side of this.sides()) {
       const base = this.field.anchor(side, 'base');
       this.plaques[side].place(base.x - rect.left, base.y - rect.top + 4);
+    }
+    // Free-for-all: each rival's hand hangs above their castle.
+    if (this.count > 2) {
+      for (const side of this.sides().slice(1)) {
+        const keep = this.field.anchor(side, 'base');
+        this.oppHands[side].style.left = `${keep.x}px`;
+      }
     }
     const deck = this.deckPile.getBoundingClientRect();
     this.hand.deckPoint = { x: deck.left, y: deck.top };
@@ -361,14 +398,17 @@ class BoardScreen implements Screen {
     if (this.shown) this.field.setCastles(this.castleValues());
   }
 
-  private castleValues(): [{ keep: number; wall: number }, { keep: number; wall: number }] {
+  /** Castle heights by side. */
+  private castleValues(): { keep: number; wall: number }[] {
     const s = this.shown!;
-    const a = s[this.seatOfSide(0)];
-    const b = s[this.seatOfSide(1)];
-    return [
-      { keep: a.keep, wall: a.wall },
-      { keep: b.keep, wall: b.wall },
-    ];
+    return this.sides().map((side) => {
+      const p = s[this.seatOfSide(side)];
+      return { keep: p.keep, wall: p.wall };
+    });
+  }
+
+  private setShields(view: PlayerView): void {
+    for (const seat of this.seats()) this.field.setShield(this.sideOf(seat), view.players[seat].shield);
   }
 
   // ---------------------------------------------------------------------------
@@ -437,7 +477,7 @@ class BoardScreen implements Screen {
         ]);
         if (timedOut) reportProblem('animationTimeout', 'An update took too long to animate', { events: kinds.slice(0, 40), ...this.snapshot() });
         this.view = update.view;
-        this.shown = [clonePlayer(update.view.players[0]), clonePlayer(update.view.players[1])];
+        this.shown = update.view.players.map(clonePlayer);
         this.shownActive = update.view.active;
       }
     } finally {
@@ -445,8 +485,7 @@ class BoardScreen implements Screen {
     }
     if (this.destroyed || !this.view) return;
     this.field.setCastles(this.castleValues());
-    this.field.setShield(this.sideOf(0), this.view.players[0].shield);
-    this.field.setShield(this.sideOf(1), this.view.players[1].shield);
+    this.setShields(this.view);
     this.handSeat = this.view.viewer;
     this.handModel = [...this.view.players[this.view.viewer].hand];
     this.render();
@@ -463,19 +502,21 @@ class BoardScreen implements Screen {
       if (!this.resultsShown) {
         this.resultsShown = true;
         const winner = view.result.winner;
-        fx.gameOver(winner === null ? null : this.session.kind === 'local' ? true : this.session.isLocal(winner), winner === null ? null : this.sideOf(winner), this.fxContext());
-        showResults({
-          host: this.layer,
-          session: this.session,
-          view,
-          stats: this.stats,
-          seatSide: (seat) => this.sideOf(seat),
-          name: (seat) => this.name(seat),
-          onExit: () => this.exit(),
-          getPresence: () => this.presence,
-        });
+        const announce = !this.fallenShown;
+        if (announce) fx.gameOver(winner === null ? null : this.session.kind === 'local' ? true : this.session.isLocal(winner), winner === null ? null : this.sideOf(winner), this.fxContext());
+        // After an early defeat the results are already up: only the rivals' fight ended.
+        if (!this.fallenShown) this.openResults(view);
       }
       return;
+    }
+
+    // Free-for-all against the AI: when your castle falls the defeat shows at once
+    // (the AIs play on behind it; "view board" shows how it ends).
+    if (this.session.kind === 'ai' && view.players[view.viewer].eliminated && !this.fallenShown) {
+      this.fallenShown = true;
+      this.resultsShown = true;
+      fx.gameOver(false, null, this.fxContext());
+      this.openResults(view, true);
     }
 
     if (this.session.kind === 'local' && this.curtainFor !== view.viewer) {
@@ -484,6 +525,20 @@ class BoardScreen implements Screen {
     }
     this.maybeChoose();
     this.session.idle();
+  }
+
+  private openResults(view: PlayerView, fallen = false): void {
+    showResults({
+      host: this.layer,
+      session: this.session,
+      view,
+      stats: this.stats,
+      seatsBySide: this.sides().map((side) => this.seatOfSide(side)),
+      fallen,
+      name: (seat) => this.name(seat),
+      onExit: () => this.exit(),
+      getPresence: () => this.presence,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -512,7 +567,7 @@ class BoardScreen implements Screen {
       return;
     }
     const canAct = this.canAct();
-    for (const seat of [0, 1] as const) {
+    for (const seat of this.seats()) {
       const side = this.sideOf(seat);
       const p = this.shown[seat];
       this.panels[side].update(p, {
@@ -536,32 +591,9 @@ class BoardScreen implements Screen {
     this.hand.render(this.handModel, { view, seat: handSeat, canAct });
     this.refreshInspect?.();
 
-    // Opponent's hand: backs, or faces when revealed.
-    const opp = this.shown[other(handSeat)];
-    const oppCards = opp.hand;
-    const oppHero = this.heroOf(other(handSeat));
-    if (this.oppHand.childElementCount !== oppCards.length || this.oppHand.dataset.key !== JSON.stringify(oppCards)) {
-      this.oppHand.dataset.key = JSON.stringify(oppCards);
-      if (this.pilePreview && !this.discardPile.matches(':hover')) this.hidePilePreview();
-      this.oppHand.replaceChildren(
-        ...oppCards.map((c) => {
-          const el = c.cardId ? cardFace(c.cardId, { calm: true, hero: oppHero }) : cardBack();
-          el.dataset.uid = String(c.uid);
-          if (c.cardId) {
-            const id = c.cardId;
-            el.classList.add('revealed');
-            el.addEventListener('click', () => {
-              this.hidePilePreview();
-              this.inspectCard(id, oppHero);
-            });
-            el.addEventListener('pointerenter', (e) => {
-              if (e.pointerType === 'mouse') this.showCardPreview(id, el.getBoundingClientRect(), 'below', oppHero);
-            });
-            el.addEventListener('pointerleave', () => this.hidePilePreview());
-          }
-          return el;
-        }),
-      );
+    // Rivals' hands: backs, or faces when revealed.
+    for (const oppSeat of this.seats()) {
+      if (oppSeat !== handSeat) this.renderOppHand(oppSeat);
     }
 
     // Piles.
@@ -599,6 +631,34 @@ class BoardScreen implements Screen {
     this.twilightChip.title = `${t('twilightName')}: ${line}`;
   }
 
+  private renderOppHand(seat: PlayerId): void {
+    const el = this.oppHands[this.sideOf(seat)];
+    const oppCards = this.shown![seat].hand;
+    const oppHero = this.heroOf(seat);
+    if (el.childElementCount === oppCards.length && el.dataset.key === JSON.stringify(oppCards)) return;
+    el.dataset.key = JSON.stringify(oppCards);
+    if (this.pilePreview && !this.discardPile.matches(':hover')) this.hidePilePreview();
+    el.replaceChildren(
+      ...oppCards.map((c) => {
+        const card = c.cardId ? cardFace(c.cardId, { calm: true, hero: oppHero }) : cardBack();
+        card.dataset.uid = String(c.uid);
+        if (c.cardId) {
+          const id = c.cardId;
+          card.classList.add('revealed');
+          card.addEventListener('click', () => {
+            this.hidePilePreview();
+            this.inspectCard(id, oppHero);
+          });
+          card.addEventListener('pointerenter', (e) => {
+            if (e.pointerType === 'mouse') this.showCardPreview(id, card.getBoundingClientRect(), 'below', oppHero);
+          });
+          card.addEventListener('pointerleave', () => this.hidePilePreview());
+        }
+        return card;
+      }),
+    );
+  }
+
   private renderEventChip(view: PlayerView): void {
     const active = view.activeEvent;
     const id = active ? active.id : view.upcomingEvent.id;
@@ -623,8 +683,8 @@ class BoardScreen implements Screen {
     const starting = events.some((e) => e.type === 'gameStarted');
     if (starting) {
       if (this.session.kind === 'online') callAttention(t('gameStartedNotice'), t('gameStartedNoticeBody'));
-      this.stats.reset();
-      this.history = [[], []];
+      this.stats.reset(this.count);
+      this.history = this.seats().map(() => []);
     }
     // After a reload the server only sends the current state: pick up the figures saved before it.
     else if (update.resumed) this.loadStats();
@@ -677,8 +737,8 @@ class BoardScreen implements Screen {
       const raw = localStorage.getItem(key);
       if (raw) this.stats.restore(JSON.parse(raw));
       const history = JSON.parse(localStorage.getItem(`${key}:history`) ?? 'null') as unknown;
-      if (Array.isArray(history) && history.length === 2 && history.every((h) => Array.isArray(h) && h.every((id) => typeof id === 'string'))) {
-        this.history = [history[0].slice(0, HISTORY_SIZE), history[1].slice(0, HISTORY_SIZE)];
+      if (Array.isArray(history) && history.length === this.count && history.every((h) => Array.isArray(h) && h.every((id) => typeof id === 'string'))) {
+        this.history = (history as string[][]).map((h) => h.slice(0, HISTORY_SIZE));
       }
     } catch {
       // Nothing usable saved.
@@ -689,6 +749,7 @@ class BoardScreen implements Screen {
   private async snapTo(view: PlayerView, starting: boolean): Promise<void> {
     if (starting) {
       this.resultsShown = false;
+      this.fallenShown = false;
       this.closeEvent = null;
       this.closeChoice = null;
       this.layer.replaceChildren();
@@ -697,35 +758,32 @@ class BoardScreen implements Screen {
       // Castle scale and progress bars follow this match's rules.
       this.field.setMaxPoints(view.rules.keepWin);
       for (const plaque of this.plaques) plaque.setKeepWin(view.rules.keepWin);
-      this.field.setHeroes([view.players[this.seatOfSide(0)].hero, view.players[this.seatOfSide(1)].hero]);
+      this.field.setHeroes(this.sides().map((side) => view.players[this.seatOfSide(side)].hero));
       void this.field.setMood(skyFor(view.activeEvent?.id ?? null, twilightLevel(view)), 400);
     }
     if (!starting && this.discardPile.querySelector('.pile-empty')) {
       // Resumed mid-game: show the last card played, by whoever played most recently.
-      const lastSeat = view.players[other(view.active)].lastPlayedCard ? other(view.active) : view.active;
+      // Look back in turn order from the player before the one to move.
+      const back = this.seats().map((k) => (view.active - 1 - k + 2 * this.count) % this.count);
+      const lastSeat = back.find((seat) => view.players[seat].lastPlayedCard) ?? view.active;
       const last = view.players[lastSeat].lastPlayedCard;
       if (last) this.setDiscardTop(last, view.players[lastSeat].hero);
       else if (view.players[view.viewer].discardCount > 0) this.setDiscardTop(null);
     }
     this.view = view;
     // Resumed with nothing saved: at least the last card each player played.
-    for (const seat of [0, 1] as const) {
+    for (const seat of this.seats()) {
       const last = view.players[seat].lastPlayedCard;
       if (!starting && this.history[seat].length === 0 && last) this.history[seat] = [last];
     }
-    this.shownHistory = [this.history[0].slice(), this.history[1].slice()];
-    this.shown = [clonePlayer(view.players[0]), clonePlayer(view.players[1])];
+    this.shownHistory = this.history.map((h) => h.slice());
+    this.shown = view.players.map(clonePlayer);
     this.shownActive = view.active;
     this.handSeat = view.viewer;
     if (starting) {
       // Castles rise from the ground and the hand is dealt.
-      this.field.setCastles([
-        { keep: 0, wall: 0 },
-        { keep: 0, wall: 0 },
-      ]);
-      const values = this.castleValues();
-      void this.field.animateCastle(0, values[0].keep, values[0].wall, 1100 * animScale());
-      void this.field.animateCastle(1, values[1].keep, values[1].wall, 1100 * animScale());
+      this.field.setCastles(this.sides().map(() => ({ keep: 0, wall: 0 })));
+      this.castleValues().forEach((v, side) => void this.field.animateCastle(side, v.keep, v.wall, 1100 * animScale()));
       audio.play('build');
       this.handModel = [];
       this.render();
@@ -742,8 +800,7 @@ class BoardScreen implements Screen {
       this.field.setCastles(this.castleValues());
       this.handModel = [...view.players[view.viewer].hand];
     }
-    this.field.setShield(this.sideOf(0), view.players[0].shield);
-    this.field.setShield(this.sideOf(1), view.players[1].shield);
+    this.setShields(view);
     void this.field.setMood(skyFor(view.activeEvent?.id ?? null, twilightLevel(view)), 400);
   }
 
@@ -936,10 +993,27 @@ class BoardScreen implements Screen {
         break;
       }
       case 'wallsSwapped': {
-        shown[0].wall = e.walls[0];
-        shown[1].wall = e.walls[1];
-        await fx.wallsSwapped([e.walls[0]!, e.walls[1]!], [shown[0].keep, shown[1].keep], ctx);
+        // Free-for-all: only the two castles that traded Walls move.
+        const changed = this.seats().filter((seat) => e.walls[seat] !== undefined && e.walls[seat] !== shown[seat].wall);
+        e.walls.forEach((wall, seat) => {
+          if (shown[seat]) shown[seat].wall = wall;
+        });
+        await fx.wallsSwapped(
+          shown.map((p) => p.wall),
+          shown.map((p) => p.keep),
+          ctx,
+          changed.length ? changed : this.seats(),
+        );
         this.render();
+        break;
+      }
+      case 'playerEliminated': {
+        shown[e.player].eliminated = true;
+        this.render();
+        const mine = this.session.isLocal(e.player);
+        audio.play(mine ? 'defeat' : 'keepFall');
+        this.showBanner(t('eliminatedBanner'), t('logEliminated', { who: this.name(e.player) }));
+        await wait(1100);
         break;
       }
       case 'burnApplied':
@@ -1077,13 +1151,14 @@ class BoardScreen implements Screen {
       }
       return this.hand.el.getBoundingClientRect();
     }
-    const back = this.oppHand.querySelector<HTMLElement>(`[data-uid="${uid}"]`) ?? this.oppHand.lastElementChild;
+    const oppHand = this.oppHands[this.sideOf(seat)];
+    const back = oppHand.querySelector<HTMLElement>(`[data-uid="${uid}"]`) ?? oppHand.lastElementChild;
     if (back instanceof HTMLElement) {
       const rect = back.getBoundingClientRect();
       back.style.visibility = 'hidden';
       return rect;
     }
-    return this.oppHand.getBoundingClientRect();
+    return oppHand.getBoundingClientRect();
   }
 
   /** The played card flies to the centre, is shown big, and stays until the next one. */
@@ -1173,8 +1248,8 @@ class BoardScreen implements Screen {
 
   private pilePreview: HTMLElement | null = null;
   /** Last cards each seat played, newest first; `shownHistory` follows the animation. */
-  private history: [string[], string[]] = [[], []];
-  private shownHistory: [string[], string[]] = [[], []];
+  private history: string[][] = [[], []];
+  private shownHistory: string[][] = [[], []];
 
   /** Large copy of the last card played, next to the discard pile, to read what it did. */
   private showPilePreview(): void {
@@ -1308,7 +1383,9 @@ class BoardScreen implements Screen {
     await box
       .animate(
         [
-          { transform: `translateX(${this.sideOf(seat) === 0 ? -60 : 60}vw) rotate(${this.sideOf(seat) === 0 ? -12 : 12}deg)`, opacity: 0 },
+          this.sideOf(seat) === 2
+            ? { transform: 'translateY(-50vh) scale(0.6)', opacity: 0 }
+            : { transform: `translateX(${this.sideOf(seat) === 0 ? -60 : 60}vw) rotate(${this.sideOf(seat) === 0 ? -12 : 12}deg)`, opacity: 0 },
           { transform: 'none', opacity: 1 },
         ],
         { duration: 520 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
@@ -1388,7 +1465,7 @@ class BoardScreen implements Screen {
   private tickPresence(): void {
     const presence = this.presence;
     if (!presence) return;
-    for (const seat of [0, 1] as const) {
+    for (const seat of this.seats()) {
       const s = presence.seats[seat];
       let text: string | null = null;
       if (s && !s.connected && !s.left && s.reconnectBy) {
@@ -1740,14 +1817,15 @@ class BoardScreen implements Screen {
         return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, face);
       }
       if (pending.kind === 'frostResource') {
-        const opp = view.players[other(view.viewer)];
+        const rival = this.rivalOf(view.viewer, pending.target);
+        const opp = view.players[rival];
         const res = option as (typeof RESOURCES)[number];
-        const row = this.panels[this.sideOf(other(view.viewer))].resourceRow(res).cloneNode(true) as HTMLElement;
+        const row = this.panels[this.sideOf(rival)].resourceRow(res).cloneNode(true) as HTMLElement;
         return h('button.choice-option.res-option', { type: 'button', onclick: () => choose(option), title: `${opp.resources[res]}` }, row);
       }
       if (pending.kind === 'discardFromHand') {
         const card = pending.revealed?.find((c) => String(c.uid) === option);
-        const face = card ? cardFace(card.cardId, { calm: true, hero: this.heroOf(other(view.viewer)) }) : cardBack();
+        const face = card ? cardFace(card.cardId, { calm: true, hero: this.heroOf(this.rivalOf(view.viewer, pending.target)) }) : cardBack();
         return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, face);
       }
       return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, cardFace(option, { calm: true }));

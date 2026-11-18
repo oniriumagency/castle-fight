@@ -7,9 +7,7 @@ import { settings } from '../app/settings';
 import type { Difficulty } from '../game/ai';
 import { LocalSession } from '../game/localSession';
 import type { MatchSession } from '../game/session';
-import type { OnlineSession } from '../net/online';
 import { boardScreen } from './board/board';
-import { ffaScreen } from './ffa';
 import { heroSelectScreen, type HeroSelectMode } from './heroSelect';
 import { lobbyScreen } from './lobby';
 import { menuScreen } from './menu';
@@ -78,15 +76,27 @@ export const flow = {
     flow.board(session);
   },
 
-  /** Free-for-all prototype: you against two AIs. */
+  /** Free-for-all against two AIs: pick a hero and a level first. */
   ffa(): void {
-    setRoomInUrl(null);
-    show(ffaScreen());
+    flow.heroSelect('ffa');
   },
 
-  /** A free-for-all game in an online room. */
-  ffaOnline(session: OnlineSession): void {
-    show(ffaScreen(session));
+  /** You against two AIs with random heroes, on the full board. */
+  startFfa(hero: HeroId, difficulty: Difficulty): void {
+    setRoomInUrl(null);
+    const level = t(difficulty);
+    const first = randomHero(hero);
+    const second = randomHero(first);
+    const session = new LocalSession({
+      kind: 'ai',
+      difficulty,
+      seats: [
+        { nickname: nickname(t('you')), hero },
+        { nickname: t('ffaAiName', { n: 1, level }), hero: first, isAi: true },
+        { nickname: t('ffaAiName', { n: 2, level }), hero: second, isAi: true },
+      ],
+    });
+    flow.board(session);
   },
 
   /** Back into the unfinished game saved on this device. False when there is none. */

@@ -43,6 +43,8 @@ export function describeEvent(event: GameEvent, name: (seat: PlayerId) => string
       return t('logExtraTurn', { who: name(event.player) });
     case 'timedOut':
       return t('logTimedOut', { who: name(event.player) });
+    case 'playerEliminated':
+      return t('logEliminated', { who: name(event.player) });
     case 'gameOver':
       return t('logGameOver');
     default:

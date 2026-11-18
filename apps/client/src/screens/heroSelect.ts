@@ -11,7 +11,8 @@ import { heroCard, heroParts, rulesHtml } from '../ui/card';
 import { heroCss } from '../ui/theme';
 import { flow } from './flow';
 
-export type HeroSelectMode = 'ai' | 'local' | 'online';
+/** `ffa`: free-for-all, you against two AIs. */
+export type HeroSelectMode = 'ai' | 'ffa' | 'local' | 'online';
 
 const LAST_HERO = 'cardcraft-castles:last-hero';
 const LAST_LEVEL = 'cardcraft-castles:last-level';
@@ -51,6 +52,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
 
   const title = (): string => {
     if (mode === 'local') return t('chooseHeroFor', { who: step === 0 ? t('player1') : t('player2') });
+    if (mode === 'ffa') return `${t('playFfa')} · ${t('chooseHero')}`;
     return t('chooseHero');
   };
 
@@ -60,6 +62,9 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
     if (mode === 'ai') {
       remember(LAST_LEVEL, difficulty);
       flow.startAi(picked, opponent, difficulty);
+    } else if (mode === 'ffa') {
+      remember(LAST_LEVEL, difficulty);
+      flow.startFfa(picked, difficulty);
     } else if (mode === 'local') {
       if (step === 0) {
         firstPick = picked;
@@ -83,7 +88,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
       h('h2', null, L(hero.name)),
       h('div.hero-ability', null, h('h3', null, t('passive')), h('p', null, html(rulesHtml(parts.passive)))),
       h('div.hero-ability', null, h('h3', null, t('ultimate')), h('p', null, html(rulesHtml(parts.ultimate)))),
-      mode === 'ai' ? aiOptions() : null,
+      mode === 'ai' || mode === 'ffa' ? aiOptions() : null,
       h(
         'div.hero-actions',
         null,
@@ -122,7 +127,9 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
         ),
         h('small.option-hint', null, L(DIFFICULTY_DESCRIPTIONS[difficulty])),
       ),
-      h(
+      mode === 'ffa'
+        ? h('div.option-row', null, h('span', null, t('ffaRivals')), h('small.option-hint', null, t('ffaRivalsHint')))
+        : h(
         'div.option-row',
         null,
         h('span', null, t('opponentHero')),
