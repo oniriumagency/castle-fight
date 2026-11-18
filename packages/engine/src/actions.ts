@@ -1,4 +1,4 @@
-import { getCard, getHero } from './catalog';
+import { getCard, getHero, hasCombo } from './catalog';
 import {
   changeResources,
   cloneState,
@@ -48,7 +48,7 @@ export function isUltimateReady(state: Board, player: PlayerId): boolean {
  * same school. Only cards with a Combo bonus care.
  */
 export function isComboActive(state: Board, player: PlayerId, cardId: CardId): boolean {
-  return state.players[player].comboSchool === getCard(cardId).school;
+  return hasCombo(cardId) && state.players[player].comboSchool === getCard(cardId).school;
 }
 
 /**
@@ -110,7 +110,8 @@ function playCard(state: GameState, events: GameEvent[], player: PlayerId, uid: 
   const card = getCard(cardId);
   const cost = effectiveCost(state, player, cardId);
   const resource = costResource(cardId);
-  const combo = self.comboSchool === card.school;
+  // Only cards with a Combo bonus get (and announce) it.
+  const combo = isComboActive(state, player, cardId);
 
   self.hand.splice(index, 1);
   self.discard.push(cardId);

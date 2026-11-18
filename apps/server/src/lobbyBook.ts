@@ -32,7 +32,8 @@ function sameSummary(a: RoomSummary, b: RoomSummary): boolean {
     a.status === b.status &&
     a.players === b.players &&
     a.private === b.private &&
-    a.createdAt === b.createdAt
+    a.createdAt === b.createdAt &&
+    a.turnSeconds === b.turnSeconds
   );
 }
 

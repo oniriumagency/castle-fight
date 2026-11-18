@@ -17,6 +17,7 @@ function room(id: string, overrides: Partial<RoomSummary> = {}, open = true): Lo
       players: 1,
       private: false,
       createdAt: NOW,
+      turnSeconds: 30,
       ...overrides,
     },
   };

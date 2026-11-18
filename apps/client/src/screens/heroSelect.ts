@@ -182,6 +182,8 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string): Screen 
       { role: 'listbox', 'aria-label': title() },
       ids.map((id) => {
         const card = heroCard(id, { tilt: true, calm: id !== picked });
+        // Compact frame: a shorter picture leaves room for readable rules text.
+        card.classList.add('compact');
         card.setAttribute('role', 'option');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-selected', String(id === picked));

@@ -13,6 +13,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
+import { comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
@@ -126,6 +127,17 @@ class BoardScreen implements Screen {
     this.deckPile.append(cardBack(), h('span.pile-count'));
     this.discardPile.append(h('div.pile-empty'), h('span.pile-count'));
     this.hand.discardTarget = this.discardPile;
+    // The last card played sits on the discard pile: hover it to read it, click or tap to inspect it.
+    this.discardPile.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'mouse') this.showPilePreview();
+    });
+    this.discardPile.addEventListener('pointerleave', () => this.hidePilePreview());
+    this.discardPile.addEventListener('click', () => {
+      const id = this.discardTopId();
+      if (!id) return;
+      this.hidePilePreview();
+      this.inspectCard(id);
+    });
     this.eventChip.addEventListener('click', () => this.inspectEvent());
 
     this.el = h(
@@ -241,25 +253,48 @@ class BoardScreen implements Screen {
   private layout(): void {
     const w = window.innerWidth;
     const hgt = window.innerHeight;
-    const short = hgt < 520;
-    // Hand cards: as big as the screen allows without eating the castles.
-    const cardW = Math.round(Math.max(78, Math.min(w * 0.115, hgt * (short ? 0.24 : 0.2), 176)));
+    const portrait = hgt > w;
+    const short = !portrait && hgt < 520;
+    const touch = matchMedia('(hover: none)').matches;
+    // Phones get a hand made to be read: no overlap, no part below the edge.
+    const phonePortrait = portrait && w < 640;
+    let cardW: number;
+    let peek: number;
+    if (phonePortrait) {
+      cardW = Math.min(w * 0.31, hgt * 0.17, 150);
+      peek = 0;
+      this.hand.mode = 'scroll';
+    } else if (short) {
+      cardW = Math.min((w - 40) / 6.25, (hgt * 0.4) / 1.4);
+      peek = 0.05;
+      this.hand.mode = 'row';
+    } else {
+      cardW = Math.min(w * 0.115, hgt * 0.2, 176);
+      if (portrait) cardW = Math.min(w * 0.16, hgt * 0.15, 176);
+      // With a mouse the cards rest partly below the edge and rise on hover.
+      peek = touch ? 0 : 0.3;
+      this.hand.mode = w < 700 || touch ? 'row' : 'fan';
+    }
+    cardW = Math.round(Math.max(72, cardW));
+    this.hand.compact = cardW < 150;
+    this.hand.previewHost = touch ? null : this.layer;
     this.el.style.setProperty('--card-w', `${cardW}px`);
+    this.el.style.setProperty('--peek-f', String(peek));
     this.el.classList.toggle('short', short);
     this.el.classList.toggle('narrow', w < 760);
+    this.el.classList.toggle('phone-portrait', phonePortrait);
+    this.el.classList.toggle('touch', touch);
 
     const left = this.panels[0].el.getBoundingClientRect();
     const right = this.panels[1].el.getBoundingClientRect();
     const top = this.el.querySelector('.topbar')!.getBoundingClientRect();
-    const portrait = hgt > w;
-    // Visible part of the resting hand (see --peek-f in board.css), plus room for the castle plaques.
-    const peek = short ? 0.34 : 0.3;
-    const handTop = hgt - 6 - cardW * 1.4 * (1 - peek);
-    const plaqueRoom = short ? 34 : 46;
+    // Top of the resting hand, plus room for the castle plaques.
+    const handTop = hgt - 6 - cardW * 1.4 * (1 - peek) - (phonePortrait ? 6 : 0);
+    const plaqueRoom = short ? 30 : 46;
     const fieldLeft = portrait ? 0 : left.right;
     const fieldRight = portrait ? w : right.left;
-    const fieldTop = portrait ? Math.max(top.bottom, left.bottom) : top.bottom;
-    const rect = { left: fieldLeft, top: fieldTop, width: Math.max(200, fieldRight - fieldLeft), height: Math.max(120, (handTop - plaqueRoom - fieldTop) / 0.94) };
+    const fieldTop = portrait ? Math.max(top.bottom, left.bottom, right.bottom) : top.bottom;
+    const rect = { left: fieldLeft, top: fieldTop, width: Math.max(200, fieldRight - fieldLeft), height: Math.max(90, (handTop - plaqueRoom - fieldTop) / 0.94) };
     this.field.layout(rect);
     const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
     Object.assign(fieldEl.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
@@ -417,6 +452,7 @@ class BoardScreen implements Screen {
         isAi: this.session.seats[seat]?.isAi,
         active: this.shownActive === seat && view.phase !== 'finished',
         canUltimate: canAct && seat === view.viewer && p.ultimateReady,
+        mine: this.session.isLocal(seat),
       });
       this.plaques[side].update(p.keep, p.wall);
     }
@@ -485,13 +521,17 @@ class BoardScreen implements Screen {
 
   private async animate(update: StateUpdate): Promise<void> {
     const events = update.events;
+    const starting = events.some((e) => e.type === 'gameStarted');
+    if (starting) this.stats.reset();
+    // After a reload the server only sends the current state: pick up the figures saved before it.
+    else if (update.resumed) this.loadStats();
     this.stats.add(events);
+    if (events.length) this.saveStats();
     for (const e of events) {
       const line = describeEvent(e, (seat) => this.name(seat));
       if (line) this.log(line, e.type);
     }
 
-    const starting = events.some((e) => e.type === 'gameStarted');
     if (!this.shown || update.resumed || starting || events.length === 0) {
       await this.snapTo(update.view, starting);
       return;
@@ -510,11 +550,30 @@ class BoardScreen implements Screen {
     this.clearPlayed();
   }
 
+  private saveStats(): void {
+    const key = this.session.statsKey?.();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(this.stats));
+    } catch {
+      // Storage full or blocked: the results just show what this page saw.
+    }
+  }
+
+  private loadStats(): void {
+    const key = this.session.statsKey?.();
+    if (!key) return;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) this.stats.restore(JSON.parse(raw));
+    } catch {
+      // Nothing usable saved.
+    }
+  }
+
   /** Jump to a view without replaying its events (game start, resume). */
   private async snapTo(view: PlayerView, starting: boolean): Promise<void> {
     if (starting) {
-      this.stats.reset();
-      this.stats.add(this.queue.length ? [] : []);
       this.resultsShown = false;
       this.layer.replaceChildren();
       this.curtainFor = null;
@@ -524,6 +583,12 @@ class BoardScreen implements Screen {
       for (const plaque of this.plaques) plaque.setKeepWin(view.rules.keepWin);
       this.field.setHeroes([view.players[this.seatOfSide(0)].hero, view.players[this.seatOfSide(1)].hero]);
       void this.field.setMood(skyFor(view.activeEvent?.id ?? null), 400);
+    }
+    if (!starting && this.discardPile.querySelector('.pile-empty')) {
+      // Resumed mid-game: show the last card played, by whoever played most recently.
+      const last = view.players[other(view.active)].lastPlayedCard ?? view.players[view.active].lastPlayedCard;
+      if (last) this.setDiscardTop(last);
+      else if (view.players[view.viewer].discardCount > 0) this.setDiscardTop(null);
     }
     this.view = view;
     this.shown = [clonePlayer(view.players[0]), clonePlayer(view.players[1])];
@@ -813,7 +878,9 @@ class BoardScreen implements Screen {
         this.render();
         if (e.ready && !wasReady) {
           this.panels[this.sideOf(e.player)].pulse('.portrait');
+          this.panels[this.sideOf(e.player)].pulse('.ult-btn');
           fx.ultimateReady(e.player, ctx, this.session.isLocal(e.player));
+          if (this.session.isLocal(e.player)) toast(t('ultimateReadyToast'), 'info', 4200);
         }
         break;
       }
@@ -882,7 +949,8 @@ class BoardScreen implements Screen {
   private async showPlayed(cardId: string, from: DOMRect, combo: boolean): Promise<void> {
     this.clearPlayed();
     const card = cardFace(cardId, { className: 'played' });
-    if (combo) card.append(h('span.combo-tag', null, t('comboReady')));
+    const bonus = combo ? comboBonusText(cardId) : '';
+    if (bonus) card.append(h('span.combo-tag', null, `${t('comboReady')}: ${bonus}`));
     this.stage.replaceChildren(card);
     this.playedCard = card;
     const target = card.getBoundingClientRect();
@@ -938,9 +1006,51 @@ class BoardScreen implements Screen {
   }
 
   private setDiscardTop(cardId: string | null): void {
+    this.hidePilePreview();
     const top = cardId ? cardFace(cardId, { calm: true }) : cardBack();
     const count = this.discardPile.querySelector('.pile-count');
     this.discardPile.replaceChildren(top, count ?? h('span.pile-count'));
+    this.discardPile.classList.toggle('has-card', !!cardId);
+    if (this.discardPile.matches(':hover')) this.showPilePreview();
+  }
+
+  private discardTopId(): string | null {
+    return this.discardPile.querySelector<HTMLElement>('.card[data-card-id]')?.dataset.cardId ?? null;
+  }
+
+  private pilePreview: HTMLElement | null = null;
+
+  /** Large copy of the last card played, next to the discard pile, to read what it did. */
+  private showPilePreview(): void {
+    this.hidePilePreview();
+    const id = this.discardTopId();
+    if (!id || this.el.classList.contains('touch')) return;
+    const big = cardFace(id, { calm: true });
+    big.classList.add('hover-preview', 'pile-preview');
+    const host = this.layer.getBoundingClientRect();
+    const pile = this.discardPile.getBoundingClientRect();
+    const room = pile.top - host.top - 64;
+    const w = Math.round(Math.min(300, Math.max(190, room / 1.4)));
+    const hgt = w * 1.4;
+    let left = pile.left + pile.width / 2 - w / 2;
+    let top = pile.top - hgt - 12;
+    if (top < host.top + 56) {
+      // Not enough room above: stand beside the pile instead.
+      top = Math.max(host.top + 56, Math.min(pile.top + pile.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
+      left = pile.right + 16;
+      if (left + w > window.innerWidth - 8) left = pile.left - w - 16;
+    }
+    left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
+    big.style.setProperty('--w', `${w}px`);
+    big.style.left = `${left - host.left}px`;
+    big.style.top = `${top - host.top}px`;
+    this.layer.appendChild(big);
+    this.pilePreview = big;
+  }
+
+  private hidePilePreview(): void {
+    this.pilePreview?.remove();
+    this.pilePreview = null;
   }
 
   private async flyToDiscard(cardId: string | null, from: DOMRect, existing?: HTMLElement): Promise<void> {

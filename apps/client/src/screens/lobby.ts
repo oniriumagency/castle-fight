@@ -1,4 +1,4 @@
-import type { LobbyStats, RoomSummary } from '@cardcraft-castles/protocol';
+import { DEFAULT_TIMINGS, TURN_SECONDS_OPTIONS, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
 import type { LobbyConnection } from '@cardcraft-castles/protocol/client';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
@@ -25,6 +25,18 @@ export function requireNickname(input: HTMLInputElement): string | null {
   return value;
 }
 
+const TURN_KEY = 'cardcraft-castles:turn-seconds';
+
+function storedTurnSeconds(): number {
+  try {
+    const value = Number(localStorage.getItem(TURN_KEY));
+    if ((TURN_SECONDS_OPTIONS as readonly number[]).includes(value)) return value;
+  } catch {
+    // Storage blocked.
+  }
+  return DEFAULT_TIMINGS.turnSeconds;
+}
+
 /** Live list of open rooms, with create and quick join. */
 export function lobbyScreen(): Screen {
   let connection: LobbyConnection | null = null;
@@ -39,6 +51,34 @@ export function lobbyScreen(): Screen {
   const nickname = h('input', { type: 'text', maxlength: 20, placeholder: t('nicknamePlaceholder'), value: settings.get().nickname });
   const roomName = h('input', { type: 'text', maxlength: 32, placeholder: t('roomNameDefault', { name: settings.get().nickname || '…' }) });
   const privateToggle = h('input', { type: 'checkbox' });
+  let turnSeconds = storedTurnSeconds();
+  const turnPicker = h('div.segmented.turn-picker', { role: 'group', 'aria-label': t('turnTime') });
+  const renderTurnPicker = (): void => {
+    turnPicker.replaceChildren(
+      ...TURN_SECONDS_OPTIONS.map((seconds) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            'aria-pressed': String(seconds === turnSeconds),
+            'aria-label': t('secondsLong', { n: seconds }),
+            onclick: () => {
+              audio.play('uiClick');
+              turnSeconds = seconds;
+              try {
+                localStorage.setItem(TURN_KEY, String(seconds));
+              } catch {
+                // Not critical.
+              }
+              renderTurnPicker();
+            },
+          },
+          t('secondsShort', { n: seconds }),
+        ),
+      ),
+    );
+  };
+  renderTurnPicker();
 
   const statusText = (status: RoomSummary['status']): string =>
     status === 'waiting' ? t('roomWaiting') : status === 'playing' ? t('roomPlaying') : t('roomFinished');
@@ -73,7 +113,12 @@ export function lobbyScreen(): Screen {
         h(
           'div.room',
           { role: 'listitem', class: `status-${room.status}` },
-          h('div.room-info', null, h('strong', null, room.name), h('small', null, t('hostedBy', { host: room.host }))),
+          h(
+            'div.room-info',
+            null,
+            h('strong', null, room.name),
+            h('small', null, t('hostedBy', { host: room.host }), ' · ', html(iconSvg('clock')), ' ', t('secondsShort', { n: room.turnSeconds ?? DEFAULT_TIMINGS.turnSeconds })),
+          ),
           h('span.room-status', null, statusText(room.status)),
           h('span.room-players', null, html(iconSvg('users')), t('players', { n: room.players })),
           h(
@@ -138,6 +183,7 @@ export function lobbyScreen(): Screen {
         nickname: nick,
         name: roomName.value.trim() || undefined,
         private: privateToggle.checked,
+        turnSeconds,
       });
       flow.heroSelect('online', room.id);
     } catch (error) {
@@ -187,6 +233,7 @@ export function lobbyScreen(): Screen {
         h('button.btn.primary.big', { type: 'button', onclick: () => void quickJoin() }, html(iconSvg('sword')), t('quickJoin')),
         h('div.ornament', null, t('createRoom')),
         h('label.field', null, t('roomName'), roomName),
+        h('div.field', null, h('span', null, t('turnTime')), turnPicker),
         h('label.check', null, privateToggle, h('span', null, t('privateRoom'))),
         h('button.btn.big', { type: 'button', onclick: () => void create() }, t('createRoom')),
       ),

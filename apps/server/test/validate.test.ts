@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LIMITS, PROTOCOL_VERSION, cleanNickname, cleanRoomName, isRoomId, parseRoomClientMessage } from '@cardcraft-castles/protocol';
+import { LIMITS, PROTOCOL_VERSION, cleanNickname, cleanRoomName, cleanTurnSeconds, isRoomId, parseRoomClientMessage } from '@cardcraft-castles/protocol';
 import { roomIdFromUrl } from '@cardcraft-castles/protocol/client';
 
 describe('cleanNickname', () => {
@@ -28,6 +28,17 @@ describe('cleanNickname', () => {
 
   it('room names follow the same rules with their own length', () => {
     expect(cleanRoomName('x'.repeat(100))).toHaveLength(LIMITS.roomNameMax);
+  });
+});
+
+describe('cleanTurnSeconds', () => {
+  it('accepts only the offered turn lengths', () => {
+    expect(cleanTurnSeconds(45)).toBe(45);
+    expect(cleanTurnSeconds(90)).toBe(90);
+    expect(cleanTurnSeconds(31)).toBeNull();
+    expect(cleanTurnSeconds('30')).toBeNull();
+    expect(cleanTurnSeconds(1e9)).toBeNull();
+    expect(cleanTurnSeconds(undefined)).toBeNull();
   });
 });
 

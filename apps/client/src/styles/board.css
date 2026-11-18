@@ -740,13 +740,51 @@
 }
 
 @media (hover: hover) {
+  /* The hovered card rises; a full-size copy (.hover-preview) shows above it to read. */
   .hand-card:hover:not(.dragging) {
-    --hover-y: calc(var(--card-w) * -0.32);
-    --hover-s: 1.32;
+    --hover-y: calc(var(--card-w) * -0.08);
+    --hover-s: 1.05;
     --peek: 0px;
     --r: 0deg;
     z-index: 60 !important;
   }
+}
+
+.card.hover-preview {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  animation: previewIn 0.14s ease-out both;
+  box-shadow: var(--glow), 0 18px 40px rgb(0 0 0 / 70%);
+}
+
+@keyframes previewIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+}
+
+/* Phones in portrait: a sideways-scrolling row of readable cards. */
+.hand.scroll {
+  left: 0 !important;
+  right: 0 !important;
+  height: calc(var(--card-w) * 1.4 + 10px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hand.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.hand.scroll .hand-card {
+  bottom: 5px;
+  touch-action: pan-x;
+}
+
+.hand-spacer {
+  height: 1px;
 }
 
 .hand-card.selected {
@@ -769,13 +807,67 @@
   box-shadow: 0 0 0 3px #ff8a5a, 0 0 30px rgb(255 100 60 / 80%);
 }
 
-.board.short .hand-card {
-  --peek-f: 0.34;
+.board.short .hand {
+  left: calc(12px + var(--safe-l));
+  right: calc(12px + var(--safe-r));
+  bottom: calc(4px + var(--safe-b));
 }
 
-.board.short .hand {
-  left: calc(var(--side-w) + var(--safe-l) + 8px);
-  right: calc(var(--side-w) + var(--safe-r) + 8px);
+/* Touch screens: the enlarged card covers the whole table, big enough to read. */
+.board.touch .inspect {
+  inset: 0;
+  padding: 12px;
+  background: rgb(5 4 10 / 72%);
+}
+
+.board.touch .inspect-card .card {
+  --w: min(300px, 42vw, calc((100vh - 24px) / 1.4));
+}
+
+.board.touch .inspect-side {
+  width: min(300px, 46vw);
+}
+
+.board.touch .inspect-actions .btn {
+  min-height: 46px;
+}
+
+@media (orientation: portrait) {
+  .board.touch .inspect-box {
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+  }
+
+  .board.touch .inspect-card .card {
+    --w: min(300px, 68vw, calc((100vh - 250px) / 1.4));
+  }
+
+  .board.touch .inspect-side {
+    width: min(420px, 100%);
+  }
+
+  .board.touch .glossary {
+    max-height: 22vh;
+    overflow-y: auto;
+  }
+
+  .board.touch .inspect-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .board.touch .inspect-actions .btn.primary {
+    flex: 1 1 100%;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .board.touch .glossary {
+    max-height: 40vh;
+    overflow-y: auto;
+    font-size: 0.85rem;
+  }
 }
 
 /* ---------- Played card, banners, floating numbers ---------- */
@@ -1455,17 +1547,52 @@
     flex-direction: row;
   }
 
+  .board .resources {
+    gap: 3px;
+  }
+
   .board .res-row {
-    flex: 1;
-    grid-template-columns: 18px auto;
-    padding: 2px 4px;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0 2px;
+    padding: 3px 2px 2px;
+  }
+
+  .board .res-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .board .res-amount {
+    font-size: 1.2rem;
   }
 
   .board .res-meta {
-    grid-column: 1 / -1;
+    flex: 1 0 100%;
     flex-direction: row;
-    gap: 6px;
+    gap: 4px;
     justify-content: center;
+    font-size: 0.72rem;
+  }
+
+  .board.phone-portrait .opp-hand {
+    display: none;
+  }
+
+  .board.phone-portrait .side {
+    top: calc(var(--top-h) + var(--safe-t) + 4px) !important;
+  }
+
+  .board .player-name {
+    font-size: 0.85rem;
+  }
+
+  .board .hero-name {
+    font-size: 0.72rem;
   }
 
   .board .portrait {
@@ -1541,6 +1668,198 @@
   left: auto;
   right: -4px;
   transform: none;
+}
+
+/* ---------- Ultimate button ---------- */
+
+.ult-btn {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px 9px;
+  border-radius: 9px;
+  border: 1px solid rgb(227 182 86 / 28%);
+  background: rgb(10 8 16 / 70%);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: help;
+  overflow: hidden;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s;
+}
+
+.side-1 .ult-btn {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.ult-btn-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 8%);
+  color: var(--gold);
+}
+
+.ult-btn-icon svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.ult-btn-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.ult-btn-title {
+  font-family: var(--display);
+  font-size: 0.8rem;
+  color: var(--text, #f3ead8);
+  letter-spacing: 0.02em;
+}
+
+.ult-btn-hint {
+  font-size: 0.7rem;
+}
+
+.ult-btn-effect {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: rgb(243 234 216 / 72%);
+}
+
+.ult-btn-effect b {
+  color: #f3ead8;
+}
+
+.ult-btn-meter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.ult-btn-meter i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #b9832b, #ffd36a);
+  transition: width 0.6s ease;
+}
+
+.side-1 .ult-btn-meter i {
+  margin-left: auto;
+}
+
+.ult-btn.ready {
+  border-color: rgb(255 211 106 / 70%);
+  color: #f3e3b8;
+}
+
+.ult-btn.ready .ult-btn-icon {
+  background: #ffd36a;
+  color: #2a1606;
+}
+
+.ult-btn.usable {
+  cursor: pointer;
+  color: #2a1606;
+  border-color: #fff0b0;
+  background: linear-gradient(180deg, #ffe17a, #e09a2a);
+  animation: ultBtnReady 1.6s ease-in-out infinite;
+}
+
+.ult-btn.usable .ult-btn-title,
+.ult-btn.usable .ult-btn-effect,
+.ult-btn.usable .ult-btn-effect b {
+  color: #2a1606;
+}
+
+.ult-btn.usable .ult-btn-icon {
+  background: #2a1606;
+  color: #ffd36a;
+}
+
+.ult-btn.usable .ult-btn-meter {
+  display: none;
+}
+
+.ult-btn.usable:hover {
+  filter: brightness(1.08);
+}
+
+.ult-btn.usable:active {
+  transform: translateY(1px);
+}
+
+@keyframes ultBtnReady {
+  50% { box-shadow: 0 0 16px rgb(255 190 70 / 85%); }
+}
+
+.board.short .ult-btn {
+  gap: 5px;
+  padding: 4px 6px 7px;
+}
+
+.board.short .ult-btn-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.board.short .ult-btn-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.board.short .ult-btn-title {
+  font-size: 0.68rem;
+}
+
+.board.short .ult-btn-hint {
+  font-size: 0.6rem;
+}
+
+.board.short .ult-btn-effect {
+  display: none;
+}
+
+/* Phones: the ring on the portrait already shows the charge of the rival's ultimate. */
+.board.phone-portrait .ult-btn:not(.mine),
+.board.short .ult-btn:not(.mine):not(.ready) {
+  display: none;
+}
+
+.board.phone-portrait .ult-btn-effect {
+  display: none;
+}
+
+.board.short .ult-btn:not(.ready) .ult-btn-hint {
+  display: none;
+}
+
+
+.discard-pile.has-card {
+  cursor: zoom-in;
+}
+
+.discard-pile.has-card:hover .card {
+  filter: brightness(1.12);
+  box-shadow: 0 0 0 2px rgb(255 211 106 / 70%), 0 8px 14px rgb(0 0 0 / 60%);
 }
 
 /* Light behind a card as it lands (school colour, stronger by rarity). */

@@ -348,6 +348,47 @@
   .card { transition: none; }
 }
 
+/*
+ * Compact layout for small cards (the hand on phones): a shorter picture,
+ * no school line, and name and rules text that never shrink below a
+ * readable size. The frame and colours stay the same.
+ */
+.card.compact .art { aspect-ratio: 16 / 10; }
+.card.compact .name { top: 55.6cqw; }
+.card.compact .name b {
+  font-size: max(5.37cqw, 9.5px);
+  padding-block: 1.6cqw 1.3cqw;
+  /* Long names wrap onto a second line instead of being cut. */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+.card.compact.mid-name .name b { font-size: max(4.8cqw, 9px); }
+.card.compact.long-name .name b { font-size: max(4.1cqw, 8.5px); }
+.card.compact .type { display: none; }
+.card.compact .rules {
+  margin: 8.5cqw 2.6cqw 2.6cqw;
+  padding: 2.2cqw 2.2cqw 4.4cqw;
+  font-size: max(5.7cqw, 11px);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+.card.compact.mid-rules .rules { font-size: max(5.2cqw, 10px); }
+.card.compact.long-rules .rules { font-size: max(4.8cqw, 9px); line-height: 1.08; }
+.card.compact .cost { width: 24cqw; height: 29cqw; }
+.card.compact .cost span { font-size: max(11.5cqw, 13px); }
+
+.card.compact .rules.hero-rules,
+.card.compact.mid-rules .rules.hero-rules,
+.card.compact.long-rules .rules.hero-rules {
+  font-size: max(7.4cqw, 12.5px);
+  line-height: 1.2;
+  padding: 2.6cqw 3cqw 4.4cqw;
+}
+.card.compact .hero-rules p { margin-bottom: 2.2cqw; }
+
 /* Rarity sheen in the rarity's own colour (gold stays for legendaries). */
 .card.r-rara .holo {
   background-image: linear-gradient(115deg, transparent 30%, rgb(200 230 255 / 60%) 44%, rgb(120 190 255 / 55%) 50%, rgb(80 150 255 / 40%) 56%, transparent 70%);

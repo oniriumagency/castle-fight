@@ -308,7 +308,8 @@
 }
 
 .hero-grid .card {
-  --w: clamp(120px, min(15vw, 24vh), 200px);
+  /* Big enough to read each hero's passive and ultimate on the card itself. */
+  --w: clamp(150px, min(16.5vw, calc((100vh - 150px) / 2.9)), 250px);
   cursor: pointer;
   transition: transform 0.2s, filter 0.2s, box-shadow 0.2s;
   filter: saturate(0.7) brightness(0.8);
@@ -330,17 +331,22 @@
 }
 
 .hero-detail {
-  width: min(380px, 40vw);
+  width: min(380px, 34vw);
+  min-width: 0;
   padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   max-height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
+/* The whole illustration (4:3), so the hero's head is never cut. */
 .hero-portrait {
-  height: 150px;
+  flex: none;
+  aspect-ratio: 4 / 3;
+  max-height: 30vh;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 0 0 1px var(--gold-d), 0 0 0 3px rgb(0 0 0 / 60%), 0 0 30px color-mix(in srgb, var(--hero) 60%, transparent);
@@ -350,7 +356,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 30%;
+  object-position: 50% 12%;
 }
 
 .hero-detail h2 {
@@ -430,8 +436,29 @@
   padding-top: 6px;
 }
 
+.hero-actions .btn {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Back and Start stay in view at the bottom of the panel, even when its content scrolls. */
+.hero-actions {
+  position: sticky;
+  bottom: -18px;
+  margin-bottom: -18px;
+  padding-bottom: 18px;
+  padding-top: 14px;
+  background: linear-gradient(180deg, transparent, var(--panel-solid) 22%);
+}
+
 .hero-actions .btn.primary {
   flex: 1;
+  padding-inline: 14px;
+}
+
+@media (max-width: 1180px) {
+  .hero-actions .btn { padding-inline: 12px; font-size: 0.95rem; }
+  .hero-actions .btn.primary { padding-inline: 10px; }
 }
 
 @media (max-width: 900px), (max-height: 560px) {
@@ -486,6 +513,8 @@
 
   .hero-grid {
     grid-template-columns: repeat(3, auto);
+    flex: none;
+    justify-content: center;
   }
 
   .hero-grid .card {
@@ -641,7 +670,7 @@ input.shake {
   40%, 80% { transform: translateX(6px); }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px) and (orientation: portrait) {
   .lobby-body {
     flex-direction: column;
     overflow-y: auto;
@@ -831,5 +860,84 @@ input.shake {
 @media (max-height: 560px) and (orientation: landscape) {
   .option-hint {
     display: none;
+  }
+}
+
+.turn-picker {
+  display: flex;
+}
+
+.turn-picker button {
+  flex: 1;
+  padding-inline: 0.3em;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.room-info small .icon,
+.room-info small svg {
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: -0.12em;
+}
+
+/* Phones in landscape: lobby side by side, hero details wide enough for their buttons. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .lobby-body {
+    gap: 10px;
+  }
+
+  .lobby-side {
+    width: min(300px, 42vw);
+    overflow-y: auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .lobby-side .btn.big {
+    min-height: 40px;
+    padding-block: 6px;
+  }
+
+  .lobby-side input[type='text'] {
+    padding-block: 6px;
+  }
+
+  .lobby .screen-head,
+  .lobby-screen .screen-head {
+    padding-block: 6px;
+  }
+
+  .room {
+    grid-template-columns: 1fr auto;
+  }
+
+  .room-status,
+  .room-players {
+    display: none;
+  }
+
+  .hero-body {
+    gap: 12px;
+  }
+
+  .hero-grid .card {
+    --w: clamp(64px, 24vh, 110px);
+  }
+
+  .hero-detail {
+    width: min(420px, 54vw);
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    padding-inline: 12px;
+    font-size: 0.95rem;
+  }
+
+  .hero-actions .btn.primary {
+    flex: 2 1 auto;
   }
 }

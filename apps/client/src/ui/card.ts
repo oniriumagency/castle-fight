@@ -194,11 +194,14 @@ export function cardBack(opts: CardOptions = {}): HTMLDivElement {
   return el;
 }
 
-/** Long names get a smaller font so they stay on one line. */
+/** Long names get a smaller font so they stay on one line; long rules text too (in compact cards). */
 function fitName(el: HTMLElement): void {
   const name = el.querySelector('.name b')?.textContent ?? '';
   if (name.length > 20) el.classList.add('long-name');
   else if (name.length > 15) el.classList.add('mid-name');
+  const rules = el.querySelector('.rules')?.textContent?.trim() ?? '';
+  if (rules.length > 95) el.classList.add('long-rules');
+  else if (rules.length > 60) el.classList.add('mid-rules');
 }
 
 /** Tilt and sheen that follow the pointer, as in the frame preview. */

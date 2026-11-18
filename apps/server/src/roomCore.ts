@@ -324,6 +324,7 @@ export class RoomCore<S> {
       players: room.seats.filter((s) => s !== null && !s.left).length,
       private: room.private,
       createdAt: room.createdAt,
+      turnSeconds: room.timings.turnSeconds,
     };
   }
 

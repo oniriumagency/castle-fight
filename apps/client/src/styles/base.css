@@ -224,7 +224,8 @@ button {
   background: linear-gradient(90deg, transparent, var(--gold-d), transparent);
 }
 
-label.field {
+label.field,
+div.field {
   display: flex;
   flex-direction: column;
   gap: 6px;

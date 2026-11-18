@@ -60,6 +60,11 @@ export interface MatchSession {
   idle(): void;
   /** Start a new game with the same seats (or ask the opponent online). */
   rematch(): void;
+  /**
+   * Where the board keeps this game's statistics so they survive a page
+   * reload (online games resume mid-match). Null when there is nothing to keep.
+   */
+  statsKey?(): string | null;
   /** Quick reactions; only present when the session supports them. */
   emote?(emote: string): void;
   leave(): void;

@@ -48,7 +48,6 @@ async function boot(): Promise<void> {
   // Invite link: open the room straight away.
   const roomId = roomIdFromUrl(location.href);
   if (roomId) {
-    history.replaceState(null, '', location.pathname);
     try {
       if (online.hasSeat(roomId)) {
         // This browser already plays in that room (reload): take the seat back.

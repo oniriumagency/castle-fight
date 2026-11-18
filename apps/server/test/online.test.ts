@@ -169,6 +169,16 @@ describe('online play', () => {
     roomB.leave();
   });
 
+  it('uses the turn length the host picked', async () => {
+    const online = client(base).online;
+    const summary = await online.createRoom({ nickname: 'Ana', private: true, turnSeconds: 90 });
+    expect(summary.turnSeconds).toBe(90);
+    expect(await online.getRoom(summary.id)).toMatchObject({ turnSeconds: 90 });
+    // A length that is not offered falls back to the server's default.
+    const other = await online.createRoom({ nickname: 'Ana', private: true, turnSeconds: 7 });
+    expect(other.turnSeconds).not.toBe(7);
+  });
+
   it('pairs two players with quick join', async () => {
     const a = client(base);
     const b = client(base);

@@ -7,6 +7,7 @@ import {
   EMOTES,
   LIMITS,
   ROOM_ID_PATTERN,
+  TURN_SECONDS_OPTIONS,
   type ActionIntent,
   type Emote,
   type HeroChoice,
@@ -117,4 +118,9 @@ export function parseRoomClientMessage(text: string): RoomClientMessage | null {
 /** The other seat. */
 export function otherSeat(seat: PlayerId): PlayerId {
   return seat === 0 ? 1 : 0;
+}
+
+/** A turn length a host may choose (one of `TURN_SECONDS_OPTIONS`), or null. */
+export function cleanTurnSeconds(raw: unknown): number | null {
+  return typeof raw === 'number' && (TURN_SECONDS_OPTIONS as readonly number[]).includes(raw) ? raw : null;
 }
