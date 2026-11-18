@@ -75,6 +75,7 @@ function guessPlayer(
     // Cards played earlier this turn are not in the view; no condition reads them.
     schoolsThisTurn: [],
     schoolsLastTurn: pub.schoolsLastTurn.slice(),
+    ...(pub.eliminated ? { eliminated: true } : {}),
   };
 }
 
@@ -119,6 +120,7 @@ function guessPending(view: PlayerView): PendingChoice | null {
       source: { kind: 'card', id: cardId },
       combo: false,
       ...(progress ? { discarded: progress.done } : {}),
+      ...(pending.target !== undefined ? { target: pending.target } : {}),
     },
     ...(progress ? { progress: { ...progress } } : {}),
     op,
@@ -136,11 +138,11 @@ export function determinize(view: PlayerView, rng: RngHolder): GameState | null 
   const pending = guessPending(view);
   if (view.pending && !pending) return null;
 
-  const opponent: PlayerId = view.viewer === 0 ? 1 : 0;
+  // Revealed cards are matched by uid, so they only fill in the hand they belong to.
   const revealed = view.pending?.revealed;
-  const players = [0, 1].map((p) =>
-    guessPlayer(view, p as PlayerId, rng, p === opponent ? revealed : undefined),
-  ) as [PlayerState, PlayerState];
+  const players = view.players.map((_, p) =>
+    guessPlayer(view, p, rng, p !== view.viewer ? revealed : undefined),
+  );
 
   let nextUid = 1;
   for (const p of players) for (const card of p.hand) nextUid = Math.max(nextUid, card.uid + 1);

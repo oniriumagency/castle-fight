@@ -3,15 +3,19 @@ import {
   changeResources,
   cloneState,
   costResource,
+  defaultTarget,
   discardFromHand,
   effectiveCost,
+  eliminate,
   finishGame,
   highestOf,
+  isMultiplayer,
   isSchoolBanned,
+  opponents,
   other,
   ultimateThreshold,
 } from './core';
-import { isConditionMet, resolvePending, runOps } from './effects';
+import { copySource, effectsNeedTarget, isConditionMet, resolvePending, runOps } from './effects';
 import { randomPick } from './rng';
 import { settle } from './turn';
 import type {
@@ -19,6 +23,7 @@ import type {
   Board,
   ActionResult,
   CardId,
+  EffectOp,
   EngineError,
   ErrorCode,
   GameEvent,
@@ -72,7 +77,7 @@ export function playBlocker(state: Board, player: PlayerId, cardId: CardId): Eng
     return fail('cannotAfford', `Not enough ${costResource(cardId)} (needs ${cost})`);
   }
   const needsCopy = getCard(cardId).effects.some((op) => op.op === 'copyLast');
-  if (needsCopy && state.players[other(player)].lastPlayedCard === null) {
+  if (needsCopy && copySource(state, player) === null) {
     return fail('nothingToCopy', 'The opponent has not played a card yet');
   }
   return null;
@@ -81,8 +86,16 @@ export function playBlocker(state: Board, player: PlayerId, cardId: CardId): Eng
 function validate(state: GameState, action: Action): EngineError | null {
   if (state.phase === 'finished') return fail('gameOver', 'The game is over');
   if (action.type === 'timeout') return null;
-  if (action.player !== 0 && action.player !== 1) return fail('invalidAction', 'Unknown player');
+  if (!Number.isInteger(action.player) || !state.players[action.player]) {
+    return fail('invalidAction', 'Unknown player');
+  }
+  if (state.players[action.player]!.eliminated) return fail('invalidAction', 'That player is out of the game');
   if (action.type === 'concede') return null;
+  if ((action.type === 'play' || action.type === 'ultimate') && action.target !== undefined) {
+    if (!opponents(state, action.player).includes(action.target)) {
+      return fail('invalidAction', 'The target must be a rival still in the game');
+    }
+  }
   if (action.player !== state.active) return fail('notYourTurn', 'It is not your turn');
 
   if (action.type === 'choose') {
@@ -119,7 +132,19 @@ function validate(state: GameState, action: Action): EngineError | null {
   }
 }
 
-function playCard(state: GameState, events: GameEvent[], player: PlayerId, uid: number): void {
+/** Context target for a 3+ player `choose` game (undefined otherwise). */
+function targetOf(state: GameState, player: PlayerId, target: PlayerId | undefined): { target?: PlayerId } {
+  if (!isMultiplayer(state)) return {};
+  return { target: target ?? defaultTarget(state, player) };
+}
+
+function playCard(
+  state: GameState,
+  events: GameEvent[],
+  player: PlayerId,
+  uid: number,
+  target: PlayerId | undefined,
+): void {
   const self = state.players[player];
   const index = self.hand.findIndex((c) => c.uid === uid);
   const { cardId } = self.hand[index]!;
@@ -138,7 +163,12 @@ function playCard(state: GameState, events: GameEvent[], player: PlayerId, uid: 
   state.actionsLeft -= 1;
   events.push({ type: 'cardPlayed', player, uid, cardId, resource, cost, combo });
 
-  runOps(state, events, { player, source: { kind: 'card', id: cardId }, combo }, card.effects);
+  runOps(
+    state,
+    events,
+    { player, source: { kind: 'card', id: cardId }, combo, ...targetOf(state, player, target) },
+    card.effects,
+  );
 }
 
 /** The discard action: one to `rules.discardMax` cards. The Saboteur's steal happens once per action. */
@@ -150,7 +180,7 @@ function discardCards(state: GameState, events: GameEvent[], player: PlayerId, u
 
   const steal = getHero(self.hero).passive.stealOnDiscard;
   if (steal) {
-    const opponent = other(player);
+    const opponent = isMultiplayer(state) ? defaultTarget(state, player) : other(player);
     const resource = highestOf(state.players[opponent].resources);
     const reason = { kind: 'hero' as const, id: self.hero };
     const taken = changeResources(state, events, opponent, { [resource]: -steal }, reason);
@@ -159,7 +189,7 @@ function discardCards(state: GameState, events: GameEvent[], player: PlayerId, u
   }
 }
 
-function useUltimate(state: GameState, events: GameEvent[], player: PlayerId): void {
+function useUltimate(state: GameState, events: GameEvent[], player: PlayerId, target: PlayerId | undefined): void {
   const self = state.players[player];
   self.ultimateCharge = 0;
   self.ultimateUses += 1;
@@ -167,7 +197,7 @@ function useUltimate(state: GameState, events: GameEvent[], player: PlayerId): v
   runOps(
     state,
     events,
-    { player, source: { kind: 'ultimate', id: self.hero }, combo: false },
+    { player, source: { kind: 'ultimate', id: self.hero }, combo: false, ...targetOf(state, player, target) },
     getHero(self.hero).ultimate,
   );
 }
@@ -205,19 +235,25 @@ export function applyAction(previous: GameState, action: Action): ActionResult {
 
   switch (action.type) {
     case 'play':
-      playCard(state, events, action.player, action.uid);
+      playCard(state, events, action.player, action.uid, action.target);
       break;
     case 'discard':
       discardCards(state, events, action.player, [action.uid, ...(action.also ?? [])]);
       break;
     case 'ultimate':
-      useUltimate(state, events, action.player);
+      useUltimate(state, events, action.player, action.target);
       break;
     case 'choose':
       resolvePending(state, events, action.option);
       break;
     case 'concede':
-      finishGame(state, events, other(action.player), 'concede');
+      if (!isMultiplayer(state)) {
+        finishGame(state, events, other(action.player), 'concede');
+      } else {
+        eliminate(state, events, action.player, null);
+        const left = opponents(state, action.player);
+        if (left.length === 1) finishGame(state, events, left[0]!, 'concede');
+      }
       break;
     case 'timeout':
       timeOut(state, events);
@@ -245,17 +281,34 @@ export function legalActions(state: Board): Action[] {
     return state.pending.options.map((option) => ({ type: 'choose', player, option }));
   }
 
+  // 3+ players choosing targets: one action per rival for effects that hit one.
+  const rivals = choosesTargets(state) ? opponents(state, player) : [];
+  const aimed = <T extends Action>(action: T, ops: readonly EffectOp[]): T[] =>
+    rivals.length > 1 && effectsNeedTarget(ops) ? rivals.map((target) => ({ ...action, target })) : [action];
+
   const actions: Action[] = [];
-  if (isUltimateReady(state, player)) actions.push({ type: 'ultimate', player });
-  for (const card of state.players[player].hand) {
+  if (isUltimateReady(state, player)) {
+    actions.push(...aimed({ type: 'ultimate', player }, getHero(state.players[player]!.hero).ultimate));
+  }
+  for (const card of state.players[player]!.hand) {
     if (card.cardId !== null && !playBlocker(state, player, card.cardId)) {
-      actions.push({ type: 'play', player, uid: card.uid });
+      actions.push(...aimed({ type: 'play', player, uid: card.uid }, getCard(card.cardId).effects));
     }
   }
   for (const card of state.players[player].hand) {
     actions.push({ type: 'discard', player, uid: card.uid });
   }
   return actions;
+}
+
+/** True when the player aims each card at one rival (3+ players, `choose` mode). */
+export function choosesTargets(state: Board): boolean {
+  return state.players.length > 2 && state.rules.multiTargeting === 'choose';
+}
+
+/** True if playing `cardId` (3+ players, `choose` mode) needs a rival picked as target. */
+export function cardNeedsTarget(cardId: CardId): boolean {
+  return effectsNeedTarget(getCard(cardId).effects);
 }
 
 /**

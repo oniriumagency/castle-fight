@@ -1,5 +1,5 @@
 import { isUltimateReady } from './actions';
-import { other, ultimateThreshold } from './core';
+import { ultimateThreshold } from './core';
 import type {
   GameEvent,
   GameState,
@@ -38,6 +38,7 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: PlayerId): Pla
     lastPlayedCard: p.lastPlayedCard,
     comboSchool: p.comboSchool,
     schoolsLastTurn: p.schoolsLastTurn.slice(),
+    eliminated: !!p.eliminated,
     hand: p.hand.map((c) => ({ uid: c.uid, cardId: visible ? c.cardId : null })),
     deckCount: p.deck.length,
     discardCount: p.discard.length,
@@ -57,6 +58,7 @@ export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
         ? { revealed: state.pending.revealed.map((c) => ({ ...c })) }
         : {}),
       ...(state.pending.progress ? { progress: { ...state.pending.progress } } : {}),
+      ...(state.pending.ctx.target !== undefined ? { target: state.pending.ctx.target } : {}),
     };
   }
   return {
@@ -68,7 +70,7 @@ export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
     phase: state.phase,
     actionsLeft: state.actionsLeft,
     extraTurn: state.extraTurn,
-    players: [publicPlayer(state, 0, viewer), publicPlayer(state, 1, viewer)],
+    players: state.players.map((_, p) => publicPlayer(state, p, viewer)),
     pending,
     activeEvent: state.activeEvent ? { ...state.activeEvent } : null,
     upcomingEvent: { ...state.upcomingEvent },
@@ -92,8 +94,8 @@ export function redactEvents(events: readonly GameEvent[], viewer: PlayerId): Ga
         return { type: event.type, player: event.player, kind: event.kind, options: [] };
       }
       case 'handRevealed':
-        // The hand of `event.player` is shown to the other player, who is the only one who needs it.
-        return event.player === other(viewer) ? event : { ...event, cards: [] };
+        // The revealed hand is shown to the rivals; its owner already knows it.
+        return event.player !== viewer ? event : { ...event, cards: [] };
       default:
         return event;
     }

@@ -849,7 +849,7 @@ class BoardScreen implements Screen {
       case 'wallsSwapped': {
         shown[0].wall = e.walls[0];
         shown[1].wall = e.walls[1];
-        await fx.wallsSwapped(e.walls, [shown[0].keep, shown[1].keep], ctx);
+        await fx.wallsSwapped([e.walls[0]!, e.walls[1]!], [shown[0].keep, shown[1].keep], ctx);
         this.render();
         break;
       }

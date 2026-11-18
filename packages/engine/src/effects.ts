@@ -7,7 +7,10 @@ import {
   dealDamage,
   discardFromHand,
   drawCards,
+  defaultTarget,
   highestOf,
+  isMultiplayer,
+  opponents,
   other,
   statusDurationBonus,
 } from './core';
@@ -42,6 +45,72 @@ interface Choice {
   progress?: { done: number; left: number };
 }
 
+// ---------------------------------------------------------------------------
+// Targets (who "the opponent" is)
+// ---------------------------------------------------------------------------
+
+/** Ops that do something to "the opponent". With 3+ players they need a target. */
+const RIVAL_OPS: ReadonlySet<EffectOp['op']> = new Set([
+  'damage',
+  'stealResource',
+  'drainResources',
+  'loseWorker',
+  'stealWorker',
+  'burn',
+  'frost',
+  'destroyEnchantment',
+  'revealHand',
+  'peekAndDiscard',
+  'discardRandom',
+  'swapWalls',
+]);
+
+/** True if these effects touch a rival (so, with 3+ players in `choose` mode, a target is picked). */
+export function effectsNeedTarget(ops: readonly EffectOp[]): boolean {
+  return ops.some(
+    (op) =>
+      RIVAL_OPS.has(op.op) || (op.op === 'if' && (effectsNeedTarget(op.then) || effectsNeedTarget(op.else ?? []))),
+  );
+}
+
+/** True when every living rival is hit at once (3+ players, `all` mode, 2+ rivals left). */
+function hitsAll(state: GameState, player: PlayerId): boolean {
+  return isMultiplayer(state) && state.rules.multiTargeting === 'all' && opponents(state, player).length > 1;
+}
+
+/** The rivals an effect of `ctx.player` reaches. */
+function victims(state: GameState, ctx: EffectContext): PlayerId[] {
+  if (!isMultiplayer(state)) return [other(ctx.player)];
+  if (hitsAll(state, ctx.player)) return opponents(state, ctx.player);
+  return [primaryTarget(state, ctx)];
+}
+
+/** The one rival a single-target effect hits. */
+function primaryTarget(state: GameState, ctx: EffectContext): PlayerId {
+  if (!isMultiplayer(state)) return other(ctx.player);
+  const t = ctx.target;
+  if (t !== undefined && t !== ctx.player && state.players[t] && !state.players[t].eliminated) return t;
+  return defaultTarget(state, ctx.player);
+}
+
+/** Scale an amount that now lands on every rival at once. */
+function perRival(state: GameState, player: PlayerId, amount: number): number {
+  if (!hitsAll(state, player)) return amount;
+  return Math.max(1, Math.round(amount * state.rules.multiAllScale));
+}
+
+/**
+ * The rival whose last card a copy effect copies: the one who played most
+ * recently (previous in turn order first).
+ */
+export function copySource(state: Board, player: PlayerId): PlayerId | null {
+  if (state.players.length <= 2) {
+    return state.players[other(player)]!.lastPlayedCard !== null ? other(player) : null;
+  }
+  const list = opponents(state, player).reverse();
+  return list.find((p) => state.players[p]!.lastPlayedCard !== null) ?? null;
+}
+
 /** The extra amount a `perDiscard` op gets for the cards its effect discarded. */
 function discardBonus(ctx: EffectContext, op: { perDiscard?: number }): number {
   return (op.perDiscard ?? 0) * (ctx.discarded ?? 0);
@@ -52,7 +121,7 @@ function evalCondition(state: Board, ctx: Pick<EffectContext, 'player'>, cond: C
     case 'selfKeepBelow':
       return state.players[ctx.player].keep < cond.value;
     case 'opponentPlayedSchoolLastTurn':
-      return state.players[other(ctx.player)].schoolsLastTurn.includes(cond.school);
+      return opponents(state, ctx.player).some((p) => state.players[p]!.schoolsLastTurn.includes(cond.school));
   }
 }
 
@@ -67,7 +136,9 @@ export function isConditionMet(state: Board, player: PlayerId, cardId: CardId): 
 
 /** The decision an op needs, or null when it needs none. */
 function choiceFor(state: GameState, ctx: EffectContext, op: EffectOp): Choice | null {
-  const opp = state.players[other(ctx.player)];
+  // When a card hits every rival at once, rival choices take their default for each one.
+  if (RIVAL_OPS.has(op.op) && hitsAll(state, ctx.player)) return null;
+  const opp = state.players[primaryTarget(state, ctx)]!;
   switch (op.op) {
     case 'frost': {
       if (op.scope !== 'choice') return null;
@@ -108,15 +179,21 @@ function choiceFor(state: GameState, ctx: EffectContext, op: EffectOp): Choice |
   }
 }
 
+/** The resource a rival produces most of (then stockpiles most of): the default Frost pick. */
+function topResource(state: GameState, player: PlayerId): Resource {
+  const p = state.players[player]!;
+  return [...RESOURCES].sort((a, b) => p.workers[b] - p.workers[a] || p.resources[b] - p.resources[a])[0]!;
+}
+
 function applyFrost(
   state: GameState,
   events: GameEvent[],
   ctx: EffectContext,
+  target: PlayerId,
   resources: readonly Resource[],
   baseTurns: number,
 ): void {
-  const target = other(ctx.player);
-  const opp = state.players[target];
+  const opp = state.players[target]!;
   const turns = baseTurns + statusDurationBonus(state, ctx.player);
   for (const resource of resources) {
     opp.frost[resource] = Math.min(state.rules.frostMaxTurns, opp.frost[resource] + turns);
@@ -137,9 +214,10 @@ function applyOp(
   answer: string | null,
 ): { ops: EffectOp[]; ctx: EffectContext } | null {
   const me = ctx.player;
-  const them = other(me);
-  const self = state.players[me];
-  const opp = state.players[them];
+  const self = state.players[me]!;
+  const targets = victims(state, ctx);
+  const them = primaryTarget(state, ctx);
+  const opp = state.players[them]!;
   const reason = ctx.source;
 
   switch (op.op) {
@@ -155,14 +233,18 @@ function applyOp(
       const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0) + discardBonus(ctx, op);
       if (amount <= 0) return null;
       const times = op.times ?? 1;
-      for (let i = 0; i < times; i++) {
-        dealDamage(state, events, me, them, amount, {
-          kind: op.kind ?? 'normal',
-          cause: ctx.source.kind === 'ultimate' ? 'ultimate' : 'card',
-          attack: true,
-          ...(op.wallMultiplier !== undefined ? { wallMultiplier: op.wallMultiplier } : {}),
-        });
-        if (checkGameOver(state, events)) break;
+      const each = perRival(state, me, amount);
+      for (const target of targets) {
+        for (let i = 0; i < times; i++) {
+          if (state.players[target]!.eliminated) break;
+          dealDamage(state, events, me, target, each, {
+            kind: op.kind ?? 'normal',
+            cause: ctx.source.kind === 'ultimate' ? 'ultimate' : 'card',
+            attack: true,
+            ...(op.wallMultiplier !== undefined ? { wallMultiplier: op.wallMultiplier } : {}),
+          });
+          if (checkGameOver(state, events)) return null;
+        }
       }
       return null;
     }
@@ -181,45 +263,59 @@ function applyOp(
       return null;
 
     case 'stealResource': {
-      const resource = highestOf(opp.resources);
-      const taken = changeResources(state, events, them, { [resource]: -op.amount }, reason);
-      const amount = -(taken[resource] ?? 0);
-      if (amount > 0) changeResources(state, events, me, { [resource]: amount }, reason);
+      const each = perRival(state, me, op.amount);
+      for (const target of targets) {
+        const resource = highestOf(state.players[target]!.resources);
+        const taken = changeResources(state, events, target, { [resource]: -each }, reason);
+        const amount = -(taken[resource] ?? 0);
+        if (amount > 0) changeResources(state, events, me, { [resource]: amount }, reason);
+      }
       return null;
     }
 
-    case 'drainResources':
-      changeResources(
-        state,
-        events,
-        them,
-        { piedra: -op.amount, acero: -op.amount, mana: -op.amount },
-        reason,
-      );
+    case 'drainResources': {
+      const each = perRival(state, me, op.amount);
+      for (const target of targets) {
+        changeResources(state, events, target, { piedra: -each, acero: -each, mana: -each }, reason);
+      }
       return null;
+    }
 
     case 'loseWorker':
-      changeWorkers(state, events, them, { [highestOf(opp.workers)]: -1 }, reason);
+      for (const target of targets) {
+        changeWorkers(state, events, target, { [highestOf(state.players[target]!.workers)]: -1 }, reason);
+      }
       return null;
 
     case 'stealWorker': {
       // The opponent keeps at least `minWorkers`; you gain the worker either way.
+      // Against several rivals each one loses a worker but you gain only one.
       const worker = highestOf(opp.workers);
-      changeWorkers(state, events, them, { [worker]: -1 }, reason);
+      for (const target of targets) {
+        changeWorkers(state, events, target, { [highestOf(state.players[target]!.workers)]: -1 }, reason);
+      }
       changeWorkers(state, events, me, { [worker]: 1 }, reason);
       return null;
     }
 
     case 'burn': {
-      const turns = op.turns + statusDurationBonus(state, me);
-      opp.burn = Math.min(state.rules.burnMaxTurns, opp.burn + turns);
-      events.push({ type: 'burnApplied', player: them, turns, total: opp.burn });
+      const turns = perRival(state, me, op.turns + statusDurationBonus(state, me));
+      for (const target of targets) {
+        const t = state.players[target]!;
+        t.burn = Math.min(state.rules.burnMaxTurns, t.burn + turns);
+        events.push({ type: 'burnApplied', player: target, turns, total: t.burn });
+      }
       return null;
     }
 
     case 'frost':
-      if (op.scope === 'all') applyFrost(state, events, ctx, RESOURCES, op.turns);
-      else if (answer !== null) applyFrost(state, events, ctx, [answer as Resource], op.turns);
+      if (op.scope === 'all') {
+        for (const target of targets) applyFrost(state, events, ctx, target, RESOURCES, op.turns);
+      } else if (targets.length > 1) {
+        for (const target of targets) {
+          applyFrost(state, events, ctx, target, [topResource(state, target)], op.turns);
+        }
+      } else if (answer !== null) applyFrost(state, events, ctx, them, [answer as Resource], op.turns);
       return null;
 
     case 'shield': {
@@ -265,18 +361,33 @@ function applyOp(
     }
 
     case 'destroyEnchantment': {
-      if (answer === null) return null;
-      const index = opp.enchantments.findIndex((e) => e.cardId === answer);
-      if (index >= 0) {
-        opp.enchantments.splice(index, 1);
-        events.push({ type: 'enchantmentRemoved', player: them, cardId: answer, reason: 'destroyed' });
+      // Against several rivals each one loses its longest-lasting enchantment.
+      const picks: [PlayerId, string | null][] =
+        targets.length > 1
+          ? targets.map((t) => [
+              t,
+              [...state.players[t]!.enchantments].sort((a, b) => b.turnsLeft - a.turnsLeft)[0]?.cardId ?? null,
+            ])
+          : [[them, answer]];
+      for (const [target, cardId] of picks) {
+        if (cardId === null) continue;
+        const list = state.players[target]!.enchantments;
+        const index = list.findIndex((e) => e.cardId === cardId);
+        if (index >= 0) {
+          list.splice(index, 1);
+          events.push({ type: 'enchantmentRemoved', player: target, cardId, reason: 'destroyed' });
+        }
       }
       return null;
     }
 
     case 'revealHand':
-      opp.handRevealed = true;
-      events.push({ type: 'handRevealed', player: them, cards: opp.hand.map((c) => ({ ...c })) });
+      for (const target of targets) {
+        const t = state.players[target]!;
+        t.handRevealed = true;
+        t.revealedBy = me;
+        events.push({ type: 'handRevealed', player: target, cards: t.hand.map((c) => ({ ...c })) });
+      }
       return null;
 
     case 'drawbridge':
@@ -285,12 +396,22 @@ function applyOp(
       return null;
 
     case 'peekAndDiscard':
-      if (answer !== null) discardFromHand(state, events, them, Number(answer), 'effect');
+      if (targets.length > 1) {
+        // Against several rivals each one loses its most expensive card.
+        for (const target of targets) {
+          const hand = state.players[target]!.hand;
+          const best = [...hand].sort((a, b) => getCard(b.cardId).cost - getCard(a.cardId).cost)[0];
+          if (best) discardFromHand(state, events, target, best.uid, 'effect');
+        }
+      } else if (answer !== null) discardFromHand(state, events, them, Number(answer), 'effect');
       return null;
 
     case 'discardRandom':
-      for (let i = 0; i < op.count && opp.hand.length > 0; i++) {
-        discardFromHand(state, events, them, randomPick(state, opp.hand).uid, 'effect');
+      for (const target of targets) {
+        const hand = state.players[target]!.hand;
+        for (let i = 0; i < op.count && hand.length > 0; i++) {
+          discardFromHand(state, events, target, randomPick(state, hand).uid, 'effect');
+        }
       }
       return null;
 
@@ -315,15 +436,18 @@ function applyOp(
       return null;
 
     case 'swapWalls': {
+      // Against several rivals: swap with the tallest Wall.
+      const rival = targets.reduce((a, b) => (state.players[b]!.wall > state.players[a]!.wall ? b : a), them);
       const mine = self.wall;
-      self.wall = opp.wall;
-      opp.wall = mine;
-      events.push({ type: 'wallsSwapped', walls: [state.players[0].wall, state.players[1].wall] });
+      self.wall = state.players[rival]!.wall;
+      state.players[rival]!.wall = mine;
+      events.push({ type: 'wallsSwapped', walls: state.players.map((p) => p.wall) });
       return null;
     }
 
     case 'copyLast': {
-      const copied = opp.lastPlayedCard;
+      const from = copySource(state, me);
+      const copied = from === null ? null : state.players[from]!.lastPlayedCard;
       if (copied === null) return null;
       // From now on this counts as the last card you played, so a Mirage
       // answering a Mirage copies the original card instead of looping.
@@ -331,7 +455,12 @@ function applyOp(
       events.push({ type: 'cardCopied', player: me, cardId: copied });
       return {
         ops: getCard(copied).effects,
-        ctx: { player: me, source: { kind: 'card', id: copied }, combo: false },
+        ctx: {
+          player: me,
+          source: { kind: 'card', id: copied },
+          combo: false,
+          ...(ctx.target !== undefined ? { target: ctx.target } : {}),
+        },
       };
     }
 

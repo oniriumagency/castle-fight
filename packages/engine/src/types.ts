@@ -10,7 +10,18 @@
 // Vocabulary
 // ---------------------------------------------------------------------------
 
-export type PlayerId = 0 | 1;
+/**
+ * Seat index, from 0. Classic games have 2 players; the free-for-all
+ * prototype has 3. In 2-player games "the opponent" is always `other(p)`.
+ */
+export type PlayerId = number;
+
+/**
+ * How cards that hit "the opponent" work when there are 3 or more players.
+ *  - `choose`: the player picks one rival per card (the `target` of the action).
+ *  - `all`: the card hits every living rival, scaled by `rules.multiAllScale`.
+ */
+export type MultiTargeting = 'choose' | 'all';
 export type Locale = 'es' | 'en';
 export type LocalizedText = Record<Locale, string>;
 
@@ -71,6 +82,17 @@ export interface Rules {
   eventKeepFloor: number;
   /** After this many turns the higher Keep wins. 0 disables the limit. */
   turnLimit: number;
+  /** 3+ players only: how cards that hit "the opponent" pick their victims. */
+  multiTargeting: MultiTargeting;
+  /**
+   * 3+ players, `all` mode, while 2+ rivals are alive: damage, steals, drains
+   * and Burn turns are multiplied by this per rival (rounded, at least 1).
+   */
+  multiAllScale: number;
+  /** 3+ players: attacks against the strict leader (highest Keep) deal this much more. */
+  leaderExtraDamage: number;
+  /** 3+ players: whoever knocks a castle down gains this much of each resource. */
+  eliminationBounty: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,6 +299,10 @@ export interface PlayerState {
   drawbridge: boolean;
   /** This player's hand is visible to the opponent until the opponent's next turn. */
   handRevealed: boolean;
+  /** Who revealed it; the hand hides again when that player's next turn starts. */
+  revealedBy?: PlayerId;
+  /** 3+ players: this castle fell and the player no longer takes turns. */
+  eliminated?: boolean;
   /** Damage taken towards the next ultimate (see `ultimateThreshold`). */
   ultimateCharge: number;
   /** Times this player has used the ultimate. */
@@ -303,6 +329,8 @@ export interface EffectContext {
   combo: boolean;
   /** Cards this effect has made its player discard so far (drives `perDiscard`). */
   discarded?: number;
+  /** 3+ players, `choose` mode: the rival this effect is aimed at. */
+  target?: PlayerId;
 }
 
 export type ChoiceKind =
@@ -346,7 +374,7 @@ export type GamePhase =
 export type GameOverReason =
   /** The winner's Keep reached `rules.keepWin`. */
   | 'keepBuilt'
-  /** The loser's Keep fell to 0. */
+  /** The loser's Keep fell to 0 (with 3+ players: the winner is the last castle standing). */
   | 'keepDestroyed'
   | 'concede'
   /** `rules.turnLimit` was reached; the higher Keep (then Wall) wins. */
@@ -373,7 +401,7 @@ export interface GameState {
   actionsLeft: number;
   /** True when the current turn is an extra turn. */
   extraTurn: boolean;
-  players: [PlayerState, PlayerState];
+  players: PlayerState[];
   pending: PendingChoice | null;
   /** Battle event with a lasting effect that is currently running. */
   activeEvent: { id: BattleEventId; turnsLeft: number } | null;
@@ -399,6 +427,7 @@ export interface BoardPlayer {
   /** Schools of the cards played during this player's last turn (drives some card conditions). */
   schoolsLastTurn: School[];
   hand: VisibleCard[];
+  eliminated?: boolean;
 }
 
 /**
@@ -410,7 +439,7 @@ export interface Board {
   rules: Rules;
   active: PlayerId;
   phase: GamePhase;
-  players: [BoardPlayer, BoardPlayer];
+  players: BoardPlayer[];
   pending: { player: PlayerId; options: string[] } | null;
   activeEvent: { id: BattleEventId; turnsLeft: number } | null;
   /** Present on a `PlayerView` only. */
@@ -423,14 +452,14 @@ export interface Board {
 
 export type Action =
   /** Play the card `uid` from your hand, paying its cost. */
-  | { type: 'play'; player: PlayerId; uid: number }
+  | { type: 'play'; player: PlayerId; uid: number; target?: PlayerId }
   /**
    * Discard the card `uid` from your hand as your action, plus the cards in
    * `also` (up to `rules.discardMax` cards in all). The hand refills at the end of the turn.
    */
   | { type: 'discard'; player: PlayerId; uid: number; also?: number[] }
   /** Use the hero ultimate. Free action: it does not use up your play. */
-  | { type: 'ultimate'; player: PlayerId }
+  | { type: 'ultimate'; player: PlayerId; target?: PlayerId }
   /** Answer the pending choice with one of `state.pending.options`. */
   | { type: 'choose'; player: PlayerId; option: string }
   /** Give up. Allowed at any time, for either player. */
@@ -475,7 +504,7 @@ export interface VisibleCard {
 export type ChangeReason = EffectSource | { kind: 'production' | 'hero' | 'battleEvent'; id: string };
 
 export type GameEvent =
-  | { type: 'gameStarted'; firstPlayer: PlayerId; heroes: [HeroId, HeroId] }
+  | { type: 'gameStarted'; firstPlayer: PlayerId; heroes: HeroId[] }
   | { type: 'turnStarted'; player: PlayerId; turn: number; extraTurn: boolean }
   | { type: 'turnEnded'; player: PlayerId; turn: number }
   /** A global battle event fired. `turns` is set for lasting events. */
@@ -530,7 +559,7 @@ export type GameEvent =
     }
   /** A Keep or Wall shrank without being attacked (battle events). */
   | { type: 'structureLost'; player: PlayerId; target: 'keep' | 'wall'; amount: number; reason: ChangeReason }
-  | { type: 'wallsSwapped'; walls: [number, number] }
+  | { type: 'wallsSwapped'; walls: number[] }
   | { type: 'burnApplied'; player: PlayerId; turns: number; total: number }
   | { type: 'frostApplied'; player: PlayerId; resource: Resource; turns: number; total: number }
   | { type: 'shieldGained'; player: PlayerId; charges: number; total: number }
@@ -554,6 +583,8 @@ export type GameEvent =
   | { type: 'extraTurnGranted'; player: PlayerId }
   | { type: 'extraPlayGranted'; player: PlayerId }
   | { type: 'timedOut'; player: PlayerId }
+  /** 3+ players: a castle fell. `by` is who knocked it down (null for a concession). */
+  | { type: 'playerEliminated'; player: PlayerId; by: PlayerId | null }
   | { type: 'gameOver'; winner: PlayerId | null; reason: GameOverReason };
 
 // ---------------------------------------------------------------------------
@@ -582,6 +613,7 @@ export interface PlayerPublicState {
   comboSchool: School | null;
   /** Schools of the cards played during this player's last turn. */
   schoolsLastTurn: School[];
+  eliminated: boolean;
   /** Your own cards are always visible; the opponent's only when revealed. */
   hand: VisibleCard[];
   deckCount: number;
@@ -596,6 +628,8 @@ export interface PendingChoiceView {
   revealed?: CardInstance[];
   /** For `discardOwn`: cards discarded so far and how many more at most. */
   progress?: { done: number; left: number };
+  /** 3+ players: the rival the effect is aimed at. */
+  target?: PlayerId;
 }
 
 /** What one player is allowed to know. Safe to send to that player's client. */
@@ -609,7 +643,7 @@ export interface PlayerView {
   actionsLeft: number;
   extraTurn: boolean;
   /** Indexed by `PlayerId`, like `GameState.players`. */
-  players: [PlayerPublicState, PlayerPublicState];
+  players: PlayerPublicState[];
   pending: PendingChoiceView | null;
   activeEvent: { id: BattleEventId; turnsLeft: number } | null;
   upcomingEvent: { id: BattleEventId; turn: number };

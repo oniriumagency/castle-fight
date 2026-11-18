@@ -7,8 +7,8 @@ import type { GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from 
 export interface GameOptions {
   /** Same seed + same actions = same game. Use an unpredictable value online. */
   seed: number | string;
-  /** Hero of player 0 and player 1. */
-  heroes: [HeroId, HeroId];
+  /** Hero of each player, by seat: 2 heroes for a duel, 3 for the free-for-all prototype. */
+  heroes: HeroId[];
   /** Who takes the first turn. Random (from the seed) when omitted. */
   firstPlayer?: PlayerId;
   /** Overrides for the default rules, mainly for balance simulations and tests. */
@@ -47,6 +47,7 @@ function createPlayer(state: GameState, hero: HeroId): PlayerState {
  * (unknown hero), since that is a programming error rather than a player move.
  */
 export function createGame(options: GameOptions): { state: GameState; events: GameEvent[] } {
+  if (options.heroes.length < 2 || options.heroes.length > 4) throw new Error('A game needs 2 to 4 players');
   for (const hero of options.heroes) {
     if (!isHeroId(hero)) throw new Error(`Unknown hero "${hero}"`);
   }
@@ -73,18 +74,20 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
     result: null,
   } as unknown as GameState;
 
-  state.players = [createPlayer(state, options.heroes[0]), createPlayer(state, options.heroes[1])];
+  const n = options.heroes.length;
+  state.players = options.heroes.map((hero) => createPlayer(state, hero));
   state.upcomingEvent.id = rollBattleEvent(state, null);
-  const firstPlayer = options.firstPlayer ?? (randomInt(state, 2) as PlayerId);
-  // Moving second costs a tempo; a slightly taller Wall makes up for it.
-  state.players[firstPlayer === 0 ? 1 : 0].wall += rules.secondPlayerWall;
+  const firstPlayer = options.firstPlayer ?? (randomInt(state, n) as PlayerId);
+  // Moving later costs tempo; a slightly taller Wall makes up for it (more for each seat further back).
+  for (let seat = 1; seat < n; seat++) {
+    state.players[(firstPlayer + seat) % n]!.wall += rules.secondPlayerWall * seat;
+  }
 
   const events: GameEvent[] = [
-    { type: 'gameStarted', firstPlayer, heroes: [options.heroes[0], options.heroes[1]] },
+    { type: 'gameStarted', firstPlayer, heroes: options.heroes.slice() },
     { type: 'battleEventForecast', eventId: state.upcomingEvent.id, turn: state.upcomingEvent.turn },
   ];
-  drawCards(state, events, 0, rules.handSize);
-  drawCards(state, events, 1, rules.handSize);
+  for (let p = 0; p < n; p++) drawCards(state, events, p, rules.handSize);
   startTurn(state, events, firstPlayer, false);
   return { state, events };
 }

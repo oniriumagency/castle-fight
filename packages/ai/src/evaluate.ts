@@ -76,6 +76,11 @@ export interface Weights {
   enchantAttack: number;
   enchantWallReduction: number;
   enchantCostIncrease: number;
+  /**
+   * 3+ players: how much the strongest rival counts against you, against the
+   * average of all rivals (1 = only the strongest). Defaults to 0.6.
+   */
+  rivalFocus?: number;
 }
 
 export const DEFAULT_WEIGHTS: Readonly<Weights> = Object.freeze({
@@ -270,9 +275,9 @@ function enchantmentPerTurn(tables: Tables, cardId: CardId, w: Weights): number 
 
 /** Rough number of turns each player still has, from how close either Keep is to the end. */
 function horizon(state: GameState, w: Weights): number {
-  const [a, b] = state.players;
-  const toKill = Math.min(a.keep + a.wall * 0.5, b.keep + b.wall * 0.5) / w.killPace;
-  const toBuild = (state.rules.keepWin - Math.max(a.keep, b.keep)) / w.buildPace;
+  const alive = state.players.filter((p) => !p.eliminated);
+  const toKill = Math.min(...alive.map((p) => p.keep + p.wall * 0.5)) / w.killPace;
+  const toBuild = (state.rules.keepWin - Math.max(...alive.map((p) => p.keep))) / w.buildPace;
   return Math.max(1, Math.min(w.horizonMax, toKill, toBuild));
 }
 
@@ -351,11 +356,24 @@ export function evaluate(state: GameState, me: PlayerId, w: Weights, rootUid: nu
     if (state.result.winner === null) return 0;
     return state.result.winner === me ? WIN - state.turn : -WIN + state.turn;
   }
-  const opponent: PlayerId = me === 0 ? 1 : 0;
+  if (state.players[me]!.eliminated) return -WIN + state.turn;
   const tables = tablesFor(w, state.rules.keepWin);
   const turnsLeft = horizon(state, w);
-  const value =
-    sideValue(state, me, turnsLeft, w, tables, rootUid) -
-    sideValue(state, opponent, turnsLeft, w, tables, rootUid);
+  const mine = sideValue(state, me, turnsLeft, w, tables, rootUid);
+  if (state.players.length <= 2) {
+    const opponent: PlayerId = me === 0 ? 1 : 0;
+    return (
+      mine - sideValue(state, opponent, turnsLeft, w, tables, rootUid) + (state.active === me ? w.tempo / 2 : -w.tempo / 2)
+    );
+  }
+  // Free-for-all: what matters is the strongest rival, and a little the rest.
+  // A fallen rival counts as 0, so knocking one out is worth a lot.
+  const rivals = state.players
+    .map((p, i) => (i === me ? null : p.eliminated ? 0 : sideValue(state, i, turnsLeft, w, tables, rootUid)))
+    .filter((v): v is number => v !== null);
+  const focus = w.rivalFocus ?? 0.6;
+  const strongest = Math.max(...rivals);
+  const average = rivals.reduce((a, b) => a + b, 0) / rivals.length;
+  const value = mine - (focus * strongest + (1 - focus) * average);
   return value + (state.active === me ? w.tempo / 2 : -w.tempo / 2);
 }
