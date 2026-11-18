@@ -1542,6 +1542,70 @@
   min-height: 1.2em;
 }
 
+/* Hero for the rematch: one row of portraits per player on this device. */
+.rematch-heroes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.rematch-hero-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 14px;
+}
+
+.rematch-hero-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+  font-family: var(--display);
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+.rematch-hero-name {
+  color: var(--gold);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rematch-hero-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.rematch-hero-picks .opp-pick {
+  width: 38px;
+  height: 38px;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.rematch-hero-picks .opp-pick:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.rematch-hero-picks .opp-pick[aria-pressed='true'] {
+  border-color: var(--hero, var(--gold-l));
+  box-shadow: 0 0 12px var(--hero, rgb(255 200 90 / 70%));
+}
+
+.rematch-hero-picks .opp-pick:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.rematch-hero-picks .opp-pick[aria-pressed='true']:disabled {
+  opacity: 1;
+}
+
 .curtain {
   position: absolute;
   inset: 0;
@@ -1885,8 +1949,18 @@
 
   .results-crest,
   .rematch-note,
+  .rematch-heroes,
   .results-actions {
     grid-column: 1 / -1;
+  }
+
+  .rematch-hero-picks .opp-pick {
+    width: 30px;
+    height: 30px;
+  }
+
+  .rematch-heroes {
+    gap: 4px;
   }
 
   .results-crest h1 {

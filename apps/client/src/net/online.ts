@@ -1,4 +1,4 @@
-import { HEROES, type PlayerId } from '@cardcraft-castles/engine';
+import { HEROES, type HeroId, type PlayerId } from '@cardcraft-castles/engine';
 import type { Emote, HeroChoice, PlayerAction, RoomInfo } from '@cardcraft-castles/protocol';
 import { OnlineClient, roomIdFromUrl, type RoomConnection } from '@cardcraft-castles/protocol/client';
 import { BaseSession, type MatchSession, type Presence, type Seat } from '../game/session';
@@ -107,7 +107,8 @@ export class OnlineSession extends BaseSession implements MatchSession {
     // The server owns the clock.
   }
 
-  rematch(hero?: HeroChoice): void {
+  rematch(heroes?: Partial<Record<PlayerId, HeroId>>): void {
+    const hero: HeroChoice | undefined = heroes?.[this.seat];
     this.connection.rematch(hero);
   }
 

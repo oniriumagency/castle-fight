@@ -62,8 +62,11 @@ export interface MatchSession {
   act(action: PlayerAction): void;
   /** The board finished animating the latest state. Local sessions start the AI and the clock here. */
   idle(): void;
-  /** Start a new game with the same seats (or ask the opponent online). */
-  rematch(): void;
+  /**
+   * Start a new game with the same seats (or ask the opponent online).
+   * `heroes` changes the hero of the seats this device plays.
+   */
+  rematch(heroes?: Partial<Record<PlayerId, HeroId>>): void;
   /**
    * Where the board keeps this game's statistics so they survive a page
    * reload (online games resume mid-match). Null when there is nothing to keep.
