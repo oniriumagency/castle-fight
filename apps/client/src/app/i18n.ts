@@ -236,6 +236,10 @@ const STRINGS = {
   blockedSchoolBanned: { es: 'Un evento prohíbe esta escuela ahora.', en: 'A battle event forbids this school right now.' },
   blockedNothingToCopy: { es: 'El rival aún no ha jugado ninguna carta.', en: 'Your opponent has not played a card yet.' },
   blockedNotYourTurn: { es: 'Espera a tu turno.', en: 'Wait for your turn.' },
+  blockedAlreadyPlayed: { es: 'Ya jugaste tu carta este turno. Pulsa «Listo» para terminarlo.', en: 'You already played your card this turn. Press “Ready” to end it.' },
+  readyButton: { es: '¡Listo!', en: 'Ready!' },
+  readyButtonHint: { es: 'Terminar turno', en: 'End turn' },
+  readyButtonTitle: { es: 'Terminar el turno (Espacio)', en: 'End your turn (Space)' },
   dragHint: { es: 'Arrastra hacia arriba para jugar, o sobre el descarte para descartar', en: 'Drag up to play, or onto the discard pile to discard' },
   waitingOpponent: { es: 'Esperando a {who}…', en: 'Waiting for {who}…' },
   thinking: { es: '{who} está pensando…', en: '{who} is thinking…' },
@@ -389,8 +393,8 @@ const STRINGS = {
     en: 'Win by raising your <b>Castle</b> to {win} or bringing your opponent’s down to 0.',
   },
   rulesTurn: {
-    es: 'Al empezar tu turno repones la mano hasta {hand} cartas y tus trabajadores producen recursos. Después juegas una carta pagando su coste, o descartas de 1 a 3 cartas.',
-    en: 'When your turn starts you draw back up to {hand} cards and your workers produce resources. Then you play one card by paying its cost, or discard 1 to 3 cards.',
+    es: 'Al empezar tu turno repones la mano hasta {hand} cartas y tus trabajadores producen recursos. Después juegas una carta pagando su coste, o descartas de 1 a 3 cartas. Tu definitiva puedes usarla antes o después, y el turno acaba cuando pulsas <b>¡Listo!</b> (o se agota el tiempo).',
+    en: 'When your turn starts you draw back up to {hand} cards and your workers produce resources. Then you play one card by paying its cost, or discard 1 to 3 cards. You can use your ultimate before or after, and the turn ends when you press <b>Ready!</b> (or the clock runs out).',
   },
   rulesSchools: {
     es: 'Cada escuela se paga con su recurso: <b>Construcción</b> con Piedra, <b>Asalto</b> con Acero y <b>Arcano</b> con Maná. Los Canteros, Herreros y Arcanistas producen 1 por turno cada uno.',
@@ -413,8 +417,8 @@ const STRINGS = {
     en: 'If the game drags on, in round {start} (once every player has taken {before} turns) the <b>Twilight Fury</b> falls (it can be turned off when creating an online room). It rises a level every {step} rounds, and for each level attacks deal +{atk}, cards that raise your Castle give +{build}, and at the start of your turn you take {dmg} normal damage (Wall first). It keeps rising until someone wins by the usual rules.',
   },
   rulesControls: {
-    es: 'Toca una carta para verla grande y jugarla o descartarla. En ordenador también puedes arrastrarla, o usar las teclas 1 a 6, Intro para jugar, Supr para descartar y U para la definitiva.',
-    en: 'Tap a card to see it large and play or discard it. On a computer you can also drag it, or use keys 1 to 6, Enter to play, Delete to discard and U for the ultimate.',
+    es: 'Toca una carta para verla grande y jugarla o descartarla. En ordenador también puedes arrastrarla, o usar las teclas 1 a 6, Intro para jugar, Supr para descartar, U para la definitiva y Espacio para «Listo».',
+    en: 'Tap a card to see it large and play or discard it. On a computer you can also drag it, or use keys 1 to 6, Enter to play, Delete to discard, U for the ultimate and Space for “Ready”.',
   },
 } as const satisfies Record<string, LocalizedText>;
 
