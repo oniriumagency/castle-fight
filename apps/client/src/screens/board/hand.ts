@@ -13,10 +13,12 @@ import {
 } from '@cardcraft-castles/engine';
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
+import { effectsLow } from '../../app/quality';
 import { audio } from '../../fx/audio';
 import { boostTag } from '../../game/combo';
 import { cardBack, cardFace, glossaryFor } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
+import '../../styles/combo-aura.css';
 
 export interface HandContext {
   view: PlayerView;
@@ -172,6 +174,7 @@ export class Hand {
       slot.el.classList.toggle('blocked', myTurn && !!reason);
       const combo = myTurn && !reason && isComboActive(ctx.view, ctx.seat, slot.cardId);
       slot.el.classList.toggle('combo', combo);
+      setComboAura(slot.el, combo);
       slot.el.classList.toggle('boosted', combo || (myTurn && !reason && isConditionMet(ctx.view, ctx.seat, slot.cardId)));
       const cost = effectiveCost(ctx.view, ctx.seat, slot.cardId);
       const costEl = slot.el.querySelector('.cost');
@@ -410,3 +413,27 @@ export function inspectPanel(opts: {
 }
 
 export type InspectPanel = HTMLDivElement & { updateActions: (reason: string | null, canAct: boolean) => void };
+
+/**
+ * The magic aura around a card in hand whose Combo is on: a soft halo
+ * behind it, a spinning arcane ring, a sweep of light over the face and
+ * sparks rising along its sides. Only transform and opacity animate, so it
+ * stays light on phones; reduced motion keeps a still, bright aura.
+ */
+function setComboAura(card: HTMLElement, on: boolean): void {
+  const glow = card.querySelector(':scope > .combo-glow');
+  if (!on) {
+    glow?.remove();
+    card.querySelector(':scope > .combo-aura')?.remove();
+    return;
+  }
+  if (glow) return;
+  const sparks = effectsLow() ? 4 : 8;
+  let dots = '';
+  for (let i = 0; i < sparks; i++) dots += `<b style="--i:${i};--n:${sparks}"></b>`;
+  card.insertAdjacentHTML(
+    'beforeend',
+    `<div class="combo-glow" aria-hidden="true"></div>` +
+      `<div class="combo-aura" aria-hidden="true"><div class="ca-ring"><i></i></div><div class="ca-sweep"><i></i></div><div class="ca-sparks">${dots}</div></div>`,
+  );
+}
