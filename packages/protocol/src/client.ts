@@ -603,6 +603,8 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
           return [{ type: 'choose', option: action.option }];
         case 'ultimate':
           return [{ type: 'ultimate' }];
+        case 'endTurn':
+          return [{ type: 'endTurn' }];
         default:
           return [];
       }
@@ -626,6 +628,11 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
 
   ultimate(): boolean {
     return this.act({ type: 'ultimate' });
+  }
+
+  /** "Ready": end your turn. */
+  endTurn(): boolean {
+    return this.act({ type: 'endTurn' });
   }
 
   choose(option: string): boolean {

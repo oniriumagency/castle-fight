@@ -300,12 +300,15 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
 
 /**
  * Called after an effect finished resolving: the turn goes on if the player
- * still has a card to play, otherwise it ends.
+ * still has a card to play, otherwise it ends. With `rules.manualEndTurn` the
+ * turn only ends on `endTurn` (or `force`, the clock running out), so the
+ * player can still use the ultimate after their play.
  */
-export function settle(state: GameState, events: GameEvent[]): void {
+export function settle(state: GameState, events: GameEvent[], force = false): void {
   if (state.phase === 'finished' || state.pending) return;
   const self = state.players[state.active]!;
-  if (state.actionsLeft > 0 && !self.eliminated && self.hand.length > 0) {
+  const waitForReady = state.rules.manualEndTurn === true && !force;
+  if (!self.eliminated && (waitForReady || (state.actionsLeft > 0 && self.hand.length > 0))) {
     state.phase = 'action';
   } else {
     endTurn(state, events);

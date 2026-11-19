@@ -515,7 +515,7 @@ export class RoomCore<S> {
       seed: this.host.randomSeed(),
       heroes,
       ...(winner === null ? {} : { firstPlayer: (winner + 1) % seats.length }),
-      rules: { turnSeconds: room.timings.turnSeconds, ...(room.twilight === false ? { twilightRound: 0 } : {}) },
+      rules: { turnSeconds: room.timings.turnSeconds, manualEndTurn: true, ...(room.twilight === false ? { twilightRound: 0 } : {}) },
     });
     seats.forEach((s, i) => {
       s.hero = heroes[i]!;

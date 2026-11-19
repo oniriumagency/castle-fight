@@ -113,12 +113,19 @@ function validate(state: GameState, action: Action): EngineError | null {
       return isUltimateReady(state, action.player)
         ? null
         : fail('ultimateNotReady', 'The ultimate is not charged yet');
+    case 'endTurn':
+      if (state.rules.manualEndTurn !== true) return fail('invalidAction', 'The turn ends by itself in this game');
+      return canEndTurn(state)
+        ? null
+        : fail('mustPlayFirst', 'Play or discard a card before ending your turn');
     case 'play': {
+      if (state.actionsLeft <= 0) return fail('noPlaysLeft', 'You already played this turn');
       const card = state.players[action.player].hand.find((c) => c.uid === action.uid);
       if (!card) return fail('cardNotInHand', 'That card is not in your hand');
       return playBlocker(state, action.player, card.cardId);
     }
     case 'discard': {
+      if (state.actionsLeft <= 0) return fail('noPlaysLeft', 'You already played this turn');
       const uids = [action.uid, ...(action.also ?? [])];
       if (uids.length > state.rules.discardMax || new Set(uids).size !== uids.length) {
         return fail('invalidAction', `Discard between 1 and ${state.rules.discardMax} different cards`);
@@ -130,6 +137,15 @@ function validate(state: GameState, action: Action): EngineError | null {
     default:
       return fail('invalidAction', 'Unknown action');
   }
+}
+
+/**
+ * True when the active player may end the turn now (`rules.manualEndTurn`):
+ * the play of the turn is used up, or there is no card left to play.
+ */
+export function canEndTurn(state: Board): boolean {
+  if (state.rules.manualEndTurn !== true || state.phase !== 'action') return false;
+  return (state.actionsLeft ?? 0) <= 0 || state.players[state.active]!.hand.length === 0;
 }
 
 /** Context target for a 3+ player `choose` game (undefined otherwise). */
@@ -271,9 +287,12 @@ export function applyAction(previous: GameState, action: Action): ActionResult {
     case 'timeout':
       timeOut(state, events);
       break;
+    case 'endTurn':
+      break;
   }
 
-  settle(state, events);
+  // The clock and "Ready" end the turn even when the player could still act.
+  settle(state, events, action.type === 'timeout' || action.type === 'endTurn');
   return { ok: true, state, events };
 }
 
@@ -306,6 +325,9 @@ export function legalActions(state: Board): Action[] {
   if (isUltimateReady(state, player)) {
     add(actions, { type: 'ultimate', player }, () => getHero(state.players[player]!.hero).ultimate);
   }
+  if (canEndTurn(state)) actions.push({ type: 'endTurn', player });
+  // A view from before `actionsLeft` was sent counts as having the play.
+  if ((state.actionsLeft ?? 1) <= 0) return actions;
   for (const card of state.players[player]!.hand) {
     if (card.cardId !== null && !playBlocker(state, player, card.cardId)) {
       const cardId = card.cardId;

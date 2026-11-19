@@ -18,6 +18,7 @@ export {
   replay,
   currentPlayer,
   isUltimateReady,
+  canEndTurn,
   isComboActive,
   isBoostActive,
   playBlocker,
