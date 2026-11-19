@@ -127,7 +127,7 @@ function lerpColor(a: number, b: number, t: number): number {
 const SKY = 'scenery/sky.jpg';
 const TERRAIN = 'scenery/terrain.png';
 const BACKDROP = 'scenery/backdrop.jpg';
-const TERRAIN_GROUND = 0.8;
+const TERRAIN_GROUND = 0.72;
 /** The sky is drawn this much wider than the screen, and sways across the extra. */
 const SKY_OVERSCAN = 0.12;
 /** One full sway, left and back, in milliseconds. */
@@ -135,6 +135,12 @@ const SKY_SWAY_MS = 180_000;
 /** Endless drift of a seamless sky, in screen pixels per second. */
 const SKY_DRIFT = 5;
 const SEAMLESS_ASPECT = 2.8;
+/**
+ * The painted sky sits this far (of its height) above the horizon, so its
+ * clouds clear the mountains; below it, its own horizon colour fills down.
+ */
+const SKY_LIFT = 0.2;
+const SKY_HORIZON = 0xbe8364;
 
 async function loadArt(path: string): Promise<Texture | null> {
   try {
@@ -198,6 +204,8 @@ export class Battlefield {
   private readonly paintedSky = new Sprite();
   /** A seamless sky, drawn instead of `paintedSky`. */
   private readonly skyTile = new TilingSprite();
+  /** Horizon colour under the lifted sky, behind the mountains. */
+  private readonly skyFloor = new Graphics();
   private skySway = { x: 0, room: 0, time: 0 };
   /** The drawn sun glow; a painted sky has its own light, so it is barely there. */
   private sunGain = 1;
@@ -276,7 +284,7 @@ export class Battlefield {
     this.painted.visible = false;
     this.paintedSky.visible = false;
     this.skyTile.visible = false;
-    this.world.addChild(this.skyA, this.skyB, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
+    this.world.addChild(this.skyA, this.skyB, this.skyFloor, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
@@ -296,7 +304,7 @@ export class Battlefield {
       const seamless = sky.width / sky.height >= SEAMLESS_ASPECT;
       this.paintedSky.visible = !seamless;
       this.skyTile.visible = seamless;
-      this.paintedSky.tint = this.skyTile.tint = skyTint(this.mood);
+      this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = skyTint(this.mood);
       this.skyA.visible = this.skyB.visible = false;
       // Painted clouds are in the picture; the drawn ones only drift faintly over it.
       for (const cloud of this.clouds) cloud.alpha *= 0.45;
@@ -322,8 +330,13 @@ export class Battlefield {
   /** Covers the screen with the painting, its ground line on the castles' ground. */
   private layoutBackdrop(): void {
     const skyTex = this.paintedSky.texture;
+    this.skyFloor.clear();
+    if ((this.skyTile.visible || this.paintedSky.visible) && skyTex.width) {
+      const full = this.groundY + 8;
+      this.skyFloor.rect(0, full * (1 - SKY_LIFT) - 4, this.width, full * SKY_LIFT + 4).fill({ color: SKY_HORIZON });
+    }
     if (this.skyTile.visible && skyTex.width) {
-      const h = this.groundY + 8;
+      const h = (this.groundY + 8) * (1 - SKY_LIFT);
       const k = Math.max(h / skyTex.height, this.width / skyTex.width);
       this.skyTile.width = this.width;
       this.skyTile.height = h;
@@ -333,7 +346,7 @@ export class Battlefield {
     if (this.paintedSky.visible && skyTex.width) {
       // The sky covers the screen down to just below the ground line, where
       // the terrain covers it, with its warm bottom glow on the horizon.
-      const h = this.groundY + 8;
+      const h = (this.groundY + 8) * (1 - SKY_LIFT);
       const k = Math.max(h / skyTex.height, (this.width * (1 + SKY_OVERSCAN)) / skyTex.width);
       this.paintedSky.scale.set(k);
       const room = skyTex.width * k - this.width;
@@ -480,7 +493,7 @@ export class Battlefield {
         };
         this.applyTints();
         this.painted.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
-        this.paintedSky.tint = this.skyTile.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
+        this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
       .then(() => {
         this.applySky(mood, this.skyA);
