@@ -394,6 +394,10 @@ export class Battlefield {
   }
 
   layout(field?: FieldRect): void {
+    // The screens lay out on the window's resize event, before Pixi's own
+    // (deferred) resize: bring the canvas to the window size first, or the
+    // scene would be laid out for the old size.
+    this.app.resize();
     this.width = this.app.screen.width;
     this.height = this.app.screen.height;
     if (field) this.lastRect = field;
