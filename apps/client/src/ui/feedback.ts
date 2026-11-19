@@ -2,8 +2,9 @@
  * The feedback button in the bottom left corner, on every screen: players
  * write what went wrong or what they would change, attach screenshots, and
  * it reaches the developer (read at /reportes). The game's version, mode,
- * heroes and the browser go along automatically. At the start of every game
- * a speech bubble points at the button.
+ * heroes and the browser go along automatically. The first time a player
+ * reaches the main menu, a speech bubble points at the button; it never comes
+ * back, and it is never shown during a game, where it would cover the board.
  */
 import { REPORT_LIMITS, type ReportKind } from '@cardcraft-castles/protocol';
 import { h, html, isTouch, toast } from '../app/dom';
@@ -19,8 +20,26 @@ const ENDPOINT = `${serverUrl.replace(/\/+$/, '')}/api/reports`;
 
 /** Screenshots are shrunk to this many pixels on the long side, then to the byte limit. */
 const MAX_SIDE = 1920;
-const HINT_DELAY_MS = 2200;
-const HINT_MS = 9000;
+const HINT_DELAY_MS = 1500;
+const HINT_MS = 7000;
+/** Set once the player has seen the bubble (or opened the dialog): it is shown once per player. */
+const HINT_SEEN_KEY = 'cardcraft-castles:feedback-hint-seen';
+
+function hintSeen(): boolean {
+  try {
+    return localStorage.getItem(HINT_SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markHintSeen(): void {
+  try {
+    localStorage.setItem(HINT_SEEN_KEY, '1');
+  } catch {
+    // Private mode: it may show again next visit, which is harmless.
+  }
+}
 
 interface Attachment {
   blob: Blob;
@@ -54,46 +73,48 @@ export function initFeedback(): void {
 }
 
 /**
- * The speech bubble next to the button, shortly after a game starts. With
- * `above`, it stands over that element (the hand) instead of covering it.
+ * The speech bubble next to the button, shortly after the main menu opens,
+ * only the first time ever. It goes away by itself, or on any tap or key.
  */
-export function showFeedbackHint(above?: HTMLElement): void {
+export function showFeedbackHint(): void {
   hideFeedbackHint();
-  hintTimers.push(
-    window.setTimeout(() => {
-      if (!button?.isConnected) return;
-      hint = h(
-        'div.feedback-hint',
-        {
-          role: 'status',
-          onclick: (e: Event) => {
-            e.stopPropagation();
-            openFeedback();
-          },
+  if (hintSeen()) return;
+  const appear = (): void => {
+    if (!button?.isConnected || hintSeen()) return;
+    // Not over a dialog or the "turn your phone" screen: try again a little later.
+    const rotate = document.querySelector('.rotate-screen');
+    if (document.querySelector('.modal-backdrop') || (rotate && getComputedStyle(rotate).display !== 'none')) {
+      hintTimers.push(window.setTimeout(appear, HINT_DELAY_MS));
+      return;
+    }
+    markHintSeen();
+    hint = h(
+      'div.feedback-hint',
+      {
+        role: 'status',
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          openFeedback();
         },
-        t('feedbackHint'),
-      );
-      const top = above?.isConnected ? above.getBoundingClientRect().top : 0;
-      if (top > 0 && top < window.innerHeight - 60) {
-        hint.classList.add('lifted');
-        hint.style.bottom = `${Math.round(window.innerHeight - top + 10)}px`;
-      }
-      document.body.append(hint);
-      requestAnimationFrame(() => hint?.classList.add('in'));
-      // Any tap or key elsewhere puts it away; it never blocks the game.
-      const listening = new AbortController();
-      hintListeners = listening;
-      const away = (e: Event): void => {
-        if (!(e.target instanceof Node && hint?.contains(e.target))) hideFeedbackHint();
-      };
-      window.setTimeout(() => {
-        if (listening.signal.aborted) return;
-        document.addEventListener('pointerdown', away, { capture: true, signal: listening.signal });
-        document.addEventListener('keydown', away, { capture: true, signal: listening.signal });
-      }, 0);
-      hintTimers.push(window.setTimeout(hideFeedbackHint, HINT_MS));
-    }, HINT_DELAY_MS),
-  );
+      },
+      t('feedbackHint'),
+    );
+    document.body.append(hint);
+    requestAnimationFrame(() => hint?.classList.add('in'));
+    // Any tap or key elsewhere puts it away; it never blocks anything.
+    const listening = new AbortController();
+    hintListeners = listening;
+    const away = (e: Event): void => {
+      if (!(e.target instanceof Node && hint?.contains(e.target))) hideFeedbackHint();
+    };
+    window.setTimeout(() => {
+      if (listening.signal.aborted) return;
+      document.addEventListener('pointerdown', away, { capture: true, signal: listening.signal });
+      document.addEventListener('keydown', away, { capture: true, signal: listening.signal });
+    }, 0);
+    hintTimers.push(window.setTimeout(hideFeedbackHint, HINT_MS));
+  };
+  hintTimers.push(window.setTimeout(appear, HINT_DELAY_MS));
 }
 
 export function hideFeedbackHint(): void {
@@ -177,6 +198,7 @@ const KINDS: [ReportKind, StringKey][] = [
 ];
 
 export function openFeedback(): void {
+  markHintSeen();
   hideFeedbackHint();
   if (document.querySelector('.modal.feedback')) return;
   audio.play('uiClick');
