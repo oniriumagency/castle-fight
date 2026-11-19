@@ -20,7 +20,7 @@ import type {
 export * from './validate';
 
 /** Bumped on every breaking change; the server rejects other versions. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -244,6 +244,8 @@ export type ActionIntent =
   /** `also`: more cards discarded in the same action (the rules cap the total). */
   | { type: 'discard'; uid: number; also?: number[] }
   | { type: 'ultimate' }
+  /** "Ready": end the turn once the play is used up. */
+  | { type: 'endTurn' }
   | { type: 'choose'; option: string }
   | { type: 'concede' };
 

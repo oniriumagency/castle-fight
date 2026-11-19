@@ -1,6 +1,8 @@
 import {
+  CARDS,
   DEFAULT_RULES,
   RESOURCES,
+  canEndTurn,
   getBattleEvent,
   getCard,
   getHero,
@@ -93,6 +95,13 @@ class BoardScreen implements Screen {
   private readonly plaques: CastlePlaque[];
   private readonly hand = new Hand();
   private readonly ultMode = new UltimateMode();
+  /** "Ready": ends the turn once the card of the turn is played. */
+  private readonly readyBtn = h(
+    'button.ready-btn',
+    { type: 'button', hidden: true },
+    h('span.ready-btn-label', null, t('readyButton')),
+    h('small', null, t('readyButtonHint')),
+  ) as HTMLButtonElement;
   /** Each rival's hand (by side; side 0 has none). */
   private readonly oppHands: HTMLElement[];
   private readonly stage = h('div.play-stage');
@@ -198,6 +207,7 @@ class BoardScreen implements Screen {
       this.stage,
       this.hand.el,
       this.ultMode.button,
+      this.readyBtn,
       this.ultMode.aura,
       this.floaters,
       this.banner,
@@ -211,6 +221,8 @@ class BoardScreen implements Screen {
       const view = this.view;
       if (view && this.canAct() && view.players[view.viewer].ultimateReady) this.act({ type: 'ultimate', player: view.viewer });
     };
+    this.readyBtn.title = t('readyButtonTitle');
+    this.readyBtn.addEventListener('click', () => this.endTurn());
     this.ultMode.pulse = () => fx.ultimateAura(this.fxContext(), this.ultMode.button.classList.contains('usable'));
     for (const panel of this.panels) {
       panel.onInspect = (entry) => {
@@ -237,7 +249,9 @@ class BoardScreen implements Screen {
 
   mount(): void {
     audio.music('battle');
-    void preloadArt([...this.session.seats.map((s) => getHero(s.hero).art)]);
+    // Heroes first, then every card in the game (about 3 MB in all), so a card
+    // drawn later already has its illustration instead of a dark panel while it downloads.
+    void preloadArt(this.session.seats.map((s) => getHero(s.hero).art)).then(() => preloadArt(CARDS.map((c) => c.art)));
     this.field.setCount(this.count);
     setTableSize(this.count);
     this.field.setHeroes(this.sides().map((side) => this.session.seats[this.seatOfSide(side)].hero));
@@ -386,8 +400,9 @@ class BoardScreen implements Screen {
       peek = 0;
       this.hand.mode = 'scroll';
     } else if (short) {
-      // With the ultimate ready, the hero button takes about 0.82 of a card next to the hand.
-      cardW = this.el.classList.contains('ult-on') ? Math.min((w - 54) / 7.07, (hgt * 0.4) / 1.4) : Math.min((w - 40) / 6.25, (hgt * 0.4) / 1.4);
+      // Each button ("Ready", the hero) takes about 0.82 of a card next to the hand.
+      const buttons = (this.el.classList.contains('ult-on') ? 1 : 0) + (this.el.classList.contains('ready-on') ? 1 : 0);
+      cardW = Math.min((w - 40 - 14 * buttons) / (6.25 + 0.82 * buttons), (hgt * 0.4) / 1.4);
       peek = 0.05;
       this.hand.mode = 'row';
     } else {
@@ -545,6 +560,10 @@ class BoardScreen implements Screen {
       this.busy = false;
     }
     if (this.destroyed || !this.view) return;
+    // A settled board has no card on stage. An update given up on (its animation
+    // stalled in a background tab) never reaches its own clean-up, which left the
+    // rival's card stuck in the middle of the screen until the next play.
+    this.clearPlayed();
     this.field.setCastles(this.castleValues());
     this.setShields(this.view);
     this.syncGraves(this.view);
@@ -620,6 +639,21 @@ class BoardScreen implements Screen {
     );
   }
 
+  /** The player may play or discard a card now (not only use the ultimate or say "Ready"). */
+  private canPlay(): boolean {
+    return this.canAct() && (this.view?.actionsLeft ?? 1) > 0;
+  }
+
+  /** "Ready" can be pressed now. */
+  private canReady(): boolean {
+    return this.canAct() && !!this.view && canEndTurn(this.view);
+  }
+
+  private endTurn(): void {
+    const view = this.view;
+    if (view && this.canReady()) this.act({ type: 'endTurn', player: view.viewer });
+  }
+
   private render(): void {
     // The turn moved on (clock, opponent) while the discard picker was open.
     if (this.closeDiscard && !this.canAct()) this.closeDiscard();
@@ -655,11 +689,22 @@ class BoardScreen implements Screen {
     const mineNow = this.shown[handSeat];
     const ultReady = !!mineNow?.ultimateReady && this.curtain.hidden && handSeat === view.viewer && view.phase !== 'finished';
     if (mineNow) this.ultMode.update(mineNow.hero, ultReady, ultReady && canAct);
+    // "Ready" sits next to the hand (left of the hero button), and pulses when nothing else is left to do.
+    const ready = this.canReady();
+    this.readyBtn.hidden = !ready;
+    this.readyBtn.classList.toggle('only', ready && !(ultReady && canAct));
+    let relayout = false;
     if (this.el.classList.contains('ult-on') !== ultReady) {
       this.el.classList.toggle('ult-on', ultReady);
-      this.layout();
+      relayout = true;
     }
-    this.hand.render(this.handModel, { view, seat: handSeat, canAct });
+    if (this.el.classList.contains('ready-on') !== ready) {
+      this.el.classList.toggle('ready-on', ready);
+      relayout = true;
+    }
+    if (relayout) this.layout();
+    const canPlay = canAct && (view.actionsLeft ?? 1) > 0;
+    this.hand.render(this.handModel, { view, seat: handSeat, canAct: canPlay, played: canAct && !canPlay });
     this.refreshInspect?.();
 
     // Rivals' hands: backs, or faces when revealed.
@@ -1270,6 +1315,7 @@ class BoardScreen implements Screen {
   /** The played card flies to the centre, is shown big, and stays until the next one. */
   private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId): Promise<void> {
     this.clearPlayed();
+    const gen = this.animGen;
     const card = markBoost(cardFace(cardId, { className: 'played', hero }), cardId, boost);
     const combo = boost === 'combo';
     if (hero) card.dataset.hero = hero;
@@ -1288,6 +1334,8 @@ class BoardScreen implements Screen {
       { duration: 520 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
     );
     await anim.finished.catch(() => undefined);
+    // Given up on while it flew (the tab was hidden): the board has moved on.
+    if (gen !== this.animGen || this.playedCard !== card) return;
     const landed = card.getBoundingClientRect();
     this.playBurst(cardId, combo);
     if (getCard(cardId).rarity === 'legendaria') this.showLegendaryCall(landed);
@@ -1728,7 +1776,7 @@ class BoardScreen implements Screen {
   /** Open the discard picker with `uid` chosen: the player may add more cards, up to the rules' cap. */
   private tryDiscard(uid: number): void {
     const ctx = this.hand.context;
-    if (!ctx || !this.canAct()) return;
+    if (!ctx || !this.canPlay()) return;
     const max = ctx.view.rules.discardMax;
     const hand = this.handModel.filter((c) => c.cardId !== null);
     if (max <= 1 || hand.length <= 1) {
@@ -1786,7 +1834,7 @@ class BoardScreen implements Screen {
       wrap.remove();
     };
     const confirm = (): void => {
-      if (!picked.length || !this.canAct()) return close();
+      if (!picked.length || !this.canPlay()) return close();
       close();
       const [first, ...also] = picked;
       this.act(also.length ? { type: 'discard', player: ctx.seat, uid: first!, also } : { type: 'discard', player: ctx.seat, uid: first! });
@@ -1922,6 +1970,9 @@ class BoardScreen implements Screen {
       this.tryPlay(selected);
     } else if ((e.key === 'Delete' || e.key === 'Backspace' || e.key.toLowerCase() === 'd') && selected !== null) {
       this.tryDiscard(selected);
+    } else if (e.key === ' ' && this.canReady()) {
+      e.preventDefault();
+      this.endTurn();
     } else if (e.key.toLowerCase() === 'u') {
       const view = this.view;
       if (view && this.canAct() && view.players[view.viewer].ultimateReady) this.act({ type: 'ultimate', player: view.viewer });

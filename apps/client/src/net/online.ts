@@ -90,6 +90,9 @@ export class OnlineSession extends BaseSession implements MatchSession {
       case 'ultimate':
         this.connection.ultimate();
         break;
+      case 'endTurn':
+        this.connection.endTurn();
+        break;
       case 'choose':
         this.connection.choose(action.option);
         break;

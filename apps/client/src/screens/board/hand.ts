@@ -24,6 +24,8 @@ export interface HandContext {
   seat: PlayerId;
   /** The player may play or discard now. */
   canAct: boolean;
+  /** It is the player's turn, but the card of the turn is already played: only "Ready" (and the ultimate) remain. */
+  played?: boolean;
 }
 
 interface Slot {
@@ -34,7 +36,7 @@ interface Slot {
 
 /** Why a card cannot be played now, in words, or null if it can. */
 export function blockReason(ctx: HandContext, cardId: string): string | null {
-  if (!ctx.canAct) return t('blockedNotYourTurn');
+  if (!ctx.canAct) return t(ctx.played ? 'blockedAlreadyPlayed' : 'blockedNotYourTurn');
   const blocker = playBlocker(ctx.view, ctx.seat, cardId);
   if (!blocker) return null;
   if (blocker.code === 'cannotAfford') {

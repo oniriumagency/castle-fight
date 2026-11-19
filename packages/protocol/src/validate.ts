@@ -81,6 +81,7 @@ export function parseActionIntent(raw: unknown): ActionIntent | null {
       return { type: 'discard', uid: raw.uid, also: raw.also.slice() };
     }
     case 'ultimate':
+    case 'endTurn':
     case 'concede':
       return { type: raw.type };
     case 'choose':

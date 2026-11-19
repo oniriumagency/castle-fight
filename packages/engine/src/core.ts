@@ -478,6 +478,24 @@ export function drawCards(state: GameState, events: GameEvent[], player: PlayerI
   }
 }
 
+/**
+ * The Saboteur's passive: steal `stealOnDiscard` of the opponent's biggest
+ * stockpile (with 3+ players, from the default target). Returns false if the
+ * hero has no such passive. Callers fire it at most once per action or card.
+ */
+export function saboteurSteal(state: GameState, events: GameEvent[], player: PlayerId): boolean {
+  const self = state.players[player];
+  const steal = getHero(self.hero).passive.stealOnDiscard;
+  if (!steal) return false;
+  const opponent = isMultiplayer(state) ? defaultTarget(state, player) : other(player);
+  const resource = highestOf(state.players[opponent].resources);
+  const reason = { kind: 'hero' as const, id: self.hero };
+  const taken = changeResources(state, events, opponent, { [resource]: -steal }, reason);
+  const amount = -(taken[resource] ?? 0);
+  if (amount > 0) changeResources(state, events, player, { [resource]: amount }, reason);
+  return true;
+}
+
 /** Move a card from a hand to its owner's discard pile. Returns false if it is not there. */
 export function discardFromHand(
   state: GameState,
