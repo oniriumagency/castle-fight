@@ -506,15 +506,17 @@ A stonemason in a leather apron, a soot-stained blacksmith with a hammer and a r
 
 El fondo del tablero y del menú va en dos imágenes, sin castillos: los castillos los dibuja el juego encima y crecen con su valor.
 
-- `art/scenery/sky.jpg`: solo cielo, que se repite sin costura de izquierda a derecha. El juego lo desplaza despacio (se para con "Reducir movimiento") y lo tiñe con cada evento.
-- `art/scenery/terrain.png`: montañas, colinas y el valle, sobre un cielo magenta plano (#FF00FF). Los generadores de imágenes no dan transparencias, así que `scripts/build-art.mjs` convierte el magenta en transparente. Un PNG ya transparente también sirve. El suelo donde se apoyan los castillos está al 80 % de la altura.
+- `art/scenery/sky.jpg`: solo cielo. El juego lo dibuja un poco más ancho que la pantalla y lo mece despacio de lado a lado (se para con "Reducir movimiento"), así que no hace falta que sea tileable. También lo tiñe con cada evento.
+- `art/scenery/terrain.png` (o .jpg): montañas, colinas y el valle, sobre un cielo magenta plano (#FF00FF). Los generadores de imágenes no dan transparencias, así que `scripts/build-art.mjs` convierte el magenta en transparente. Un PNG ya transparente también sirve. El suelo donde se apoyan los castillos está al 80 % de la altura.
 
 Si solo existe una de las dos, la otra se sigue dibujando. Una imagen única con todo, `art/scenery/backdrop.jpg`, también funciona.
 
 ### Cielo (`art/scenery/sky.jpg`, 21:9)
 
+Para que sea tileable de verdad, genera en ComfyUI con tiling solo en el eje X, o desplaza la imagen la mitad de su ancho y haz inpaint de la costura.
+
 ```
-A wide panoramic painted sky only, for the background of a strategy card game: towering cumulus clouds and soft wispy streaks at dusk, lit warm amber and rose from a low sun just below the bottom edge, deepening to slate blue at the top. Nothing but sky: no land, no mountains, no horizon line, no buildings, no birds. The image must tile seamlessly from left to right: the left and right edges continue into each other, with no cloud cut off at an edge and an even distribution of clouds across the width. The bottom fifth is a soft bright warm glow with few details, because terrain will cover it. Painterly dark-fantasy illustration, digital oil painting with visible confident brushwork, rich but calm colour, fine atmospheric haze. Colour palette: warm amber, honey, soft rose and slate blue. Aspect ratio 21:9 (or 2:1) landscape, very high resolution. No text, no letters, no logos, no frame, no border, no watermark, no signature.
+Seamless horizontally tileable texture of a painted dusk sky, made to repeat side by side as a scrolling game background. A wide, continuous band of cumulus and stratocumulus clouds stretching evenly across the whole width, like a straight-on strip cut from a 360-degree panorama: clouds of similar size and density spread uniformly from the left edge to the right edge, all drifting parallel to the horizon. No focal point, no central opening or gap in the clouds, no vanishing point, no radial, swirling or converging perspective, no symmetry, no single large hero cloud. The light changes only from top to bottom, never from left to right: deep slate blue at the top, warm amber and soft rose through the middle, a bright warm hazy glow along the bottom fifth with very little detail. The left and right edges have the same colours, brightness and cloud density, and the clouds continue past both edges. Nothing but sky: no land, no mountains, no sun disc, no birds. Painterly dark-fantasy illustration, digital oil painting with visible confident brushwork, rich but calm colour. Aspect ratio 21:9 (or 2:1) landscape, very high resolution. No text, no letters, no logos, no frame, no border, no vignette, no watermark, no signature.
 ```
 
 ### Terreno (`art/scenery/terrain.png`, 16:9)
