@@ -246,7 +246,7 @@ class BoardScreen implements Screen {
     window.addEventListener('keydown', this.onKey);
     // Player reports carry the game being played; every game reminds them the button is there.
     setGameContext(() => this.reportContext());
-    showFeedbackHint();
+    showFeedbackHint(this.hand.el);
     // Online, the browser can call the player back when it is their turn: ask on their first click.
     if (this.session.kind === 'online') this.el.addEventListener('pointerdown', askNotificationPermission, { once: true });
     this.unsubscribeSettings = settings.subscribe((next, prev) => {

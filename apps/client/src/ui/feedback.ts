@@ -53,8 +53,11 @@ export function initFeedback(): void {
   document.body.append(button);
 }
 
-/** The speech bubble next to the button, shortly after a game starts. */
-export function showFeedbackHint(): void {
+/**
+ * The speech bubble next to the button, shortly after a game starts. With
+ * `above`, it stands over that element (the hand) instead of covering it.
+ */
+export function showFeedbackHint(above?: HTMLElement): void {
   hideFeedbackHint();
   hintTimers.push(
     window.setTimeout(() => {
@@ -70,6 +73,11 @@ export function showFeedbackHint(): void {
         },
         t('feedbackHint'),
       );
+      const top = above?.isConnected ? above.getBoundingClientRect().top : 0;
+      if (top > 0 && top < window.innerHeight - 60) {
+        hint.classList.add('lifted');
+        hint.style.bottom = `${Math.round(window.innerHeight - top + 10)}px`;
+      }
       document.body.append(hint);
       requestAnimationFrame(() => hint?.classList.add('in'));
       // Any tap or key elsewhere puts it away; it never blocks the game.

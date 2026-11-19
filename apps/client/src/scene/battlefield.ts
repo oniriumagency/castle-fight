@@ -1,7 +1,8 @@
-import { Application, Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
+import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle } from './castle';
 import {
@@ -112,6 +113,30 @@ function lerpColor(a: number, b: number, t: number): number {
   return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t);
 }
 
+/**
+ * The painted backdrop (`art/scenery/backdrop.jpg`): sky, mountains and the
+ * valley floor in one illustration, with no castles. Its ground line, where
+ * the castles stand, is this far down the image. Without the file the scene
+ * keeps its drawn landscape.
+ */
+const BACKDROP = 'scenery/backdrop.jpg';
+const BACKDROP_GROUND = 0.8;
+
+/**
+ * Battle events recolour the painted backdrop by how far their land colours
+ * are from the default ones: the default mood leaves it as painted.
+ */
+function paintTint(mood: SkyMood): number {
+  const channel = (c: number, shift: number): number => (c >> shift) & 255;
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const ratio = (key: 'far' | 'near'): number => (channel(mood[key], shift) + 24) / (channel(DEFAULT_SKY[key], shift) + 24);
+    const k = Math.min(1, Math.max(0.3, (ratio('far') + ratio('near')) / 2));
+    out |= Math.round(k * 255) << shift;
+  }
+  return out;
+}
+
 export class Battlefield {
   readonly tweens: Tweens;
   /** Every castle the scene can show; only the first `count` are on the field. */
@@ -130,6 +155,8 @@ export class Battlefield {
   private readonly mid = new Graphics();
   private readonly near = new Graphics();
   private readonly ground = new Graphics();
+  private readonly painted = new Sprite();
+  private paintedTint = { from: 0xffffff, to: 0xffffff };
   private readonly weather = new Container();
   private readonly particles: Particle[] = [];
   private readonly pool: Sprite[] = [];
@@ -198,13 +225,43 @@ export class Battlefield {
     ];
     this.castles[2].visible = false;
 
-    this.world.addChild(this.skyA, this.skyB, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
+    this.painted.visible = false;
+    this.world.addChild(this.skyA, this.skyB, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
     this.skyB.alpha = 0;
 
     app.ticker.add((t) => this.update(t.deltaMS));
+    void this.loadBackdrop();
+  }
+
+  /** Swaps the drawn landscape for the painted one when the illustration exists. */
+  private async loadBackdrop(): Promise<void> {
+    let texture: Texture;
+    try {
+      texture = await Assets.load<Texture>({ src: artUrl(BACKDROP), parser: 'loadTextures' });
+    } catch {
+      return;
+    }
+    if (!texture?.width) return;
+    this.painted.texture = texture;
+    this.painted.visible = true;
+    this.painted.tint = paintTint(this.mood);
+    for (const layer of [this.skyA, this.skyB, this.far, this.mid, this.near, this.ground]) layer.visible = false;
+    // Painted clouds are in the picture; the drawn ones only drift faintly over it.
+    for (const cloud of this.clouds) cloud.alpha *= 0.45;
+    this.layoutBackdrop();
+  }
+
+  /** Covers the screen with the painting, its ground line on the castles' ground. */
+  private layoutBackdrop(): void {
+    const tex = this.painted.texture;
+    if (!this.painted.visible || !tex.width) return;
+    const groundPx = tex.height * BACKDROP_GROUND;
+    const scale = Math.max(this.width / tex.width, this.groundY / groundPx, (this.height - this.groundY) / (tex.height - groundPx));
+    this.painted.scale.set(scale);
+    this.painted.position.set((this.width - tex.width * scale) / 2, this.groundY - groundPx * scale);
   }
 
   /** Two castles for a duel, three for a free-for-all (the third stands in the middle). */
@@ -248,6 +305,7 @@ export class Battlefield {
       cloud.scale.set((this.width / 512) * (0.5 + (i % 2) * 0.25));
     });
     this.drawLandscape();
+    this.layoutBackdrop();
 
     // The castles fit a winning Keep in the field, leaving room for the roof.
     const sideRoom = Math.min(rect.width * 0.23, 260);
@@ -315,6 +373,7 @@ export class Battlefield {
     this.applySky(mood, this.skyB);
     this.skyB.alpha = 0;
     const sunFrom = this.sun.alpha;
+    this.paintedTint = { from: this.painted.tint as number, to: paintTint(mood) };
     this.sun.texture = glowTexture(mood.sun, 256);
     return this.tweens
       .run(ms, (t) => {
@@ -327,6 +386,7 @@ export class Battlefield {
           ground: lerpColor(from.ground, to.ground, t),
         };
         this.applyTints();
+        this.painted.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
       }, ease.inOutCubic)
       .then(() => {
         this.applySky(mood, this.skyA);

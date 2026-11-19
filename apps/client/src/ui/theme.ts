@@ -33,12 +33,12 @@ export interface SkyMood {
 }
 
 export const DEFAULT_SKY: SkyMood = {
-  top: '#2b3a5c',
-  middle: '#8a7fa0',
-  horizon: '#f2c48d',
-  far: 0x5d6787,
-  near: 0x34405a,
-  ground: 0x2f3b26,
+  top: '#2a2c44',
+  middle: '#9a7f7c',
+  horizon: '#f4c088',
+  far: 0x6a6478,
+  near: 0x3b3a4a,
+  ground: 0x343a22,
   sun: '255,214,150',
   sunAlpha: 0.9,
   weather: 'none',

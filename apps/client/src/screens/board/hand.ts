@@ -226,12 +226,12 @@ export class Hand {
     big.classList.toggle('boosted', slot.el.classList.contains('boosted'));
     if (big.classList.contains('boosted')) big.append(boostTag(slot.cardId, big.classList.contains('combo')));
     big.classList.toggle('blocked', slot.el.classList.contains('blocked'));
-    const r = slot.el.getBoundingClientRect();
     const hostRect = host.getBoundingClientRect();
     const handTop = this.el.getBoundingClientRect().top;
-    // As large as the inspect view, standing on the hand and kept on screen.
+    // As large as the inspect view, standing on the hand in the middle of the
+    // table (over the deck), so it never hides a castle or a player's panel.
     const w = Math.round(Math.min(300, Math.max(200, (handTop - hostRect.top - 70) / 1.4)));
-    const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    const x = Math.min(Math.max(8, window.innerWidth / 2 - w / 2), window.innerWidth - w - 8);
     big.style.setProperty('--w', `${w}px`);
     big.style.left = `${x - hostRect.left}px`;
     big.style.top = `${Math.max(64, handTop - w * 1.4 - 12) - hostRect.top}px`;

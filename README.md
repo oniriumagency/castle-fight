@@ -50,6 +50,10 @@ Necesita dos secretos en el repositorio (Settings → Secrets and variables → 
 | `CLOUDFLARE_API_TOKEN` | Token de API creado con la plantilla "Edit Cloudflare Workers", limitado a la cuenta y a la zona `onirium.agency`. |
 | `CLOUDFLARE_ACCOUNT_ID` | El Account ID de la cuenta de Cloudflare. |
 
+### Versión de pruebas (preview)
+
+Para probar cambios grandes sin tocar el juego publicado, el flujo [Preview](.github/workflows/preview.yml) publica la rama en un Worker aparte, `cardcraft-castles-preview`, en su dirección de `workers.dev` (sale al final del registro del flujo y en su resumen). Tiene sus propias salas y sus propios reportes, y usa los mismos dos secretos. Se publica en cada push a las ramas que lista el flujo (y a `preview/**`), y nunca toca games.onirium.agency.
+
 ### Reportes y sugerencias de los jugadores
 
 El botón de abajo a la izquierda (en todas las pantallas) abre un formulario para enviar errores, sugerencias o comentarios con hasta tres capturas. Junto al texto se guarda la versión del juego, la pantalla, el modo, los héroes, el turno y el navegador. Se guardan en un Durable Object (`Reports`, con SQLite) del mismo Worker, así que no hace falta crear nada más en Cloudflare; se conservan los 500 más recientes.

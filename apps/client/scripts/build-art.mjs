@@ -13,8 +13,10 @@ import sharp from 'sharp';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, '../../../art');
 const target = join(here, '../public/art');
-const FOLDERS = ['cards', 'heroes', 'events'];
+const FOLDERS = ['cards', 'heroes', 'events', 'scenery'];
 const WIDTH = 720;
+/** The painted battlefield fills the whole screen, so it keeps more pixels. */
+const WIDTHS = { scenery: 2560 };
 
 async function mtime(path) {
   try {
@@ -28,7 +30,9 @@ let built = 0;
 let skipped = 0;
 for (const folder of FOLDERS) {
   await mkdir(join(target, folder), { recursive: true });
-  for (const file of await readdir(join(source, folder))) {
+  // `scenery` is optional: without it the battlefield is drawn.
+  const files = await readdir(join(source, folder)).catch(() => []);
+  for (const file of files) {
     if (!/\.(jpe?g|png)$/i.test(file)) continue;
     const input = join(source, folder, file);
     const output = join(target, folder, file.replace(/\.(jpe?g|png)$/i, '.webp'));
@@ -36,7 +40,10 @@ for (const folder of FOLDERS) {
       skipped++;
       continue;
     }
-    await sharp(input).resize({ width: WIDTH, withoutEnlargement: true }).webp({ quality: 80 }).toFile(output);
+    await sharp(input)
+      .resize({ width: WIDTHS[folder] ?? WIDTH, withoutEnlargement: true })
+      .webp({ quality: folder === 'scenery' ? 84 : 80 })
+      .toFile(output);
     built++;
   }
 }
