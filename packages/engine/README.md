@@ -40,6 +40,7 @@ if (result.ok) {
 | `legalActions(board)` | Todas las acciones del jugador que debe mover (sin `concede` ni `timeout`). |
 | `getPlayerView(state, viewer)` | El estado sin información oculta, listo para enviar a ese jugador. |
 | `redactEvents(events, viewer)` | Los eventos que ese jugador puede ver. |
+| `rollOutcomes(cardId)` | Los resultados posibles del dado de una carta (una cara de cada uno y su probabilidad), o `null` si no tira dado. |
 | `replay(initial, actions)` | Reproduce una partida a partir de su lista de acciones. |
 | `effectiveCost(board, player, cardId)` | Coste actual de una carta, con pasivas, encantamientos y eventos aplicados. |
 | `playBlocker(board, player, cardId)` | Por qué no se puede jugar una carta ahora (`null` si se puede). Sirve para atenuar cartas en la interfaz. |
@@ -112,6 +113,8 @@ Los números base salen de `design/cards.json` y el resto de `DEFAULT_RULES`. To
 **Combo.** Una carta con Combo recibe su bonificación si la última carta que jugaste es de la misma escuela. Descartar rompe la cadena.
 
 **Héroes.** La definitiva se carga con el daño que recibes en Muralla y Torreón (ataques y Quemadura). La primera vez hacen falta 35 puntos y cada uso encarece la siguiente en 15. Usarla es una acción gratuita: después sigues jugando tu carta.
+
+**Dados.** Barril de Pólvora tira un dado de 6 caras con el generador de la partida, así que el resultado sale de la semilla como todo lo demás y nadie puede adivinarlo antes. La tirada es pública (`diceRolled`, con la cara y si acierta, no hace nada o sale por la culata). El daño que te haces a ti mismo no es un ataque: no lo bloquea tu Escudo ni le suman bonificaciones, pero carga tu definitiva como cualquier daño recibido. Con 3 jugadores se escala igual que el golpe a cada rival (21), y si te deja el Torreón en 0 quedas eliminado. `applyAction(state, action, { rolls: [n] })` fuerza el resultado: solo lo usan los tests y la IA para estudiar cada cara; el servidor nunca lo pasa.
 
 **Eventos de batalla.** Salta uno al empezar las rondas 5, 9, 13... (cada 4 rondas, `rules.eventEveryRounds`). Como la Furia, cuenta rondas y no turnos, así que con 2 jugadores son los turnos 9, 17, 25... y con 3, los turnos 13, 25, 37...; los turnos extra no adelantan nada. El siguiente evento se conoce de antemano (`state.upcomingEvent`), para que la interfaz lo anuncie y los jugadores planeen. Nunca se repite el mismo dos veces seguidas. Eclipse y Tregua duran 1 ronda (`state.activeEvent.untilRound`): un turno de cada jugador, juegue con 2 o con 3. Las partidas guardadas antes de este cambio siguen contando turnos. Las pérdidas por eventos no cargan la definitiva, ignoran el Escudo y nunca matan: el Terremoto deja el Torreón en 1 como mínimo.
 

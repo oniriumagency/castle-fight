@@ -17,7 +17,7 @@ import {
   statusDurationBonus,
   twilightLevel,
 } from './core';
-import { randomPick } from './rng';
+import { randomInt, randomPick } from './rng';
 import type {
   Board,
   CardId,
@@ -68,11 +68,18 @@ const RIVAL_OPS: ReadonlySet<EffectOp['op']> = new Set([
   'swapWalls',
 ]);
 
+/** The effects every face of a `roll` can lead to. */
+function rollBranches(op: Extract<EffectOp, { op: 'roll' }>): EffectOp[] {
+  return op.results.flatMap((r) => r.then);
+}
+
 /** True if these effects touch a rival (so, with 3+ players in `choose` mode, a target is picked). */
 export function effectsNeedTarget(ops: readonly EffectOp[]): boolean {
   return ops.some(
     (op) =>
-      RIVAL_OPS.has(op.op) || (op.op === 'if' && (effectsNeedTarget(op.then) || effectsNeedTarget(op.else ?? []))),
+      RIVAL_OPS.has(op.op) ||
+      (op.op === 'if' && (effectsNeedTarget(op.then) || effectsNeedTarget(op.else ?? []))) ||
+      (op.op === 'roll' && effectsNeedTarget(rollBranches(op))),
   );
 }
 
@@ -144,6 +151,31 @@ function evalCondition(state: Board, ctx: Pick<EffectContext, 'player'>, cond: C
  */
 export function isConditionMet(state: Board, player: PlayerId, cardId: CardId): boolean {
   return getCard(cardId).effects.some((op) => op.op === 'if' && evalCondition(state, { player }, op.cond));
+}
+
+/**
+ * The ways a card's die roll can turn out, one entry per distinct result:
+ * a face that gives it (to pass as `applyAction`'s `rolls`) and its chance.
+ * Null for cards that roll no die. Lets the AI weigh every outcome instead of
+ * trusting a single random one.
+ */
+export function rollOutcomes(cardId: CardId): { roll: number; chance: number }[] | null {
+  const op = getCard(cardId).effects.find((o): o is Extract<EffectOp, { op: 'roll' }> => o.op === 'roll');
+  if (!op) return null;
+  const out: { roll: number; chance: number }[] = [];
+  const listed = new Set<number>();
+  for (const r of op.results) {
+    const faces = r.faces.filter((f) => f >= 1 && f <= op.sides && !listed.has(f));
+    faces.forEach((f) => listed.add(f));
+    if (faces.length > 0) out.push({ roll: faces[0]!, chance: faces.length / op.sides });
+  }
+  const rest = op.sides - listed.size;
+  if (rest > 0) {
+    let face = 1;
+    while (listed.has(face)) face++;
+    out.push({ roll: face, chance: rest / op.sides });
+  }
+  return out;
 }
 
 /** The decision an op needs, or null when it needs none. */
@@ -516,6 +548,28 @@ function applyOp(
 
     case 'if':
       return { ops: evalCondition(state, ctx, op.cond) ? op.then : (op.else ?? []), ctx };
+
+    case 'roll': {
+      const forced = state.forcedRolls?.shift();
+      const roll = forced !== undefined && forced >= 1 && forced <= op.sides ? forced : randomInt(state, op.sides) + 1;
+      const result = op.results.find((r) => r.faces.includes(roll));
+      events.push({
+        type: 'diceRolled',
+        player: me,
+        cardId: ctx.source.id,
+        sides: op.sides,
+        roll,
+        outcome: result?.outcome ?? 'miss',
+      });
+      return { ops: result?.then ?? [], ctx };
+    }
+
+    case 'selfDamage': {
+      const amount = perRival(state, me, op.amount);
+      if (amount <= 0) return null;
+      dealDamage(state, events, me, me, amount, { kind: op.kind ?? 'normal', cause: 'card', attack: false });
+      return null;
+    }
   }
 }
 

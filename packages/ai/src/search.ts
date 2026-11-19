@@ -1,5 +1,5 @@
-import { applyAction, legalActions, nextRandom } from '@cardcraft-castles/engine';
-import type { Action, CardId, GameState, PlayerId, PlayerView, RngHolder } from '@cardcraft-castles/engine';
+import { applyAction, legalActions, nextRandom, rollOutcomes } from '@cardcraft-castles/engine';
+import type { Action, ActionResult, CardId, GameState, PlayerId, PlayerView, RngHolder } from '@cardcraft-castles/engine';
 import { determinize } from './determinize';
 import type { Profile } from './difficulty';
 import { WIN, evaluate, holdValue, type Weights } from './evaluate';
@@ -24,6 +24,21 @@ interface Leaf {
 
 function cardOf(state: GameState, player: PlayerId, uid: number): CardId {
   return state.players[player].hand.find((c) => c.uid === uid)!.cardId;
+}
+
+/**
+ * The ways an action can turn out, with their chances. A card that rolls a
+ * die gives one result per distinct outcome, so the AI weighs the whole die
+ * instead of trusting the one face its guessed world would roll. Anything
+ * else gives just its own result.
+ */
+function outcomes(state: GameState, action: Action): { result: ActionResult; chance: number }[] {
+  if (action.type === 'play') {
+    const card = state.players[action.player]!.hand.find((c) => c.uid === action.uid);
+    const rolls = card ? rollOutcomes(card.cardId) : null;
+    if (rolls) return rolls.map((o) => ({ result: applyAction(state, action, { rolls: [o.roll] }), chance: o.chance }));
+  }
+  return [{ result: applyAction(state, action), chance: 1 }];
 }
 
 /**
@@ -73,25 +88,40 @@ function bestTurn(
 ): Leaf {
   const turn = start.turn;
   let budget = TURN_NODE_BUDGET;
-  let best: Leaf | null = null;
 
-  const visit = (state: GameState, penalty: number): void => {
+  // The best way to finish the turn from `state`. A die roll is a chance node:
+  // its value is the average of its outcomes, and the line goes on from the
+  // likeliest one.
+  const visit = (state: GameState, penalty: number): Leaf => {
     const turnOver = state.phase === 'finished' || state.active !== player || state.turn !== turn;
     if (!turnOver && budget > 0) {
-      const actions = distinctActions(state, w, onlyBestDiscard);
-      for (const action of actions) {
-        budget -= 1;
-        const result = applyAction(state, action);
-        if (result.ok) visit(result.state, penalty + (action.type === 'discard' ? w.discard : 0));
+      let best: Leaf | null = null;
+      for (const action of distinctActions(state, w, onlyBestDiscard)) {
+        const branches = outcomes(state, action);
+        budget -= branches.length;
+        const cost = penalty + (action.type === 'discard' ? w.discard : 0);
+        let value = 0;
+        let likeliest: Leaf | null = null;
+        let likeliestChance = -1;
+        for (const { result, chance } of branches) {
+          if (!result.ok) continue;
+          const leaf = visit(result.state, cost);
+          value += chance * leaf.value;
+          if (chance > likeliestChance) {
+            likeliest = leaf;
+            likeliestChance = chance;
+          }
+        }
+        if (!likeliest) continue;
+        const leaf = branches.length === 1 ? likeliest : { ...likeliest, value };
+        if (!best || leaf.value > best.value) best = leaf;
       }
-      return;
+      if (best) return best;
     }
-    const value = evaluate(state, player, w, rootUid) - penalty;
-    if (!best || value > best.value) best = { state, value, penalty };
+    return { state, value: evaluate(state, player, w, rootUid) - penalty, penalty };
   };
 
-  visit(start, startPenalty);
-  return best ?? { state: start, value: evaluate(start, player, w, rootUid) - startPenalty, penalty: startPenalty };
+  return visit(start, startPenalty);
 }
 
 /** Let both sides play their best turn until the opponent has moved `replies` times. */
@@ -160,17 +190,19 @@ export function rankActions(view: PlayerView, profile: Profile, w: Weights, rng:
   if (worlds.length === 0) return options.map((action, i) => ({ action, value: -i }));
   const rootUid = worlds[0]!.nextUid;
 
-  // First look: the AI's own turn, in every world.
-  const leaves: Leaf[][] = options.map(() => []);
+  // First look: the AI's own turn, in every world (and every outcome of a die).
+  const leaves: { leaf: Leaf; chance: number }[][][] = options.map(() => []);
   const ranked: RankedAction[] = options.map((action) => ({ action, value: 0 }));
   for (const world of worlds) {
     options.forEach((action, i) => {
-      const result = applyAction(world, action);
-      const leaf: Leaf = result.ok
-        ? bestTurn(result.state, me, w, rootUid, false, action.type === 'discard' ? w.discard : 0)
-        : { state: world, value: -WIN, penalty: 0 };
-      leaves[i]!.push(leaf);
-      ranked[i]!.value += leaf.value / worlds.length;
+      const branches = outcomes(world, action).map(({ result, chance }) => ({
+        chance,
+        leaf: result.ok
+          ? bestTurn(result.state, me, w, rootUid, false, action.type === 'discard' ? w.discard : 0)
+          : ({ state: world, value: -WIN, penalty: 0 } satisfies Leaf),
+      }));
+      leaves[i]!.push(branches);
+      ranked[i]!.value += branches.reduce((v, b) => v + b.chance * b.leaf.value, 0) / worlds.length;
     });
   }
 
@@ -182,8 +214,10 @@ export function rankActions(view: PlayerView, profile: Profile, w: Weights, rng:
     let deepWorst = Infinity;
     for (const i of deep) {
       let total = 0;
-      for (const leaf of leaves[i]!) {
-        total += playOut(leaf.state, me, profile.replies, w, rootUid) - leaf.penalty;
+      for (const branches of leaves[i]!) {
+        for (const { leaf, chance } of branches) {
+          total += chance * (playOut(leaf.state, me, profile.replies, w, rootUid) - leaf.penalty);
+        }
       }
       ranked[i]!.value = total / worlds.length;
       deepWorst = Math.min(deepWorst, ranked[i]!.value);

@@ -21,11 +21,11 @@ import {
 
 describe('catalog', () => {
   it('loads everything in design/cards.json', () => {
-    expect(CARDS).toHaveLength(70);
+    expect(CARDS).toHaveLength(71);
     expect(HEROES).toHaveLength(6);
     expect(BATTLE_EVENTS).toHaveLength(6);
     expect(CARDS.map((c) => c.id)).toEqual(design.cards.map((c) => c.id));
-    const perSchool = { construccion: 24, asalto: 23, arcano: 23 };
+    const perSchool = { construccion: 24, asalto: 24, arcano: 23 };
     for (const school of ['construccion', 'asalto', 'arcano'] as const) {
       expect(CARDS.filter((c) => c.school === school)).toHaveLength(perSchool[school]);
     }

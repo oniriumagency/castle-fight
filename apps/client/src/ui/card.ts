@@ -128,6 +128,8 @@ function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>
     else if (op.op === 'if') {
       effectNumbers(op.then, out);
       if (op.else) effectNumbers(op.else, out);
+    } else if (op.op === 'roll') {
+      for (const r of op.results) effectNumbers(r.then, out);
     }
   }
   return out;

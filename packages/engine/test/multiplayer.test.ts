@@ -130,8 +130,50 @@ describe('three players', () => {
   }
 });
 
+describe('Powder Keg with three players', () => {
+  function keg(roll: number) {
+    const state = threeWay({ multiTargeting: 'all', multiAllScale: 0.6 });
+    setHand(state, 0, ['barril-de-polvora', 'cimientos']);
+    const uid = state.players[0]!.hand[0]!.uid;
+    const result = applyAction(state, { type: 'play', player: 0, uid }, { rolls: [roll] });
+    if (!result.ok) throw new Error(result.error.message);
+    return { before: state, ...result };
+  }
+
+  it('a hit lands 21 on each rival, a backfire 21 on yourself', () => {
+    const hit = keg(5);
+    for (const p of [1, 2]) {
+      expect(hit.before.players[p]!.wall + hit.before.players[p]!.keep - hit.state.players[p]!.wall - hit.state.players[p]!.keep).toBe(21);
+    }
+    const boom = keg(1);
+    const me = (s: GameState) => s.players[0]!.wall + s.players[0]!.keep;
+    expect(me(boom.before) - me(boom.state)).toBe(21);
+    expect(boom.state.players[1]!.keep).toBe(boom.before.players[1]!.keep);
+  });
+
+  it('a backfire that brings your Keep to 0 knocks you out and the game goes on', () => {
+    const state = threeWay({ multiTargeting: 'all', multiAllScale: 0.6 });
+    state.players[0]!.wall = 0;
+    state.players[0]!.keep = 10;
+    setHand(state, 0, ['barril-de-polvora', 'cimientos']);
+    const uid = state.players[0]!.hand[0]!.uid;
+    const result = applyAction(state, { type: 'play', player: 0, uid }, { rolls: [1] });
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.state.players[0]!.eliminated).toBe(true);
+    expect(result.state.phase).not.toBe('finished');
+    expect(result.state.active).not.toBe(0);
+  });
+});
+
 describe('free-for-all rules text', () => {
-  const flat = (ops: readonly EffectOp[]): EffectOp[] => ops.flatMap((o) => (o.op === 'if' ? [o, ...flat(o.then), ...flat(o.else ?? [])] : [o]));
+  const flat = (ops: readonly EffectOp[]): EffectOp[] =>
+    ops.flatMap((o) =>
+      o.op === 'if'
+        ? [o, ...flat(o.then), ...flat(o.else ?? [])]
+        : o.op === 'roll'
+          ? [o, ...flat(o.results.flatMap((r) => r.then))]
+          : [o],
+    );
   const scaled = (n: number): number => Math.max(1, Math.round(n * DEFAULT_RULES.multiAllScale));
 
   it('every card that reaches the rivals has a 3-player text with the scaled numbers', () => {

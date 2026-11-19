@@ -206,6 +206,11 @@ function opNominal(op: EffectOp, w: Weights): number {
       const b = sum(op.else ?? [], w);
       return Math.max(a, b) * 0.6 + Math.min(a, b) * 0.4;
     }
+    case 'roll':
+      // What the die gives on average.
+      return op.results.reduce((total, r) => total + (sum(r.then, w) * r.faces.length) / op.sides, 0);
+    case 'selfDamage':
+      return -op.amount * (op.kind === 'piercing' ? 1.2 : 0.95);
   }
 }
 
