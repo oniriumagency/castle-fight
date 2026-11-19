@@ -289,6 +289,7 @@ const STRINGS = {
   logTimeoutDiscard: { es: '{who} se quedó sin tiempo y descarta {card}', en: '{who} ran out of time and discards {card}' },
   logEffectDiscard: { es: '{who} pierde {card}', en: '{who} loses {card}' },
   logCopied: { es: '{who} copia {card}', en: '{who} copies {card}' },
+  copiedCard: { es: 'Copió', en: 'Copied' },
   logUltimate: { es: '{who} desata su definitiva', en: '{who} unleashes the ultimate' },
   logDamage: { es: '{who} recibe {n} de daño', en: '{who} takes {n} damage' },
   logBlocked: { es: 'El Escudo de {who} bloquea el ataque', en: "{who}'s Shield blocks the attack" },

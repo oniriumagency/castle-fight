@@ -924,6 +924,10 @@
   width: min(300px, 46vw);
 }
 
+.board.touch .inspect-copied .card {
+  --w: min(220px, 28vw, calc((100vh - 60px) / 1.4));
+}
+
 .board.touch .inspect-actions .btn {
   min-height: 46px;
 }
@@ -941,6 +945,21 @@
 
   .board.touch .inspect-side {
     width: min(420px, 100%);
+  }
+
+  /* A Mirage and the card it copied sit side by side, the text below both. */
+  .board.touch .inspect-box:has(.inspect-copied) {
+    flex-flow: row wrap;
+    justify-content: center;
+  }
+
+  .board.touch .inspect-box:has(.inspect-copied) .inspect-side {
+    flex-basis: 100%;
+  }
+
+  .board.touch .inspect-box:has(.inspect-copied) .inspect-card .card,
+  .board.touch .inspect-copied .card {
+    --w: min(200px, 42vw, calc((100vh - 280px) / 1.4));
   }
 
   .board.touch .glossary {
@@ -1275,6 +1294,25 @@
 
 .inspect-card .card {
   --w: clamp(120px, min(40vh, 34vw), 300px);
+}
+
+/* What a Mirage copied, next to it: a little smaller, under a label. */
+.inspect-copied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspect-copied .card {
+  --w: clamp(100px, min(32vh, 24vw), 240px);
+}
+
+.inspect-copied-label {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  color: var(--gold-l);
 }
 
 .inspect-side {
