@@ -13,6 +13,13 @@ export interface Env {
    * and Secrets) or with `wrangler secret put REPORTS_KEY --env production`.
    */
   REPORTS_KEY?: string;
+  /** The built site (library + game) in `--env production`; absent in development and tests. */
+  ASSETS?: Fetcher;
+  /**
+   * `"on"`: the root of the site is the games library (games.onirium.agency).
+   * Unset (development, preview copies): the root goes straight to the game.
+   */
+  LIBRARY?: string;
   /**
    * Optional overrides for local development and tests. Leave them unset in
    * production: the defaults are the real game.

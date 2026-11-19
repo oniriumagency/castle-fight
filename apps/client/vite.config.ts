@@ -16,7 +16,15 @@ function appVersion(): string {
   return `${version}+${commit.slice(0, 7)}`;
 }
 
+/**
+ * The game lives under this path on games.onirium.agency; the root is the
+ * Onirium games library (apps/library). Everything the client loads goes
+ * through `import.meta.env.BASE_URL`, so changing it here is enough.
+ */
+export const GAME_PATH = '/cardcraft-castles/';
+
 export default defineConfig({
+  base: GAME_PATH,
   define: {
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
