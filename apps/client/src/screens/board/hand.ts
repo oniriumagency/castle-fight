@@ -72,7 +72,9 @@ export class Hand {
   compact = false;
   /** Where the big hover preview goes (mouse only); null disables it. */
   previewHost: HTMLElement | null = null;
-  private preview: { uid: number; el: HTMLElement } | null = null;
+  private preview: { uid: number; el: HTMLElement; source: HTMLElement } | null = null;
+  /** Turn and active seat at the last render, to drop the preview when the turn moves on. */
+  private lastTurn: string | null = null;
   private readonly spacer = h('div.hand-spacer', { 'aria-hidden': 'true' });
 
   onSelect: (uid: number | null) => void = () => {};
@@ -80,7 +82,14 @@ export class Hand {
   onDiscard: (uid: number) => void = () => {};
 
   constructor() {
-    window.addEventListener('pointermove', (e) => this.dragMove(e));
+    window.addEventListener('pointermove', (e) => {
+      // The mouse is somewhere else than the card being previewed: a card
+      // that moved, was redrawn or swapped under the pointer may never get
+      // its own pointerleave, and its preview would stay on screen.
+      if (this.preview && e.pointerType === 'mouse' && !(e.target instanceof Node && this.preview.source.contains(e.target))) this.hidePreview();
+      this.dragMove(e);
+    });
+    window.addEventListener('blur', () => this.hidePreview());
     window.addEventListener('pointerup', (e) => this.dragEnd(e));
     window.addEventListener('pointercancel', (e) => this.dragEnd(e, true));
   }
@@ -119,6 +128,11 @@ export class Hand {
 
   render(cards: readonly VisibleCard[], ctx: HandContext): void {
     this.ctx = ctx;
+    // A new turn (or a new player to act) clears the big preview: it would be
+    // left over the board with stale costs while the hand is dealt again.
+    const turn = `${ctx.view.turn}:${ctx.view.active}`;
+    if (turn !== this.lastTurn) this.hidePreview();
+    this.lastTurn = turn;
     const keep = new Map(this.slots.map((s) => [s.uid, s]));
     const next: Slot[] = [];
     const seen = new Set<number>();
@@ -128,6 +142,7 @@ export class Hand {
       seen.add(card.uid);
       let slot = keep.get(card.uid);
       if (slot && slot.cardId !== card.cardId) {
+        this.hidePreview(slot.uid);
         slot.el.remove();
         slot = undefined;
       }
@@ -153,7 +168,7 @@ export class Hand {
     for (const child of Array.from(this.el.children)) {
       if (child.classList.contains('hand-card') && !live.has(child as HTMLElement)) child.remove();
     }
-    if (this.preview && !this.slots.some((s) => s.uid === this.preview!.uid)) this.hidePreview();
+    if (this.preview && !this.slots.some((s) => s.el === this.preview!.source)) this.hidePreview();
     if (this.selected !== null && !this.slots.some((s) => s.uid === this.selected)) this.select(null);
     this.refreshStates();
     this.layout();
@@ -238,7 +253,7 @@ export class Hand {
     big.style.left = `${x - hostRect.left}px`;
     big.style.top = `${Math.max(64, handTop - w * 1.4 - 12) - hostRect.top}px`;
     host.appendChild(big);
-    this.preview = { uid, el: big };
+    this.preview = { uid, el: big, source: slot.el };
   }
 
   hidePreview(uid?: number): void {
@@ -271,6 +286,10 @@ export class Hand {
       if (e.pointerType !== 'mouse') return;
       audio.play('cardHover');
       if (!this.drag?.active) this.showPreview(card.uid);
+    });
+    // Back on a card whose preview was cleared (the turn moved on): show it again.
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' && !this.preview && !this.drag) this.showPreview(card.uid);
     });
     el.addEventListener('pointerleave', () => this.hidePreview(card.uid));
     el.addEventListener('pointerdown', (e) => {
