@@ -4,6 +4,8 @@
  * (against the AI or two players on one device) or online through the
  * server SDK.
  */
+// First: large screens zoom the page before anything measures it.
+import './app/uiScale';
 import '@fontsource/cinzel/600.css';
 import '@fontsource/cinzel/700.css';
 import '@fontsource/cinzel/800.css';
