@@ -1373,3 +1373,28 @@ input.shake {
     --w: 170px;
   }
 }
+
+/* "Shall we let you know when it is your turn?" on the online screens. */
+.notify-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.notify-offer[hidden] {
+  display: none;
+}
+
+.notify-offer .btn {
+  min-height: 34px;
+  padding: 4px 14px;
+  font-size: 0.9rem;
+}
+
+.notify-on {
+  color: var(--gold-l);
+}

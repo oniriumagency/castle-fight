@@ -17,7 +17,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
-import { askNotificationPermission, callAttention } from '../../app/attention';
+import { callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
@@ -261,8 +261,6 @@ class BoardScreen implements Screen {
     // Player reports carry the game being played. No bubble here: it would cover the board.
     setGameContext(() => this.reportContext());
     hideFeedbackHint();
-    // Online, the browser can call the player back when it is their turn: ask on their first click.
-    if (this.session.kind === 'online') this.el.addEventListener('pointerdown', askNotificationPermission, { once: true });
     this.unsubscribeSettings = settings.subscribe((next, prev) => {
       if (next.locale !== prev.locale) this.relocalize();
     });
