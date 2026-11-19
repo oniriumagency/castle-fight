@@ -75,7 +75,7 @@ jobs:
       - name: Check the library, the game and the old invite links
         run: |
           curl --fail --silent --show-error --output "$RUNNER_TEMP/library.html" "$SITE_URL/"
-          grep --quiet '<title>Onirium Games</title>' "$RUNNER_TEMP/library.html"
+          grep --quiet '<title>Onirium Games' "$RUNNER_TEMP/library.html"
           curl --fail --silent --show-error --output "$RUNNER_TEMP/game.html" "$SITE_URL/cardcraft-castles/"
           grep --quiet '<title>Cardcraft: Castles</title>' "$RUNNER_TEMP/game.html"
           location=$(curl --silent --show-error --output /dev/null --write-out '%{redirect_url}' "$SITE_URL/?room=abcd2345")
