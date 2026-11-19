@@ -193,6 +193,8 @@ export class Battlefield {
   private readonly ground = new Graphics();
   private readonly paintedSky = new Sprite();
   private skySway = { x: 0, room: 0, time: 0 };
+  /** The drawn sun glow; a painted sky has its own light, so it is barely there. */
+  private sunGain = 1;
   private readonly painted = new Sprite();
   /** Under the painted land, in case the screen is taller than its foreground. */
   private readonly paintedFloor = new Graphics();
@@ -300,6 +302,10 @@ export class Battlefield {
         for (const cloud of this.clouds) cloud.alpha *= 0.45;
       }
     }
+    if (sky || (land && !terrain)) {
+      this.sunGain = 0.15;
+      this.sun.alpha = this.mood.sunAlpha * this.sunGain;
+    }
     this.layoutBackdrop();
   }
 
@@ -322,11 +328,15 @@ export class Battlefield {
     // Wide enough for the screen and tall enough to reach the top; a short
     // screen below the ground is filled with the floor colour, not by zooming in.
     const scale = Math.max(this.width / tex.width, this.groundY / groundPx);
-    const bottom = this.groundY + (tex.height - groundPx) * scale;
+    // On a screen taller than the painting below its ground line, the painting
+    // moves down (the meadow is flat, so the castles still stand on it) as long
+    // as its top stays above the screen; only then is the floor colour needed.
+    const y = Math.min(0, Math.max(this.groundY - groundPx * scale, this.height - tex.height * scale));
+    const bottom = y + tex.height * scale;
     this.paintedFloor.clear();
     if (bottom < this.height) this.paintedFloor.rect(0, bottom - 2, this.width, this.height - bottom + 2).fill({ color: 0x2c2f1e });
     this.painted.scale.set(scale);
-    this.painted.position.set((this.width - tex.width * scale) / 2, this.groundY - groundPx * scale);
+    this.painted.position.set((this.width - tex.width * scale) / 2, y);
   }
 
   /** Two castles for a duel, three for a free-for-all (the third stands in the middle). */
@@ -443,7 +453,7 @@ export class Battlefield {
     return this.tweens
       .run(ms, (t) => {
         this.skyB.alpha = t;
-        this.sun.alpha = sunFrom + (mood.sunAlpha - sunFrom) * t;
+        this.sun.alpha = sunFrom + (mood.sunAlpha * this.sunGain - sunFrom) * t;
         this.tint = {
           far: lerpColor(from.far, to.far, t),
           mid: lerpColor(from.mid, to.mid, t),
