@@ -13,6 +13,7 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | `packages/ai` | IA rival con tres dificultades, que corre en el navegador sin servidor, y simulaciones de equilibrio IA contra IA. [Documentación](packages/ai/README.md). |
 | `packages/protocol` | Mensajes entre cliente y servidor y el SDK de cliente tipado (`@cardcraft-castles/protocol/client`) con lobby, salas, reconexión y reloj. [Documentación](packages/protocol/README.md). |
 | `apps/client` | Cliente web (Vite + PixiJS): menú, lobby online, selección de héroe, tablero animado y resultados, en escritorio y móvil, en español e inglés. Se juega contra la IA, a dos jugadores en el mismo dispositivo o en línea. [Documentación](apps/client/README.md). |
+| `apps/library` | Portada de games.onirium.agency: la biblioteca de juegos de Onirium. Se genera desde `games.json` y junta la biblioteca y el juego en una sola carpeta para publicar. [Documentación](apps/library/README.md). |
 | `apps/server` | Servidor autoritativo en Cloudflare Workers (plan gratuito): un Durable Object para el lobby en vivo y uno por sala, con reloj de turno, reconexión, revancha, partida rápida, salas privadas por enlace y límites contra abusos. [Documentación](apps/server/README.md). |
 
 ## Puesta en marcha
@@ -33,15 +34,17 @@ Para desarrollar:
 
 ```sh
 pnpm dev:server    # Worker local en http://localhost:8787
-pnpm dev:client    # cliente en http://localhost:5173 (redirige /api al Worker)
+pnpm dev:client    # cliente en http://localhost:5173/cardcraft-castles/ (redirige /api al Worker)
 pnpm --filter @cardcraft-castles/server smoke   # dos bots se emparejan y juegan una partida contra el Worker local
 ```
 
 ## Despliegue
 
-El juego está publicado en <https://games.onirium.agency>, en el plan gratuito de Cloudflare. Es un solo Worker (`cardcraft-castles`) que sirve el cliente compilado como archivos estáticos y atiende `/api/*` con el servidor, así que la página, la API y los WebSockets comparten origen.
+<https://games.onirium.agency> es la biblioteca de juegos de Onirium y el juego está en <https://games.onirium.agency/cardcraft-castles/>, en el plan gratuito de Cloudflare. Es un solo Worker (`cardcraft-castles`) que sirve como archivos estáticos la biblioteca y el cliente compilado (`apps/library/dist`) y atiende `/api/*` con el servidor, así que la página, la API y los WebSockets comparten origen.
 
-Cada push a `main` lo publica el flujo [Deploy](.github/workflows/deploy.yml): comprueba tipos y tests, compila el cliente, ejecuta `wrangler deploy --env production` y, al terminar, dos bots juegan una partida entera en una sala privada contra el servidor publicado. También se puede lanzar a mano desde la pestaña Actions.
+Los enlaces de sala de antes de la biblioteca (`https://games.onirium.agency/?room=<id>`) siguen funcionando: el Worker los redirige a `/cardcraft-castles/?room=<id>`. Como el dominio no cambia, los jugadores conservan su apodo, ajustes, historial y asientos guardados.
+
+Cada push a `main` lo publica el flujo [Deploy](.github/workflows/deploy.yml): comprueba tipos y tests, compila el cliente y la biblioteca, ejecuta `wrangler deploy --env production` y, al terminar, dos bots juegan una partida entera en una sala privada contra el servidor publicado. También se puede lanzar a mano desde la pestaña Actions.
 
 Necesita dos secretos en el repositorio (Settings → Secrets and variables → Actions):
 

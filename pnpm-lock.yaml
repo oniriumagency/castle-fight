@@ -42,6 +42,21 @@ importers:
         specifier: ^8.3.8
         version: 8.3.8(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
 
+  apps/library:
+    devDependencies:
+      '@cardcraft-castles/client':
+        specifier: workspace:*
+        version: link:../client
+      '@fontsource/cinzel':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/eb-garamond':
+        specifier: ^5.3.0
+        version: 5.3.0
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@22.20.5)
+
   apps/server:
     dependencies:
       '@cardcraft-castles/engine':

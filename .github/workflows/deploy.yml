@@ -56,7 +56,11 @@ jobs:
       - name: Build the client
         run: pnpm --filter @cardcraft-castles/client build
 
-      - name: Publish the Worker and the client
+      # The games library at the root, with the game under /cardcraft-castles/.
+      - name: Build the site
+        run: pnpm --filter @cardcraft-castles/library build
+
+      - name: Publish the Worker and the site
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -68,10 +72,15 @@ jobs:
           curl --fail --silent --show-error --retry 40 --retry-delay 15 --retry-all-errors \
             "$SITE_URL/api/health"
 
-      - name: Check that the page is the game
+      - name: Check the library, the game and the old invite links
         run: |
-          curl --fail --silent --show-error --output "$RUNNER_TEMP/index.html" "$SITE_URL/"
-          grep --quiet '<title>Cardcraft: Castles</title>' "$RUNNER_TEMP/index.html"
+          curl --fail --silent --show-error --output "$RUNNER_TEMP/library.html" "$SITE_URL/"
+          grep --quiet '<title>Onirium Games</title>' "$RUNNER_TEMP/library.html"
+          curl --fail --silent --show-error --output "$RUNNER_TEMP/game.html" "$SITE_URL/cardcraft-castles/"
+          grep --quiet '<title>Cardcraft: Castles</title>' "$RUNNER_TEMP/game.html"
+          location=$(curl --silent --show-error --output /dev/null --write-out '%{redirect_url}' "$SITE_URL/?room=abcd2345")
+          echo "Old invite link -> $location"
+          [ "$location" = "$SITE_URL/cardcraft-castles/?room=abcd2345" ]
 
       - name: Play a whole online game against the published server
         run: pnpm --filter @cardcraft-castles/server smoke "$SITE_URL" --private

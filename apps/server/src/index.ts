@@ -5,6 +5,7 @@
  */
 import { CARDS, GAME_TITLE } from '@cardcraft-castles/engine';
 import {
+  INVITE_PARAM,
   PROTOCOL_VERSION,
   cleanNickname,
   cleanRoomName,
@@ -72,6 +73,25 @@ function clientIdOf(value: unknown): string | null {
   return typeof value === 'string' && /^[0-9a-f]{24}$/.test(value) ? value : null;
 }
 
+/**
+ * Where the game lives since games.onirium.agency became the games library.
+ * Same value as `GAME_PATH` in apps/client/vite.config.ts.
+ */
+const GAME_PATH = '/cardcraft-castles/';
+
+/**
+ * The site's root. Invite links from before the library (`/?room=<id>`) and
+ * copies of the site without the library go to the game, keeping the query;
+ * otherwise the library's page is served.
+ */
+async function home(request: Request, url: URL, env: Env): Promise<Response> {
+  const toGame = (status: number) =>
+    new Response(null, { status, headers: { location: GAME_PATH + url.search, 'cache-control': 'no-store' } });
+  if (url.searchParams.has(INVITE_PARAM)) return toGame(301);
+  if (env.LIBRARY !== 'on' || !env.ASSETS) return toGame(302);
+  return env.ASSETS.fetch(request);
+}
+
 function ipOf(request: Request): string {
   return request.headers.get('cf-connecting-ip') ?? 'local';
 }
@@ -85,6 +105,8 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
     try {
+      if (path === '/') return await home(request, url, env);
+
       if (path === '/api/health') {
         return json({ ok: true, game: GAME_TITLE, protocol: PROTOCOL_VERSION, cards: CARDS.length } satisfies HealthResponse);
       }

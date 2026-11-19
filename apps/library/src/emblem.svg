@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Onirium Games">
+  <defs>
+    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe3a0"/>
+      <stop offset=".55" stop-color="#e3b656"/>
+      <stop offset="1" stop-color="#8a6420"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 3 59 17v30L32 61 5 47V17Z" fill="#211914" stroke="url(#brass)" stroke-width="3"/>
+  <path d="M32 10 52 20.5v22.8L32 54 12 43.3V20.5Z" fill="none" stroke="url(#brass)" stroke-width="1.2" opacity=".55"/>
+  <path d="M38.5 18.5a12.5 12.5 0 1 0 6.8 20.8 10 10 0 1 1-6.8-20.8Z" fill="url(#brass)"/>
+  <path d="M22 44h20v-9l-3 2v-4l-3 2v-4h-8v4l-3-2v4l-3-2Z" fill="url(#brass)" opacity=".9"/>
+  <circle cx="44" cy="18" r="1.6" fill="#ffe3a0"/>
+</svg>

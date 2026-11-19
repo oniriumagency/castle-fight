@@ -1,0 +1,17 @@
+{
+  "name": "@cardcraft-castles/library",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Biblioteca de juegos de Onirium: la portada de games.onirium.agency",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@cardcraft-castles/client": "workspace:*",
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/eb-garamond": "^5.3.0",
+    "sharp": "0.35.5"
+  }
+}
