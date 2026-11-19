@@ -28,10 +28,13 @@
       "name": "cardcraft-castles-preview",
       "workers_dev": true,
       "preview_urls": false,
+      // Same site layout as production (game under /cardcraft-castles/), but
+      // without LIBRARY: the root sends straight to the game.
       "assets": {
-        "directory": "../client/dist",
-        "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/reportes"]
+        "directory": "../library/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page",
+        "run_worker_first": ["/", "/api/*", "/reportes"]
       },
       "observability": { "enabled": true },
       "durable_objects": {
