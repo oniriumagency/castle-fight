@@ -62,7 +62,10 @@ for (const folder of FOLDERS) {
       skipped++;
       continue;
     }
-    const resized = sharp(input).resize({ width: WIDTHS[folder] ?? WIDTH, withoutEnlargement: true });
+    // The sky is sized by its height (it fills the screen top to horizon); a
+    // seamless panorama can be several screens wide.
+    const size = folder === 'scenery' && file.startsWith('sky') ? { height: 1200 } : { width: WIDTHS[folder] ?? WIDTH };
+    const resized = sharp(input).resize({ ...size, withoutEnlargement: true });
     const image = folder === 'scenery' && file.startsWith('terrain') ? await cutOutSky(resized) : resized;
     await image.webp({ quality: folder === 'scenery' ? 84 : 80, alphaQuality: 90 }).toFile(output);
     built++;

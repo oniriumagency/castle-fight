@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
@@ -116,8 +116,9 @@ function lerpColor(a: number, b: number, t: number): number {
 /**
  * The painted battlefield, in two layers from `art/scenery/` (see
  * design/art-prompts.md):
- * - `sky.jpg`: clouds only. It covers the sky with a little room to spare
- *   and sways slowly from side to side, so it never needs to tile.
+ * - `sky.jpg`: clouds only. A panorama at least 2.8 times wider than tall is
+ *   taken as seamless and drifts endlessly; any other sky covers the screen
+ *   with a little room to spare and sways slowly from side to side.
  * - `terrain.png`: mountains, hills and the valley floor with the sky cut out.
  *   Its ground line, where the castles stand, is TERRAIN_GROUND down the image.
  * A single `backdrop.jpg` (sky and land in one) also works. Missing files keep
@@ -131,6 +132,9 @@ const TERRAIN_GROUND = 0.8;
 const SKY_OVERSCAN = 0.12;
 /** One full sway, left and back, in milliseconds. */
 const SKY_SWAY_MS = 180_000;
+/** Endless drift of a seamless sky, in screen pixels per second. */
+const SKY_DRIFT = 5;
+const SEAMLESS_ASPECT = 2.8;
 
 async function loadArt(path: string): Promise<Texture | null> {
   try {
@@ -192,6 +196,8 @@ export class Battlefield {
   private readonly near = new Graphics();
   private readonly ground = new Graphics();
   private readonly paintedSky = new Sprite();
+  /** A seamless sky, drawn instead of `paintedSky`. */
+  private readonly skyTile = new TilingSprite();
   private skySway = { x: 0, room: 0, time: 0 };
   /** The drawn sun glow; a painted sky has its own light, so it is barely there. */
   private sunGain = 1;
@@ -269,7 +275,8 @@ export class Battlefield {
 
     this.painted.visible = false;
     this.paintedSky.visible = false;
-    this.world.addChild(this.skyA, this.skyB, this.paintedSky, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
+    this.skyTile.visible = false;
+    this.world.addChild(this.skyA, this.skyB, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
@@ -285,8 +292,11 @@ export class Battlefield {
     const land = terrain ?? (await loadArt(BACKDROP));
     if (sky) {
       this.paintedSky.texture = sky;
-      this.paintedSky.visible = true;
-      this.paintedSky.tint = skyTint(this.mood);
+      this.skyTile.texture = sky;
+      const seamless = sky.width / sky.height >= SEAMLESS_ASPECT;
+      this.paintedSky.visible = !seamless;
+      this.skyTile.visible = seamless;
+      this.paintedSky.tint = this.skyTile.tint = skyTint(this.mood);
       this.skyA.visible = this.skyB.visible = false;
       // Painted clouds are in the picture; the drawn ones only drift faintly over it.
       for (const cloud of this.clouds) cloud.alpha *= 0.45;
@@ -312,6 +322,14 @@ export class Battlefield {
   /** Covers the screen with the painting, its ground line on the castles' ground. */
   private layoutBackdrop(): void {
     const skyTex = this.paintedSky.texture;
+    if (this.skyTile.visible && skyTex.width) {
+      const h = this.groundY + 8;
+      const k = Math.max(h / skyTex.height, this.width / skyTex.width);
+      this.skyTile.width = this.width;
+      this.skyTile.height = h;
+      this.skyTile.tileScale.set(k);
+      this.skyTile.tilePosition.y = h - skyTex.height * k;
+    }
     if (this.paintedSky.visible && skyTex.width) {
       // The sky covers the screen down to just below the ground line, where
       // the terrain covers it, with its warm bottom glow on the horizon.
@@ -462,7 +480,7 @@ export class Battlefield {
         };
         this.applyTints();
         this.painted.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
-        this.paintedSky.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
+        this.paintedSky.tint = this.skyTile.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
       .then(() => {
         this.applySky(mood, this.skyA);
@@ -873,6 +891,10 @@ export class Battlefield {
     this.monitorFrames(dt);
     const calm = settings.get().reducedMotion;
     for (const castle of this.castles) castle.tick(dt, calm);
+    if (this.skyTile.visible && !calm) {
+      const span = this.skyTile.texture.width * this.skyTile.tileScale.x;
+      this.skyTile.tilePosition.x = (this.skyTile.tilePosition.x - (SKY_DRIFT * dt) / 1000) % span;
+    }
     if (this.paintedSky.visible && !calm) {
       this.skySway.time = (this.skySway.time + dt) % SKY_SWAY_MS;
       const swing = Math.sin((this.skySway.time / SKY_SWAY_MS) * Math.PI * 2) * 0.45;
