@@ -1,6 +1,5 @@
 import {
   DEFAULT_RULES,
-  RARITY_NAMES,
   SCHOOL_NAMES,
   TERMS,
   getBattleEvent,
@@ -15,12 +14,12 @@ import {
 import { escapeHtml, h, html } from '../app/dom';
 import { L, locale } from '../app/i18n';
 import { settings } from '../app/settings';
-import { SCHOOL_EMBLEM, artUrl, emblemSvg, iconSvg } from './assets';
+import { SCHOOL_EMBLEM, artUrl, emblemSvg, iconSvg, watchArt } from './assets';
 
 /**
  * Card faces drawn in DOM/CSS, following the approved frame design: metal
  * trim by rarity, body colour by school, arched illustration, name plate,
- * school · rarity line, parchment rules box, cost shield with the resource
+ * school line, parchment rules box, cost shield with the resource
  * icon, rarity gem and a holographic sheen on rare and better cards.
  */
 
@@ -212,15 +211,21 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
   el.innerHTML = `
     <div class="trim"><div class="body">
       <div class="art"><img alt="" draggable="false" ${opts.lazy ? 'loading="lazy"' : ''} src="${artUrl(card.art)}"></div>
-      <div class="type">${escapeHtml(L(SCHOOL_NAMES[card.school]))} · ${escapeHtml(L(RARITY_NAMES[card.rarity]))}</div>
+      <div class="type">${escapeHtml(L(SCHOOL_NAMES[card.school]))}</div>
       <div class="rules"><span>${opts.hero ? buffHtml(rulesHtml(buffText(card.effects, rulesOf(card), opts.hero))) : rulesHtml(rulesOf(card))}</span></div>
     </div></div>
     <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(L(card.name))}</b></div>
     <div class="cost ${costClass}"><span>${cost}</span>${emblemSvg(SCHOOL_EMBLEM[card.school])}</div>
     <div class="gem"></div>
     <div class="holo"></div>`;
-  // Cards whose illustration is not painted yet show a plain school-coloured panel.
-  el.querySelector('.art img')?.addEventListener('error', () => el.classList.add('no-art'), { once: true });
+  // Cards whose illustration is not painted yet show the school emblem on a school-coloured panel.
+  const img = el.querySelector<HTMLImageElement>('.art img');
+  if (img) {
+    watchArt(img, () => {
+      el.classList.add('no-art');
+      img.insertAdjacentHTML('afterend', emblemSvg(SCHOOL_EMBLEM[card.school], 'art-emblem'));
+    });
+  }
   el.setAttribute('aria-label', `${L(card.name)}. ${cost}. ${rulesOf(card)}`);
   fitName(el);
   return el;

@@ -1,6 +1,7 @@
 import {
   HEROES,
   applyAction,
+  legalActions,
   createGame,
   getPlayerView,
   redactEvents,
@@ -137,7 +138,12 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.stopTimers();
     this.deadline = null;
     this.clockTurn = -1;
-    const { state, events } = createGame({ seed: randomSeed(), heroes: this.seats.map((s) => s.hero) });
+    const { state, events } = createGame({
+      seed: randomSeed(),
+      heroes: this.seats.map((s) => s.hero),
+      // The turn ends on "Ready", so the ultimate can still follow the card.
+      rules: { manualEndTurn: true },
+    });
     this.state = state;
     this.publish(events);
   }
@@ -191,7 +197,10 @@ export class LocalSession extends BaseSession implements MatchSession {
     const mover = this.state.pending?.player ?? this.state.active;
     if (this.kind === 'ai' && mover !== 0) {
       if (this.aiTimer) return;
-      const think = 650 + Math.random() * 600;
+      // Saying "Ready" once there is nothing else to do needs no thinking.
+      const legal = legalActions(this.state);
+      const onlyReady = legal.length === 1 && legal[0]!.type === 'endTurn';
+      const think = onlyReady ? 250 : 650 + Math.random() * 600;
       const scale = settings.get().animationSpeed === 'fast' ? 0.5 : 1;
       this.aiTimer = setTimeout(() => {
         this.aiTimer = null;

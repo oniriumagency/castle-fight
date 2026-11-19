@@ -117,6 +117,12 @@ export interface Rules {
   twilightDamage: number;
   /** Twilight Fury: extra Castle every card that builds it raises, per level. */
   twilightBuildBonus: number;
+  /**
+   * When true, the turn does not end by itself once the play is used up: the
+   * player can still use the ultimate and ends the turn with `endTurn`
+   * ("Ready"). Missing (older saves, simulations) means the turn ends at once.
+   */
+  manualEndTurn?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +388,8 @@ export interface EffectContext {
   combo: boolean;
   /** Cards this effect has made its player discard so far (drives `perDiscard`). */
   discarded?: number;
+  /** The Saboteur's passive already fired for this card (it fires once per card). */
+  sabotaged?: boolean;
   /** 3+ players, `choose` mode: the rival this effect is aimed at. */
   target?: PlayerId;
 }
@@ -505,6 +513,8 @@ export interface Board {
   players: BoardPlayer[];
   pending: { player: PlayerId; options: string[] } | null;
   activeEvent: ActiveEvent | null;
+  /** Plays (or discards) the active player still has this turn. */
+  actionsLeft?: number;
   /** Present on a `PlayerView` only. */
   viewer?: PlayerId;
 }
@@ -525,6 +535,11 @@ export type Action =
   | { type: 'ultimate'; player: PlayerId; target?: PlayerId }
   /** Answer the pending choice with one of `state.pending.options`. */
   | { type: 'choose'; player: PlayerId; option: string }
+  /**
+   * End your turn ("Ready"). Only with `rules.manualEndTurn`, once the play
+   * of the turn is used up (or the hand is empty).
+   */
+  | { type: 'endTurn'; player: PlayerId }
   /** Give up. Allowed at any time, for either player. */
   | { type: 'concede'; player: PlayerId }
   /**
@@ -542,6 +557,8 @@ export type ErrorCode =
   | 'schoolBanned'
   | 'nothingToCopy'
   | 'ultimateNotReady'
+  | 'noPlaysLeft'
+  | 'mustPlayFirst'
   | 'invalidChoice'
   | 'invalidAction';
 

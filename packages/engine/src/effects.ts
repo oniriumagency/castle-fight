@@ -6,6 +6,7 @@ import {
   checkGameOver,
   dealDamage,
   discardFromHand,
+  saboteurSteal,
   drawCards,
   defaultTarget,
   enchantmentLife,
@@ -111,6 +112,15 @@ export function copySource(state: Board, player: PlayerId): PlayerId | null {
   }
   const list = opponents(state, player).reverse();
   return list.find((p) => state.players[p]!.lastPlayedCard !== null) ?? null;
+}
+
+/**
+ * A card of `ctx.player` just made someone discard (its owner or a rival):
+ * the Saboteur's passive fires, once per card. Returns the context to go on with.
+ */
+function afterDiscard(state: GameState, events: GameEvent[], ctx: EffectContext): EffectContext {
+  if (ctx.sabotaged || ctx.source.kind !== 'card') return ctx;
+  return saboteurSteal(state, events, ctx.player) ? { ...ctx, sabotaged: true } : ctx;
 }
 
 /** The extra amount a `perDiscard` op gets for the cards its effect discarded. */
@@ -408,39 +418,45 @@ function applyOp(
       events.push({ type: 'drawbridgeRaised', player: me });
       return null;
 
-    case 'peekAndDiscard':
+    case 'peekAndDiscard': {
+      let hit = false;
       if (targets.length > 1) {
         // Against several rivals each one loses its most expensive card.
         for (const target of targets) {
           const hand = state.players[target]!.hand;
           const best = [...hand].sort((a, b) => getCard(b.cardId).cost - getCard(a.cardId).cost)[0];
-          if (best) discardFromHand(state, events, target, best.uid, 'effect');
+          if (best && discardFromHand(state, events, target, best.uid, 'effect')) hit = true;
         }
-      } else if (answer !== null) discardFromHand(state, events, them, Number(answer), 'effect');
-      return null;
+      } else if (answer !== null) hit = discardFromHand(state, events, them, Number(answer), 'effect');
+      return hit ? { ops: [], ctx: afterDiscard(state, events, ctx) } : null;
+    }
 
-    case 'discardRandom':
+    case 'discardRandom': {
+      let hit = false;
       for (const target of targets) {
         const hand = state.players[target]!.hand;
         for (let i = 0; i < op.count && hand.length > 0; i++) {
           discardFromHand(state, events, target, randomPick(state, hand).uid, 'effect');
+          hit = true;
         }
       }
-      return null;
+      return hit ? { ops: [], ctx: afterDiscard(state, events, ctx) } : null;
+    }
 
     case 'discardOwn': {
       const discarded = ctx.discarded ?? 0;
       if (op.count === 'hand') {
         const uids = self.hand.map((c) => c.uid);
         for (const uid of uids) discardFromHand(state, events, me, uid, 'effect');
-        return { ops: [], ctx: { ...ctx, discarded: discarded + uids.length } };
+        const after = uids.length > 0 ? afterDiscard(state, events, ctx) : ctx;
+        return { ops: [], ctx: { ...after, discarded: discarded + uids.length } };
       }
       if (answer === null || answer === 'done') return null;
       if (!discardFromHand(state, events, me, Number(answer), 'effect')) return null;
       // The remaining discards come back as a smaller copy of this op.
       return {
         ops: op.count > 1 ? [{ ...op, count: op.count - 1 }] : [],
-        ctx: { ...ctx, discarded: discarded + 1 },
+        ctx: { ...afterDiscard(state, events, ctx), discarded: discarded + 1 },
       };
     }
 

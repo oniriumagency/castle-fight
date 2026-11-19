@@ -53,6 +53,10 @@ jobs:
       - name: Build the client
         run: pnpm --filter @cardcraft-castles/client build
 
+      # Same layout as production: the game under /cardcraft-castles/.
+      - name: Build the site
+        run: pnpm --filter @cardcraft-castles/library build
+
       - name: Publish the preview Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

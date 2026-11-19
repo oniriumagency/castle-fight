@@ -93,6 +93,13 @@ export interface OnlineClientOptions {
 }
 
 const STORAGE_PREFIX = 'cardcraft:';
+/**
+ * How long a socket may stay in the handshake before it is dropped and tried
+ * again. Browsers can leave a stalled handshake pending for minutes (a flaky
+ * mobile network, a laptop waking up), and the heartbeat only starts once the
+ * socket opens, so without this the lobby sat on "Connecting…" for good.
+ */
+const CONNECT_TIMEOUT_MS = 10_000;
 /** Seat tokens older than this are not worth trying. */
 const SEAT_TOKEN_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -228,6 +235,7 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
   private attempts = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastHeard = 0;
   /** When the last ping went out still unanswered, or 0. */
   private pingSentAt = 0;
@@ -305,8 +313,21 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
       return;
     }
     this.socket = socket;
+    this.connectTimer = setTimeout(() => {
+      this.connectTimer = null;
+      if (this.socket !== socket || socket.readyState === OPEN) return;
+      socket.onclose = socket.onmessage = socket.onopen = socket.onerror = null;
+      try {
+        socket.close();
+      } catch {
+        // Ignore.
+      }
+      this.dropped(1006, 'connect timeout');
+    }, CONNECT_TIMEOUT_MS);
     socket.onopen = () => {
       if (this.socket !== socket) return;
+      if (this.connectTimer) clearTimeout(this.connectTimer);
+      this.connectTimer = null;
       this.attempts = 0;
       this.lastHeard = Date.now();
       this.pingSentAt = 0;
@@ -396,8 +417,10 @@ abstract class ManagedSocket<Events extends { status: ConnectionStatus }> extend
   private clearTimers(): void {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.connectTimer) clearTimeout(this.connectTimer);
     this.retryTimer = null;
     this.heartbeatTimer = null;
+    this.connectTimer = null;
   }
 
   private watchWindow(): void {
@@ -603,6 +626,8 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
           return [{ type: 'choose', option: action.option }];
         case 'ultimate':
           return [{ type: 'ultimate' }];
+        case 'endTurn':
+          return [{ type: 'endTurn' }];
         default:
           return [];
       }
@@ -626,6 +651,11 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
 
   ultimate(): boolean {
     return this.act({ type: 'ultimate' });
+  }
+
+  /** "Ready": end your turn. */
+  endTurn(): boolean {
+    return this.act({ type: 'endTurn' });
   }
 
   choose(option: string): boolean {

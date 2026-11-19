@@ -3352,3 +3352,120 @@
 .inspect-card .card > .combo-tag {
   right: 28px;
 }
+
+/* ---------- "Ready": ends the turn once the card is played ---------- */
+
+/* Room for the button to the right of the hand (and left of the hero button, when it shows). */
+.board.ready-on .hand {
+  right: calc(var(--side-w) * 0.35 + var(--safe-r) + var(--ult-w) + 18px);
+}
+
+.board.ready-on.ult-on .hand {
+  right: calc(var(--side-w) * 0.35 + var(--safe-r) + var(--ult-w) * 2 + 32px);
+}
+
+.board.short.ready-on .hand {
+  right: calc(12px + var(--safe-r) + var(--ult-w) + 14px);
+}
+
+.board.short.ready-on.ult-on .hand {
+  right: calc(12px + var(--safe-r) + var(--ult-w) * 2 + 26px);
+}
+
+.ready-btn {
+  position: absolute;
+  right: calc(var(--side-w) * 0.35 + var(--safe-r) + 6px);
+  bottom: calc(14px + var(--safe-b));
+  z-index: 16;
+  width: var(--ult-w);
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #fff0b0;
+  background:
+    radial-gradient(circle at 50% 30%, rgb(255 255 255 / 35%), transparent 55%),
+    linear-gradient(180deg, #ffe17a, #d8901f 70%, #a8661a);
+  box-shadow:
+    inset 0 -4px 0 rgb(0 0 0 / 22%),
+    inset 0 0 0 4px rgb(120 70 10 / 35%),
+    0 0 14px rgb(255 190 60 / 55%),
+    0 6px 14px rgb(0 0 0 / 55%);
+  color: #2a1606;
+  font-family: var(--display);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, filter 0.15s;
+  animation: readyIn 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.ready-btn[hidden] {
+  display: none;
+}
+
+.ready-btn .ready-btn-label {
+  font-weight: 900;
+  font-size: clamp(0.85rem, calc(var(--ult-w) * 0.19), 1.35rem);
+  letter-spacing: 0.03em;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgb(255 240 190 / 70%);
+}
+
+.ready-btn small {
+  font-family: var(--text);
+  font-weight: 700;
+  font-size: clamp(0.55rem, calc(var(--ult-w) * 0.1), 0.78rem);
+  line-height: 1.05;
+  max-width: 86%;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.ready-btn:hover,
+.ready-btn:focus-visible {
+  filter: brightness(1.12);
+  transform: translateY(-2px) scale(1.04);
+  outline: none;
+}
+
+.ready-btn:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+/* Nothing else to do this turn: it calls for attention. */
+.ready-btn.only {
+  animation: readyIn 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both, readyPulse 1.3s ease-in-out 0.6s infinite;
+}
+
+/* With the ultimate ready, it stands to the left of the hero button. */
+.board.ult-on .ready-btn {
+  right: calc(var(--side-w) * 0.35 + var(--safe-r) + var(--ult-w) + 20px);
+}
+
+.board.short .ready-btn {
+  right: calc(12px + var(--safe-r));
+  bottom: calc(10px + var(--safe-b));
+}
+
+.board.short.ult-on .ready-btn {
+  right: calc(12px + var(--safe-r) + var(--ult-w) + 12px);
+}
+
+@keyframes readyIn {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes readyPulse {
+  0%, 100% { box-shadow: inset 0 -4px 0 rgb(0 0 0 / 22%), inset 0 0 0 4px rgb(120 70 10 / 35%), 0 0 14px rgb(255 190 60 / 55%), 0 6px 14px rgb(0 0 0 / 55%); }
+  50% { box-shadow: inset 0 -4px 0 rgb(0 0 0 / 22%), inset 0 0 0 4px rgb(120 70 10 / 35%), 0 0 30px 6px rgb(255 210 90 / 85%), 0 6px 14px rgb(0 0 0 / 55%); }
+}
+
+.reduced-motion .ready-btn,
+.reduced-motion .ready-btn.only {
+  animation: none;
+}

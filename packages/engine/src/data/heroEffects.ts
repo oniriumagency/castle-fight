@@ -29,7 +29,7 @@ export const HERO_EFFECTS: Record<HeroId, { passive: HeroPassive; ultimate: Effe
     ],
   },
   saboteadora: {
-    passive: { stealOnDiscard: 4 },
+    passive: { stealOnDiscard: 3 },
     ultimate: [{ op: 'stealWorker' }, { op: 'damage', amount: 10, kind: 'piercing' }],
   },
   guardian: {

@@ -56,6 +56,25 @@ describe('chooseAction', () => {
     });
   }
 
+  for (const heroes of [['hechicera', 'saboteadora'], ['arquitecta', 'mariscal', 'guardian']] as const) {
+    it(`says "Ready" to end its turns (${heroes.length} players, manual end of turn)`, () => {
+      let { state } = createGame({ seed: `ready:${heroes.length}`, heroes: [...heroes], rules: { manualEndTurn: true } });
+      let readies = 0;
+      for (let step = 0; state.phase !== 'finished'; step++) {
+        expect(step, 'the game should end').toBeLessThan(3000);
+        const action = chooseAction(state, 'normal');
+        expect(legalActions(state)).toContainEqual(action);
+        if (action.type === 'endTurn') readies += 1;
+        const result = applyAction(state, action);
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        state = result.state;
+      }
+      expect(state.result).not.toBeNull();
+      expect(readies).toBeGreaterThan(5);
+    });
+  }
+
   it('gives the same answer for the same position, and for the same seed', () => {
     const { state } = createGame({ seed: 7, heroes: ['mariscal', 'guardian'] });
     for (const level of DIFFICULTIES) {
