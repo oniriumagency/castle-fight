@@ -127,13 +127,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   purificacion: [{ op: 'cleanse' }, { op: 'keep', amount: 5 }],
   'trueque-de-destinos': [{ op: 'swapWalls' }],
   espejismo: [{ op: 'copyLast' }],
-  'maldicion-de-oxido': [
-    {
-      op: 'enchant',
-      turns: 3,
-      modifiers: { opponentCostIncrease: { school: 'asalto', amount: 2 } },
-    },
-  ],
+  'maldicion-de-oxido': [{ op: 'rust', turns: 3 }],
   'manantial-de-mana': [
     {
       op: 'enchant',

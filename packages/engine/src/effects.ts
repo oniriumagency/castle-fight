@@ -61,6 +61,7 @@ const RIVAL_OPS: ReadonlySet<EffectOp['op']> = new Set([
   'stealWorker',
   'burn',
   'frost',
+  'rust',
   'destroyEnchantment',
   'revealHand',
   'peekAndDiscard',
@@ -333,6 +334,17 @@ function applyOp(
       } else if (answer !== null) applyFrost(state, events, ctx, them, [answer as Resource], op.turns);
       return null;
 
+    case 'rust': {
+      // Every rival hit gets the full duration; playing it again restarts it, it does not stack.
+      const turns = op.turns + statusDurationBonus(state, me);
+      for (const target of targets) {
+        const t = state.players[target]!;
+        t.rust = Math.max(t.rust ?? 0, turns);
+        events.push({ type: 'rustApplied', player: target, turns, total: t.rust });
+      }
+      return null;
+    }
+
     case 'shield': {
       self.shield = Math.min(state.rules.shieldMaxCharges, self.shield + op.charges);
       events.push({ type: 'shieldGained', player: me, charges: op.charges, total: self.shield });
@@ -342,6 +354,7 @@ function applyOp(
     case 'cleanse': {
       self.burn = 0;
       self.frost = { piedra: 0, acero: 0, mana: 0 };
+      self.rust = 0;
       events.push({ type: 'statusesCleansed', player: me });
       return null;
     }

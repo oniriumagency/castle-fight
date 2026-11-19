@@ -64,6 +64,7 @@ function guessPlayer(
     enchantments: pub.enchantments.map((e) => ({ ...e })),
     burn: pub.burn,
     frost: { ...pub.frost },
+    rust: pub.rust,
     shield: pub.shield,
     drawbridge: pub.drawbridge,
     handRevealed: pub.handRevealed,

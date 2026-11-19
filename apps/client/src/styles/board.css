@@ -491,6 +491,12 @@
   box-shadow: 0 0 10px rgb(255 100 20 / 35%);
 }
 
+.status-chip.rust {
+  color: #e0915a;
+  border-color: rgb(184 92 40 / 60%);
+  box-shadow: 0 0 10px rgb(160 70 20 / 30%);
+}
+
 .status-chip.shield {
   color: #bfeaff;
   border-color: rgb(174 232 255 / 60%);

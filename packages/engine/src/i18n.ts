@@ -21,6 +21,7 @@ export const TERMS = {
   passive: { es: 'Pasiva', en: 'Passive' },
   burn: { es: 'Quemadura', en: 'Burn' },
   frost: { es: 'Escarcha', en: 'Frost' },
+  rust: { es: 'Óxido', en: 'Rust' },
   shield: { es: 'Escudo', en: 'Shield' },
   piercing: { es: 'Perforante', en: 'Piercing' },
   battleEvent: { es: 'Evento de batalla', en: 'Battle event' },

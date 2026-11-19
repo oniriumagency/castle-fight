@@ -33,6 +33,8 @@ export function describeEvent(event: GameEvent, name: (seat: PlayerId) => string
       return t('logEvent', { event: L(getBattleEvent(event.eventId).name) });
     case 'twilightRose':
       return t('logTwilight', { level: event.level });
+    case 'rustApplied':
+      return t('logRust', { who: name(event.player), n: event.total });
     case 'enchantmentAdded':
       return t('logEnchant', { who: name(event.player), card: card(event.cardId) });
     case 'enchantmentRemoved':

@@ -1164,6 +1164,12 @@ class BoardScreen implements Screen {
         this.panels[this.sideOf(e.player)].pulse(`.res-${e.resource}`);
         await fx.status('frost', e.player, ctx);
         break;
+      case 'rustApplied':
+        shown[e.player].rust = e.total;
+        this.render();
+        this.panels[this.sideOf(e.player)].pulse('.status-chip.rust');
+        await fx.status('rust', e.player, ctx);
+        break;
       case 'shieldGained':
         shown[e.player].shield = e.total;
         this.render();
@@ -1171,6 +1177,7 @@ class BoardScreen implements Screen {
         break;
       case 'statusesCleansed':
         shown[e.player].burn = 0;
+        shown[e.player].rust = 0;
         for (const res of RESOURCES) shown[e.player].frost[res] = 0;
         this.render();
         await fx.status('cleanse', e.player, ctx);

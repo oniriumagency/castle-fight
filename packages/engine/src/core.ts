@@ -14,6 +14,7 @@ import type {
   Resource,
   ResourceMap,
   Rules,
+  School,
   VisibleCard,
 } from './types';
 
@@ -210,6 +211,9 @@ export function isSchoolBanned(state: Board, cardId: CardId): boolean {
   return effect.kind === 'banSchool' && effect.school === getCard(cardId).school;
 }
 
+/** What Rust does: while it lasts, cards of this school cost this much more. */
+export const RUST = Object.freeze({ school: 'asalto' as School, costIncrease: 2 });
+
 /**
  * What `player` pays right now for `cardId`, after hero passives, enemy
  * enchantments and battle events. Never below 0.
@@ -233,6 +237,9 @@ export function effectiveCost(state: Board, player: PlayerId, cardId: CardId): n
     }
     if (n === 2) break;
   }
+
+  // Rust on this player (Maldición de Óxido).
+  if ((state.players[player].rust ?? 0) > 0 && card.school === RUST.school) cost += RUST.costIncrease;
 
   cost = Math.max(0, cost);
 
@@ -537,6 +544,7 @@ export function eliminate(state: GameState, events: GameEvent[], player: PlayerI
   p.eliminated = true;
   p.keep = Math.max(0, p.keep);
   p.burn = 0;
+  p.rust = 0;
   p.extraTurns = 0;
   for (const e of p.enchantments) {
     events.push({ type: 'enchantmentRemoved', player, cardId: e.cardId, reason: 'destroyed' });

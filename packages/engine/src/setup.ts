@@ -29,6 +29,7 @@ function createPlayer(state: GameState, hero: HeroId): PlayerState {
     enchantments: [],
     burn: 0,
     frost: emptyResources(),
+    rust: 0,
     shield: 0,
     drawbridge: false,
     handRevealed: false,

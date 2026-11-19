@@ -29,6 +29,7 @@ export { getPlayerView, redactEvents } from './view';
 export { isConditionMet, effectsNeedTarget } from './effects';
 export {
   effectiveCost,
+  RUST,
   costResource,
   attackBonus,
   enchantmentLife,

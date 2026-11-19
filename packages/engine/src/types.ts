@@ -196,6 +196,8 @@ export type EffectOp =
   | { op: 'burn'; turns: number }
   /** Frost on the opponent: one chosen resource, or all three. */
   | { op: 'frost'; scope: 'choice' | 'all'; turns: number }
+  /** Rust on the opponent: their Assault cards cost more for their next `turns` turns. */
+  | { op: 'rust'; turns: number }
   /** Shield charges for you. */
   | { op: 'shield'; charges: number }
   /** Remove your negative statuses (Burn and Frost). */
@@ -352,6 +354,8 @@ export interface PlayerState {
   burn: number;
   /** Frost turns left per resource. */
   frost: ResourceMap;
+  /** Rust turns left: while above 0 this player's Assault cards cost more. Missing in old saves. */
+  rust?: number;
   /** Shield charges. */
   shield: number;
   /** The next piercing attack against this player is treated as normal damage. */
@@ -488,6 +492,8 @@ export interface BoardPlayer {
   keep: number;
   resources: ResourceMap;
   enchantments: Enchantment[];
+  /** Rust turns left (raises the cost of Assault cards). Missing in old saves. */
+  rust?: number;
   ultimateCharge: number;
   ultimateUses: number;
   lastPlayedCard: CardId | null;
@@ -649,6 +655,7 @@ export type GameEvent =
   | { type: 'wallsSwapped'; walls: number[] }
   | { type: 'burnApplied'; player: PlayerId; turns: number; total: number }
   | { type: 'frostApplied'; player: PlayerId; resource: Resource; turns: number; total: number }
+  | { type: 'rustApplied'; player: PlayerId; turns: number; total: number }
   | { type: 'shieldGained'; player: PlayerId; charges: number; total: number }
   | { type: 'statusesCleansed'; player: PlayerId }
   | { type: 'drawbridgeRaised'; player: PlayerId }
@@ -697,6 +704,8 @@ export interface PlayerPublicState {
   enchantments: Enchantment[];
   burn: number;
   frost: ResourceMap;
+  /** Rust turns left. */
+  rust: number;
   shield: number;
   drawbridge: boolean;
   handRevealed: boolean;
