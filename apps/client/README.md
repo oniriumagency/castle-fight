@@ -3,7 +3,7 @@
 Vite + TypeScript + PixiJS 8. Sin framework de interfaz: las pantallas son DOM con CSS y el campo de batalla es un lienzo de Pixi detrás de ellas.
 
 ```sh
-pnpm dev:client     # http://localhost:5173 (con pnpm dev:server para jugar en línea)
+pnpm dev:client     # http://localhost:5173/cardcraft-castles/ (con pnpm dev:server para jugar en línea)
 pnpm --filter @cardcraft-castles/client build
 ```
 

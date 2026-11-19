@@ -47,7 +47,7 @@ export function callAttention(title: string, body: string): void {
   document.title = `🔔 ${title}`;
   try {
     if ('Notification' in window && Notification.permission === 'granted') {
-      note = new Notification(title, { body, icon: '/favicon.svg', tag: 'cardcraft-castles-turn', renotify: true, requireInteraction: false } as NotificationOptions);
+      note = new Notification(title, { body, icon: `${import.meta.env.BASE_URL}favicon.svg`, tag: 'cardcraft-castles-turn', renotify: true, requireInteraction: false } as NotificationOptions);
       note.onclick = () => {
         window.focus();
         stop();

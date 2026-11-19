@@ -1,0 +1,78 @@
+{
+  "$comment": "Los juegos de la biblioteca, en el orden en que se muestran. Para añadir uno, copia una entrada. Ver README.md.",
+  "moreComing": true,
+  "games": [
+    {
+      "id": "cardcraft-castles",
+      "title": "Cardcraft: Castles",
+      "kind": {
+        "es": "Juego de cartas",
+        "en": "Card game"
+      },
+      "url": "/cardcraft-castles/",
+      "cover": "art/cards/ciudadela-eterna.jpg",
+      "tagline": {
+        "es": "Levanta tu castillo. Derriba el del rival.",
+        "en": "Raise your castle. Bring down theirs."
+      },
+      "description": {
+        "es": "Duelo de cartas por turnos: sube tu castillo a 100 o deja el del rival en 0. Seis héroes, 70 cartas y partidas de lo que dura un café, contra la IA, a dos en el mismo dispositivo o en línea.",
+        "en": "A turn-based card duel: raise your castle to 100 or bring your rival's down to 0. Six heroes, 70 cards and games as long as a coffee, against the AI, two players on one device or online."
+      },
+      "tags": {
+        "es": [
+          "Cartas",
+          "Estrategia",
+          "1 contra 1",
+          "En línea"
+        ],
+        "en": [
+          "Cards",
+          "Strategy",
+          "1 vs 1",
+          "Online"
+        ]
+      },
+      "play": {
+        "es": "Jugar",
+        "en": "Play"
+      }
+    },
+    {
+      "id": "cardcraft-castles-beta",
+      "title": "Cardcraft: Castles",
+      "kind": {
+        "es": "Juego de cartas / Rediseño",
+        "en": "Card game / Redesign"
+      },
+      "badge": {
+        "es": "Beta",
+        "en": "Beta"
+      },
+      "url": "https://cardcraft-castles-preview.oniriumagency.workers.dev/",
+      "cover": "art/reference/style-reference.jpg",
+      "tagline": {
+        "es": "El rediseño visual, todavía en obras.",
+        "en": "The visual redesign, still under construction."
+      },
+      "description": {
+        "es": "Prueba antes que nadie el nuevo aspecto del juego: madera, cuero y latón, y un valle pintado al atardecer. Es una versión de pruebas: puede tener errores y sus salas en línea son aparte de las del juego publicado.",
+        "en": "Try the game's new look before anyone else: wood, leather and brass, and a valley painted at sunset. It is a test build: it may have bugs and its online rooms are separate from the published game's."
+      },
+      "tags": {
+        "es": [
+          "Versión de pruebas",
+          "Rediseño"
+        ],
+        "en": [
+          "Test build",
+          "Redesign"
+        ]
+      },
+      "play": {
+        "es": "Probar la beta",
+        "en": "Try the beta"
+      }
+    }
+  ]
+}

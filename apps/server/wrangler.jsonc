@@ -18,8 +18,8 @@
   ],
 
   // The top level is what `pnpm dev` and the tests run: the API alone.
-  // `--env production` is the published game: the same Worker, plus the built
-  // client as static assets, on its own domain. See the README.
+  // `--env production` is games.onirium.agency: the same Worker, plus the built
+  // site (games library + game) as static assets, on its own domain. See the README.
   "env": {
     // A test copy of the game for branches (see .github/workflows/preview.yml):
     // its own Worker, rooms and reports on workers.dev, so nothing reaches
@@ -48,11 +48,16 @@
       "workers_dev": false,
       "preview_urls": false,
       "routes": [{ "pattern": "games.onirium.agency", "custom_domain": true }],
+      // The whole site, built by apps/library: the games library at `/` and
+      // the game under `/cardcraft-castles/`. The Worker answers `/` first, to
+      // send invite links from before the library (`/?room=<id>`) to the game.
       "assets": {
-        "directory": "../client/dist",
-        "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/reportes"]
+        "directory": "../library/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page",
+        "run_worker_first": ["/", "/api/*", "/reportes"]
       },
+      "vars": { "LIBRARY": "on" },
       "observability": { "enabled": true },
       // Bindings are not inherited by environments: keep this equal to the list above.
       "durable_objects": {
