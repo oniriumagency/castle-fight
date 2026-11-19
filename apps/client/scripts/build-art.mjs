@@ -26,6 +26,28 @@ async function mtime(path) {
   }
 }
 
+/**
+ * The terrain is painted over a flat magenta (#FF00FF) sky, since image
+ * generators do not give transparency: magenta becomes transparent, with a
+ * soft edge, and the pink fringe on the hills is removed.
+ */
+async function cutOutSky(image) {
+  const { data, info } = await image.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    // How magenta the pixel is: red and blue high, green low.
+    const key = Math.min(r, b) - g;
+    if (key <= 40) continue;
+    const alpha = Math.max(0, Math.min(1, (150 - key) / 110));
+    data[i + 3] = Math.round(alpha * 255);
+    data[i] = Math.min(r, g + 30);
+    data[i + 2] = Math.min(b, g + 30);
+  }
+  return sharp(data, { raw: info });
+}
+
 let built = 0;
 let skipped = 0;
 for (const folder of FOLDERS) {
@@ -40,10 +62,9 @@ for (const folder of FOLDERS) {
       skipped++;
       continue;
     }
-    await sharp(input)
-      .resize({ width: WIDTHS[folder] ?? WIDTH, withoutEnlargement: true })
-      .webp({ quality: folder === 'scenery' ? 84 : 80 })
-      .toFile(output);
+    const resized = sharp(input).resize({ width: WIDTHS[folder] ?? WIDTH, withoutEnlargement: true });
+    const image = folder === 'scenery' && file.startsWith('terrain') ? await cutOutSky(resized) : resized;
+    await image.webp({ quality: folder === 'scenery' ? 84 : 80, alphaQuality: 90 }).toFile(output);
     built++;
   }
 }

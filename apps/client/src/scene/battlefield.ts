@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
@@ -114,27 +114,60 @@ function lerpColor(a: number, b: number, t: number): number {
 }
 
 /**
- * The painted backdrop (`art/scenery/backdrop.jpg`): sky, mountains and the
- * valley floor in one illustration, with no castles. Its ground line, where
- * the castles stand, is this far down the image. Without the file the scene
- * keeps its drawn landscape.
+ * The painted battlefield, in two layers from `art/scenery/` (see
+ * design/art-prompts.md):
+ * - `sky.jpg`: clouds only, seamless left to right, drifting slowly.
+ * - `terrain.png`: mountains, hills and the valley floor with the sky cut out.
+ *   Its ground line, where the castles stand, is TERRAIN_GROUND down the image.
+ * A single `backdrop.jpg` (sky and land in one) also works. Missing files keep
+ * the drawn landscape for that layer.
  */
+const SKY = 'scenery/sky.jpg';
+const TERRAIN = 'scenery/terrain.png';
 const BACKDROP = 'scenery/backdrop.jpg';
-const BACKDROP_GROUND = 0.8;
+const TERRAIN_GROUND = 0.8;
+/** Sky drift, in screen pixels per second. */
+const SKY_DRIFT = 6;
+
+async function loadArt(path: string): Promise<Texture | null> {
+  try {
+    const texture = await Assets.load<Texture>({ src: artUrl(path), parser: 'loadTextures' });
+    return texture?.width ? texture : null;
+  } catch {
+    return null;
+  }
+}
+
+function hexColor(css: string): number {
+  return parseInt(css.replace('#', ''), 16);
+}
+
+/** Per channel, how far `c` is from `base` (lighter or darker), as a tint that leaves `base` unchanged. */
+function ratioTint(pairs: [number, number][]): number {
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const k = pairs.reduce((sum, [c, base]) => sum + (((c >> shift) & 255) + 24) / (((base >> shift) & 255) + 24), 0) / pairs.length;
+    out |= Math.round(Math.min(1, Math.max(0.3, k)) * 255) << shift;
+  }
+  return out;
+}
+
+function skyTint(mood: SkyMood): number {
+  return ratioTint([
+    [hexColor(mood.top), hexColor(DEFAULT_SKY.top)],
+    [hexColor(mood.middle), hexColor(DEFAULT_SKY.middle)],
+  ]);
+}
 
 /**
  * Battle events recolour the painted backdrop by how far their land colours
  * are from the default ones: the default mood leaves it as painted.
  */
 function paintTint(mood: SkyMood): number {
-  const channel = (c: number, shift: number): number => (c >> shift) & 255;
-  let out = 0;
-  for (const shift of [16, 8, 0]) {
-    const ratio = (key: 'far' | 'near'): number => (channel(mood[key], shift) + 24) / (channel(DEFAULT_SKY[key], shift) + 24);
-    const k = Math.min(1, Math.max(0.3, (ratio('far') + ratio('near')) / 2));
-    out |= Math.round(k * 255) << shift;
-  }
-  return out;
+  return ratioTint([
+    [mood.far, DEFAULT_SKY.far],
+    [mood.near, DEFAULT_SKY.near],
+  ]);
 }
 
 export class Battlefield {
@@ -155,8 +188,9 @@ export class Battlefield {
   private readonly mid = new Graphics();
   private readonly near = new Graphics();
   private readonly ground = new Graphics();
+  private readonly paintedSky = new TilingSprite();
   private readonly painted = new Sprite();
-  private paintedTint = { from: 0xffffff, to: 0xffffff };
+  private paintedTint = { from: 0xffffff, to: 0xffffff, skyFrom: 0xffffff, skyTo: 0xffffff };
   private readonly weather = new Container();
   private readonly particles: Particle[] = [];
   private readonly pool: Sprite[] = [];
@@ -226,7 +260,8 @@ export class Battlefield {
     this.castles[2].visible = false;
 
     this.painted.visible = false;
-    this.world.addChild(this.skyA, this.skyB, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
+    this.paintedSky.visible = false;
+    this.world.addChild(this.skyA, this.skyB, this.paintedSky, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
@@ -236,29 +271,46 @@ export class Battlefield {
     void this.loadBackdrop();
   }
 
-  /** Swaps the drawn landscape for the painted one when the illustration exists. */
+  /** Swaps the drawn sky and land for the painted layers that exist. */
   private async loadBackdrop(): Promise<void> {
-    let texture: Texture;
-    try {
-      texture = await Assets.load<Texture>({ src: artUrl(BACKDROP), parser: 'loadTextures' });
-    } catch {
-      return;
+    const [sky, terrain] = await Promise.all([loadArt(SKY), loadArt(TERRAIN)]);
+    const land = terrain ?? (await loadArt(BACKDROP));
+    if (sky) {
+      this.paintedSky.texture = sky;
+      this.paintedSky.visible = true;
+      this.paintedSky.tint = skyTint(this.mood);
+      this.skyA.visible = this.skyB.visible = false;
+      // Painted clouds are in the picture; the drawn ones only drift faintly over it.
+      for (const cloud of this.clouds) cloud.alpha *= 0.45;
     }
-    if (!texture?.width) return;
-    this.painted.texture = texture;
-    this.painted.visible = true;
-    this.painted.tint = paintTint(this.mood);
-    for (const layer of [this.skyA, this.skyB, this.far, this.mid, this.near, this.ground]) layer.visible = false;
-    // Painted clouds are in the picture; the drawn ones only drift faintly over it.
-    for (const cloud of this.clouds) cloud.alpha *= 0.45;
+    if (land) {
+      this.painted.texture = land;
+      this.painted.visible = true;
+      this.painted.tint = paintTint(this.mood);
+      for (const layer of [this.far, this.mid, this.near, this.ground]) layer.visible = false;
+      // A whole backdrop brings its own sky.
+      if (!terrain && !sky) {
+        this.skyA.visible = this.skyB.visible = false;
+        for (const cloud of this.clouds) cloud.alpha *= 0.45;
+      }
+    }
     this.layoutBackdrop();
   }
 
   /** Covers the screen with the painting, its ground line on the castles' ground. */
   private layoutBackdrop(): void {
+    const skyTex = this.paintedSky.texture;
+    if (this.paintedSky.visible && skyTex.width) {
+      // The sky fills down to just below the ground line, where the terrain covers it.
+      const h = this.groundY + 8;
+      const k = h / skyTex.height;
+      this.paintedSky.width = this.width;
+      this.paintedSky.height = h;
+      this.paintedSky.tileScale.set(k);
+    }
     const tex = this.painted.texture;
     if (!this.painted.visible || !tex.width) return;
-    const groundPx = tex.height * BACKDROP_GROUND;
+    const groundPx = tex.height * TERRAIN_GROUND;
     const scale = Math.max(this.width / tex.width, this.groundY / groundPx, (this.height - this.groundY) / (tex.height - groundPx));
     this.painted.scale.set(scale);
     this.painted.position.set((this.width - tex.width * scale) / 2, this.groundY - groundPx * scale);
@@ -373,7 +425,7 @@ export class Battlefield {
     this.applySky(mood, this.skyB);
     this.skyB.alpha = 0;
     const sunFrom = this.sun.alpha;
-    this.paintedTint = { from: this.painted.tint as number, to: paintTint(mood) };
+    this.paintedTint = { from: this.painted.tint as number, to: paintTint(mood), skyFrom: this.paintedSky.tint as number, skyTo: skyTint(mood) };
     this.sun.texture = glowTexture(mood.sun, 256);
     return this.tweens
       .run(ms, (t) => {
@@ -387,6 +439,7 @@ export class Battlefield {
         };
         this.applyTints();
         this.painted.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
+        this.paintedSky.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
       .then(() => {
         this.applySky(mood, this.skyA);
@@ -797,6 +850,7 @@ export class Battlefield {
     this.monitorFrames(dt);
     const calm = settings.get().reducedMotion;
     for (const castle of this.castles) castle.tick(dt, calm);
+    if (this.paintedSky.visible && !calm) this.paintedSky.tilePosition.x -= (SKY_DRIFT * dt) / 1000;
     // Clouds drift.
     for (const [i, cloud] of this.clouds.entries()) {
       cloud.x += (0.06 + i * 0.02) * step;
