@@ -382,6 +382,8 @@ export interface EffectContext {
   combo: boolean;
   /** Cards this effect has made its player discard so far (drives `perDiscard`). */
   discarded?: number;
+  /** The Saboteur's passive already fired for this card (it fires once per card). */
+  sabotaged?: boolean;
   /** 3+ players, `choose` mode: the rival this effect is aimed at. */
   target?: PlayerId;
 }

@@ -1,14 +1,13 @@
 import { getCard, getHero, hasCombo } from './catalog';
 import {
-  changeResources,
   cloneState,
   costResource,
   defaultTarget,
   discardFromHand,
+  saboteurSteal,
   effectiveCost,
   eliminate,
   finishGame,
-  highestOf,
   isMultiplayer,
   isSchoolBanned,
   opponents,
@@ -180,15 +179,7 @@ function discardCards(state: GameState, events: GameEvent[], player: PlayerId, u
   self.comboSchool = null;
   state.actionsLeft -= 1;
 
-  const steal = getHero(self.hero).passive.stealOnDiscard;
-  if (steal) {
-    const opponent = isMultiplayer(state) ? defaultTarget(state, player) : other(player);
-    const resource = highestOf(state.players[opponent].resources);
-    const reason = { kind: 'hero' as const, id: self.hero };
-    const taken = changeResources(state, events, opponent, { [resource]: -steal }, reason);
-    const amount = -(taken[resource] ?? 0);
-    if (amount > 0) changeResources(state, events, player, { [resource]: amount }, reason);
-  }
+  saboteurSteal(state, events, player);
 }
 
 function useUltimate(state: GameState, events: GameEvent[], player: PlayerId, target: PlayerId | undefined): void {

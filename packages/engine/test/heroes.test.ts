@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, HEROES, createGame, effectiveCost, isUltimateReady, legalActions, ultimateThreshold } from '../src/index';
 import type { GameState } from '../src/index';
-import { discardCard, eventsOf, mustApply, playCard, scenario } from '../src/testing';
+import { choose, discardCard, eventsOf, mustApply, playCard, scenario } from '../src/testing';
+
+const uidOf = (state: GameState, cardId: string): string =>
+  String(state.players[state.active].hand.find((c) => c.cardId === cardId)!.uid);
 
 const ME = 0;
 const OPP = 1;
@@ -64,6 +67,53 @@ const HERO_TESTS: Record<string, () => void> = {
     const after = discardCard(state).state;
     expect(after.players[OPP].resources.acero).toBe(3);
     expect(after.players[ME].resources.acero).toBe(54);
+    // It also fires when a card makes her discard, once per card however many go.
+    const opp = { resources: { piedra: 1, acero: 7, mana: 3 } };
+    let own = playCard(
+      charged('saboteadora', { opponent: opp, hand: ['tierra-quemada', 'escaramuza', 'parapeto', 'catapulta'] }),
+      'tierra-quemada',
+    ).state;
+    expect(own.players[OPP].resources.acero).toBe(7);
+    own = choose(own, uidOf(own, 'escaramuza')).state;
+    expect(own.players[OPP].resources.acero).toBe(3);
+    own = choose(own, uidOf(own, 'parapeto')).state;
+    own = choose(own, 'done').state;
+    expect(own.players[OPP].resources).toEqual({ piedra: 1, acero: 3, mana: 3 });
+    // Stopping before discarding anything steals nothing.
+    const none = choose(
+      playCard(charged('saboteadora', { opponent: opp, hand: ['tierra-quemada', 'escaramuza', 'parapeto'] }), 'tierra-quemada').state,
+      'done',
+    ).state;
+    expect(none.players[OPP].resources.acero).toBe(7);
+    // Discarding the whole hand is one steal too.
+    // (Her hand empties, so the turn passes: count the steals instead of reading the stockpile.)
+    const all = playCard(charged('saboteadora', { opponent: opp, hand: ['todo-o-nada', 'escaramuza', 'parapeto'] }), 'todo-o-nada').events;
+    const steals = eventsOf(all, 'resourcesChanged').filter((e) => e.reason.kind === 'hero');
+    expect(steals.map((e) => [e.player, e.delta])).toEqual([
+      [OPP, { acero: -4 }],
+      [ME, { acero: 4 }],
+    ]);
+    // And when her card makes the opponent discard (random or chosen).
+    const burn = playCard(
+      charged('saboteadora', { opponent: opp, hand: ['quema-de-pergaminos', 'escaramuza'], opponentHand: ['escaramuza', 'parapeto', 'catapulta'] }),
+      'quema-de-pergaminos',
+    ).state;
+    expect(burn.players[OPP].resources.acero).toBe(3);
+    const spy = playCard(
+      charged('saboteadora', { opponent: opp, hand: ['espia-en-la-corte', 'escaramuza'], opponentHand: ['escaramuza', 'parapeto'] }),
+      'espia-en-la-corte',
+    ).state;
+    expect(spy.players[OPP].resources.acero).toBe(7);
+    expect(choose(spy, spy.pending!.options[0]!).state.players[OPP].resources.acero).toBe(3);
+    // Nothing to discard, nothing stolen.
+    const empty = playCard(
+      charged('saboteadora', { opponent: opp, hand: ['quema-de-pergaminos', 'escaramuza'], opponentHand: [] }),
+      'quema-de-pergaminos',
+    ).state;
+    expect(empty.players[OPP].resources.acero).toBe(7);
+    // Another hero's discard card does not trigger it.
+    const plain = playCard(scenario({ opponent: opp, hand: ['tierra-quemada', 'escaramuza'] }), 'tierra-quemada').state;
+    expect(plain.players[OPP].resources.acero).toBe(7);
     // Ultimate: steal a worker of the type the opponent has most of, and 10 piercing damage.
     const robbed = ultimate(charged('saboteadora', { opponent: { workers: { piedra: 2, acero: 2, mana: 5 } } })).state;
     expect(robbed.players[OPP].workers.mana).toBe(4);
