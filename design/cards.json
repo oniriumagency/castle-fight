@@ -6,7 +6,7 @@
     "keepWin": 100,
     "resourceStart": 8,
     "workerStart": 2,
-    "secondPlayerWall": 5,
+    "secondPlayerWall": 7,
     "multiSeatWall": 3,
     "handSize": 6,
     "turnSeconds": 30,
