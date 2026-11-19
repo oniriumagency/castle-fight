@@ -581,7 +581,18 @@ export interface VisibleCard {
   cardId: CardId | null;
 }
 
-export type ChangeReason = EffectSource | { kind: 'production' | 'hero' | 'battleEvent' | 'twilight'; id: string };
+export type ChangeReason =
+  | EffectSource
+  | { kind: 'production' | 'hero' | 'battleEvent' | 'twilight' | 'bounty'; id: string };
+
+/**
+ * Links the two halves of a steal: the victim's loss names who took it (`to`)
+ * and the thief's gain names who lost it (`from`).
+ */
+export interface StealLink {
+  from?: PlayerId;
+  to?: PlayerId;
+}
 
 export type GameEvent =
   | { type: 'gameStarted'; firstPlayer: PlayerId; heroes: HeroId[] }
@@ -600,8 +611,8 @@ export type GameEvent =
   /** Start-of-turn production. `frozen` lists resources that did not produce. */
   | { type: 'produced'; player: PlayerId; gained: ResourceMap; frozen: Resource[] }
   /** `delta` is the actual change (already clamped at 0). */
-  | { type: 'resourcesChanged'; player: PlayerId; delta: Partial<ResourceMap>; reason: ChangeReason }
-  | { type: 'workersChanged'; player: PlayerId; delta: Partial<ResourceMap>; reason: ChangeReason }
+  | ({ type: 'resourcesChanged'; player: PlayerId; delta: Partial<ResourceMap>; reason: ChangeReason } & StealLink)
+  | ({ type: 'workersChanged'; player: PlayerId; delta: Partial<ResourceMap>; reason: ChangeReason } & StealLink)
   | {
       type: 'cardPlayed';
       player: PlayerId;

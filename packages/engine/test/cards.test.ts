@@ -220,6 +220,13 @@ const CARD_TESTS: Record<string, () => void> = {
     });
     expect(state.players[OPP].resources).toEqual({ piedra: 3, acero: 5, mana: 4 });
     expect(state.players[ME].resources.mana).toBe(55);
+    const links = eventsOf(play('saqueo-nocturno', { opponent: { resources: { piedra: 3, acero: 5, mana: 9 } } }).events, 'resourcesChanged')
+      .filter((e) => e.to !== undefined || e.from !== undefined)
+      .map((e) => [e.player, e.delta, e.to, e.from]);
+    expect(links).toEqual([
+      [OPP, { mana: -5 }, ME, undefined],
+      [ME, { mana: 5 }, undefined, OPP],
+    ]);
     // It cannot steal more than there is.
     const poor = play('saqueo-nocturno', { opponent: { resources: { piedra: 1, acero: 2, mana: 0 } } });
     expect(poor.state.players[OPP].resources.acero).toBe(0);
