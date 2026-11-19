@@ -108,7 +108,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   ],
   'todo-o-nada': [
     { op: 'discardOwn', count: 'hand' },
-    { op: 'damage', amount: 0, perDiscard: 6 },
+    { op: 'damage', amount: 0, perDiscard: 6, perDiscardAll: 4 },
   ],
 
   // ----- Arcano ------------------------------------------------------------
