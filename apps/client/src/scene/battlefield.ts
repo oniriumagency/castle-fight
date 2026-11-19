@@ -141,6 +141,16 @@ const SEAMLESS_ASPECT = 2.8;
  */
 const SKY_LIFT = 0.2;
 const SKY_HORIZON = 0xbe8364;
+/**
+ * Over a painted sky, a battle event's own sky gradient is multiplied on top
+ * this strongly, so an eclipse, a storm or the dusk of the Twilight Fury
+ * still reads at a glance. The default mood leaves the painting alone.
+ */
+const SKY_WASH = 0.8;
+
+function isDefaultMood(mood: SkyMood): boolean {
+  return mood.top === DEFAULT_SKY.top && mood.middle === DEFAULT_SKY.middle;
+}
 
 async function loadArt(path: string): Promise<Texture | null> {
   try {
@@ -206,9 +216,12 @@ export class Battlefield {
   private readonly skyTile = new TilingSprite();
   /** Horizon colour under the lifted sky, behind the mountains. */
   private readonly skyFloor = new Graphics();
+  /** Holds the gradient skies when they wash over a painted one. */
+  private readonly skyWash = new Container();
+  private paintedSkyLoaded = false;
   private skySway = { x: 0, room: 0, time: 0 };
   /** The drawn sun glow; a painted sky has its own light, so it is barely there. */
-  private sunGain = 1;
+  private paintedLight = false;
   private readonly painted = new Sprite();
   /** Under the painted land, in case the screen is taller than its foreground. */
   private readonly paintedFloor = new Graphics();
@@ -305,7 +318,12 @@ export class Battlefield {
       this.paintedSky.visible = !seamless;
       this.skyTile.visible = seamless;
       this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = skyTint(this.mood);
-      this.skyA.visible = this.skyB.visible = false;
+      // The gradient skies move above the painting, multiplied, as the events' wash.
+      this.paintedSkyLoaded = true;
+      this.skyA.blendMode = this.skyB.blendMode = 'multiply';
+      this.skyWash.addChild(this.skyA, this.skyB);
+      this.world.addChildAt(this.skyWash, this.world.getChildIndex(this.skyTile) + 1);
+      this.skyWash.alpha = isDefaultMood(this.mood) ? 0 : SKY_WASH;
       // Painted clouds are in the picture; the drawn ones only drift faintly over it.
       for (const cloud of this.clouds) cloud.alpha *= 0.45;
     }
@@ -321,10 +339,15 @@ export class Battlefield {
       }
     }
     if (sky || (land && !terrain)) {
-      this.sunGain = 0.15;
-      this.sun.alpha = this.mood.sunAlpha * this.sunGain;
+      this.paintedLight = true;
+      this.sun.alpha = this.mood.sunAlpha * this.sunGainFor(this.mood);
     }
     this.layoutBackdrop();
+  }
+
+  /** The drawn sun glow over a painting: barely there by default (the painting has its own light), full for events. */
+  private sunGainFor(mood: SkyMood): number {
+    return this.paintedLight && isDefaultMood(mood) ? 0.15 : 1;
   }
 
   /** Covers the screen with the painting, its ground line on the castles' ground. */
@@ -485,12 +508,16 @@ export class Battlefield {
     this.applySky(mood, this.skyB);
     this.skyB.alpha = 0;
     const sunFrom = this.sun.alpha;
+    const sunTo = mood.sunAlpha * this.sunGainFor(mood);
+    const washFrom = this.skyWash.alpha;
+    const washTo = this.paintedSkyLoaded && !isDefaultMood(mood) ? SKY_WASH : 0;
     this.paintedTint = { from: this.painted.tint as number, to: paintTint(mood), skyFrom: this.paintedSky.tint as number, skyTo: skyTint(mood) };
     this.sun.texture = glowTexture(mood.sun, 256);
     return this.tweens
       .run(ms, (t) => {
         this.skyB.alpha = t;
-        this.sun.alpha = sunFrom + (mood.sunAlpha * this.sunGain - sunFrom) * t;
+        this.sun.alpha = sunFrom + (sunTo - sunFrom) * t;
+        this.skyWash.alpha = washFrom + (washTo - washFrom) * t;
         this.tint = {
           far: lerpColor(from.far, to.far, t),
           mid: lerpColor(from.mid, to.mid, t),
