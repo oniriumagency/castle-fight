@@ -249,11 +249,13 @@ export class Battlefield {
     });
     this.drawLandscape();
 
-    // The castles fit a winning Keep in the field, leaving room for the roof.
+    // The castles sit in the field between the panels.
     const sideRoom = Math.min(rect.width * 0.23, 260);
     const three = this.count > 2;
     const keepWidth = Math.max(three ? 28 : 34, Math.min(rect.width * (three ? 0.062 : 0.075), three ? 84 : 96));
-    const unit = Math.max(1.2, (rect.height * 0.94 - keepWidth * 2.2) / this.maxPoints);
+    // A winning Keep (or Wall) reaches the top edge of the screen, roof beyond
+    // it, so every point gained or lost is plainly visible.
+    const unit = Math.max(1.2, (this.groundY - 6) / this.maxPoints);
     const common = { groundY: this.groundY, unit, keepWidth, wallWidth: keepWidth * 0.42, gap: keepWidth * 0.55, maxPoints: this.maxPoints * 1.1 };
     this.castles[0].setLayout({ ...common, x: rect.left + sideRoom * 0.75 });
     this.castles[1].setLayout({ ...common, x: rect.left + rect.width - sideRoom * 0.75 });
