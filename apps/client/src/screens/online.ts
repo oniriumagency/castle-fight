@@ -1,5 +1,6 @@
 import type { HeroId } from '@cardcraft-castles/engine';
 import type { RoomInfo } from '@cardcraft-castles/protocol';
+import { turnNotificationOffer } from '../app/attention';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
 import { setScreenName } from '../app/reportContext';
@@ -101,6 +102,7 @@ function waitingScreen(session: OnlineSession, cancel: () => void): Screen {
           t('copyLink'),
         ),
       ),
+      turnNotificationOffer(),
       h('button.btn', { type: 'button', onclick: () => (audio.play('uiBack'), cancel()) }, t('leaveRoom')),
     ),
   );
