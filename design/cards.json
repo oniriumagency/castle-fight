@@ -1286,12 +1286,12 @@
         "en": "The Saboteur"
       },
       "text": {
-        "es": "Pasiva: al descartar o hacer descartar, roba 4 recursos del rival (una vez por jugada). Definitiva: roba 1 trabajador del rival y hace 10 de daño perforante.",
-        "en": "Passive: when you discard or make your opponent discard, steal 4 resources from them (once per play). Ultimate: steal 1 of your opponent's workers and deal 10 piercing damage."
+        "es": "Pasiva: al descartar o hacer descartar, roba 3 recursos del rival (una vez por jugada). Definitiva: roba 1 trabajador del rival y hace 10 de daño perforante.",
+        "en": "Passive: when you discard or make your opponent discard, steal 3 resources from them (once per play). Ultimate: steal 1 of your opponent's workers and deal 10 piercing damage."
       },
       "textFfa": {
-        "es": "Pasiva: al descartar o hacer descartar, roba 4 recursos al rival con el Castillo más alto (una vez por jugada). Definitiva: cada rival pierde 1 trabajador (tú ganas 1) y recibe 6 de daño perforante.",
-        "en": "Passive: when you discard or make a rival discard, steal 4 resources from the rival with the highest Castle (once per play). Ultimate: each rival loses 1 worker (you gain 1) and takes 6 piercing damage."
+        "es": "Pasiva: al descartar o hacer descartar, roba 3 recursos al rival con el Castillo más alto (una vez por jugada). Definitiva: cada rival pierde 1 trabajador (tú ganas 1) y recibe 6 de daño perforante.",
+        "en": "Passive: when you discard or make a rival discard, steal 3 resources from the rival with the highest Castle (once per play). Ultimate: each rival loses 1 worker (you gain 1) and takes 6 piercing damage."
       },
       "art": "heroes/saboteadora.jpg"
     },
