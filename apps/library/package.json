@@ -10,8 +10,9 @@
   },
   "devDependencies": {
     "@cardcraft-castles/client": "workspace:*",
-    "@fontsource/cinzel": "^5.3.0",
-    "@fontsource/eb-garamond": "^5.3.0",
+    "@fontsource/big-shoulders-display": "^5.3.0",
+    "@fontsource/gruppo": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
     "sharp": "0.35.5"
   }
 }

@@ -1,6 +1,8 @@
 # Biblioteca de juegos
 
-La portada de <https://games.onirium.agency>: la lista de juegos de Onirium, con los mismos materiales que Cardcraft: Castles (madera, cuero y latón). Es HTML y CSS estáticos, sin framework, en español e inglés (recuerda el idioma elegido y, si no hay, usa el del juego).
+La portada de <https://games.onirium.agency>: la lista de juegos de Onirium, con la marca de Onirium (la de onirium.agency): violeta y obsidiana, Big Shoulders Display, Manrope y Gruppo, el imagotipo y la banda de meandro, con modo claro y oscuro. Es HTML y CSS estáticos, sin framework, en español e inglés. Los tokens de color están al principio de `src/styles.css`, copiados de `assets/css/styles.css` de onirium.agency: si la marca cambia allí, cámbialos también aquí.
+
+Idioma: `?lang=es|en`, la elección guardada, el idioma elegido en Cardcraft: Castles o el del navegador. Tema: la elección guardada o el del sistema.
 
 ```sh
 pnpm --filter @cardcraft-castles/client build   # el juego
@@ -28,7 +30,8 @@ Añade una entrada a `games.json`, en el orden en que debe aparecer:
 | `cover` | Imagen de portada, relativa a la raíz del repositorio (se recorta a 16:10). |
 | `tagline`, `description`, `play` | Lema, descripción y texto del botón, cada uno con `es` y `en`. |
 | `tags` | Opcional: etiquetas por idioma. |
-| `badge` | Opcional: una insignia (como "Beta"); la tarjeta se pinta en verde azulado. |
+| `kind` | Opcional: tipo de juego por idioma ("Juego de cartas"), sobre el título. |
+| `badge` | Opcional: una insignia (como "Beta"); el botón pasa a ser secundario. |
 
 Si el juego se sirve desde este mismo sitio, añádelo también a `BUNDLED` en `build.mjs` con la carpeta de su compilación, y compílalo con su `base` en esa ruta. `moreComing` muestra al final la tarjeta "Más juegos en camino".
 

@@ -5,6 +5,10 @@
     {
       "id": "cardcraft-castles",
       "title": "Cardcraft: Castles",
+      "kind": {
+        "es": "Juego de cartas",
+        "en": "Card game"
+      },
       "url": "/cardcraft-castles/",
       "cover": "art/cards/ciudadela-eterna.jpg",
       "tagline": {
@@ -37,6 +41,10 @@
     {
       "id": "cardcraft-castles-beta",
       "title": "Cardcraft: Castles",
+      "kind": {
+        "es": "Juego de cartas / Rediseño",
+        "en": "Card game / Redesign"
+      },
       "badge": {
         "es": "Beta",
         "en": "Beta"

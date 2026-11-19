@@ -23,10 +23,12 @@ const require = createRequire(import.meta.url);
 const BUNDLED = [{ path: 'cardcraft-castles', from: join(root, 'apps/client/dist') }];
 
 const FONTS = [
-  ['@fontsource/cinzel', 'cinzel-latin-600-normal.woff2'],
-  ['@fontsource/cinzel', 'cinzel-latin-700-normal.woff2'],
-  ['@fontsource/eb-garamond', 'eb-garamond-latin-400-normal.woff2'],
-  ['@fontsource/eb-garamond', 'eb-garamond-latin-400-italic.woff2'],
+  ['@fontsource/big-shoulders-display', 'big-shoulders-display-latin-600-normal.woff2'],
+  ['@fontsource/big-shoulders-display', 'big-shoulders-display-latin-800-normal.woff2'],
+  ['@fontsource/manrope', 'manrope-latin-400-normal.woff2'],
+  ['@fontsource/manrope', 'manrope-latin-600-normal.woff2'],
+  ['@fontsource/manrope', 'manrope-latin-700-normal.woff2'],
+  ['@fontsource/gruppo', 'gruppo-latin-400-normal.woff2'],
 ];
 
 const data = JSON.parse(await readFile(join(here, 'games.json'), 'utf8'));
@@ -52,7 +54,7 @@ await mkdir(join(out, 'fonts'), { recursive: true });
 await writeFile(join(out, 'index.html'), renderIndex(data));
 await writeFile(join(out, '404.html'), renderNotFound());
 await cp(join(here, 'src/styles.css'), join(out, 'styles.css'));
-await cp(join(here, 'src/emblem.svg'), join(out, 'emblem.svg'));
+await cp(join(here, 'src/favicon.svg'), join(out, 'favicon.svg'));
 for (const [pkg, file] of FONTS) {
   await cp(join(dirname(require.resolve(`${pkg}/package.json`)), 'files', file), join(out, 'fonts', file));
 }
