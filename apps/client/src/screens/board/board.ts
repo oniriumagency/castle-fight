@@ -560,6 +560,10 @@ class BoardScreen implements Screen {
       this.busy = false;
     }
     if (this.destroyed || !this.view) return;
+    // A settled board has no card on stage. An update given up on (its animation
+    // stalled in a background tab) never reaches its own clean-up, which left the
+    // rival's card stuck in the middle of the screen until the next play.
+    this.clearPlayed();
     this.field.setCastles(this.castleValues());
     this.setShields(this.view);
     this.syncGraves(this.view);
@@ -1311,6 +1315,7 @@ class BoardScreen implements Screen {
   /** The played card flies to the centre, is shown big, and stays until the next one. */
   private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId): Promise<void> {
     this.clearPlayed();
+    const gen = this.animGen;
     const card = markBoost(cardFace(cardId, { className: 'played', hero }), cardId, boost);
     const combo = boost === 'combo';
     if (hero) card.dataset.hero = hero;
@@ -1329,6 +1334,8 @@ class BoardScreen implements Screen {
       { duration: 520 * animScale(), easing: 'cubic-bezier(.2,.8,.2,1)' },
     );
     await anim.finished.catch(() => undefined);
+    // Given up on while it flew (the tab was hidden): the board has moved on.
+    if (gen !== this.animGen || this.playedCard !== card) return;
     const landed = card.getBoundingClientRect();
     this.playBurst(cardId, combo);
     if (getCard(cardId).rarity === 'legendaria') this.showLegendaryCall(landed);
