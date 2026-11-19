@@ -431,12 +431,25 @@
   letter-spacing: 0.02em;
 }
 
-/* Placeholder while a card's illustration does not exist yet. */
+/* Placeholder while a card's illustration does not exist yet: the school
+   colour and its emblem, so it never reads as a broken black picture. */
 .card.no-art .art {
-  background: radial-gradient(circle at 50% 40%, var(--f1, #3a3450) 0%, #0b0a12 75%);
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 45%, rgb(255 255 255 / 18%) 0%, transparent 55%),
+    radial-gradient(circle at 50% 45%, var(--f1, #3a3450) 0%, var(--f2, #1c1828) 90%);
 }
 .card.no-art .art img {
-  visibility: hidden;
+  display: none;
+}
+.card.no-art .art .art-emblem {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 38%;
+  height: 50%;
+  opacity: 0.55;
+  filter: drop-shadow(0 0 2cqw rgb(0 0 0 / 50%));
 }
 
 /* What the player's hero adds to a number ("13+2 damage"): the "+2" in the hero's colour. */
