@@ -125,7 +125,7 @@ Estas son interpretaciones mías del texto de las cartas. Están cubiertas por t
 
 | Tema | Decisión |
 | --- | --- |
-| Espejismo | Copia el efecto de la última carta que jugó el rival, sin su Combo. No se puede jugar si el rival aún no ha jugado ninguna. Tras copiar, esa carta cuenta como la última que jugaste. |
+| Espejismo | Copia el efecto de la última carta que jugó el rival, sin su Combo. No se puede jugar si el rival aún no ha jugado ninguna. Tras copiar, esa carta cuenta como la última que jugaste. Con 3 jugadores copia la carta más reciente de cualquier rival vivo (primero mira al que juega justo antes que tú). |
 | Ariete de Hierro | Cada punto de daño quita 2 de Muralla; los puntos que sobran al caer la Muralla pasan al Torreón sin duplicar. |
 | Ojo del Augur | Descartas la mano boca abajo, robas 6 y puedes jugar o descartar una carta más. |
 | Reloj de Arena | Como máximo un turno extra en espera. |
