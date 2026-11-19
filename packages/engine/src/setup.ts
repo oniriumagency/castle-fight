@@ -79,8 +79,10 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
   state.upcomingEvent.id = rollBattleEvent(state, null);
   const firstPlayer = options.firstPlayer ?? (randomInt(state, n) as PlayerId);
   // Moving later costs tempo; a slightly taller Wall makes up for it (more for each seat further back).
+  // With 3+ players the tempo matters less, so the step is smaller (balance sims: 33/32/34% with +3/+6).
+  const seatWall = n > 2 ? rules.multiSeatWall : rules.secondPlayerWall;
   for (let seat = 1; seat < n; seat++) {
-    state.players[(firstPlayer + seat) % n]!.wall += rules.secondPlayerWall * seat;
+    state.players[(firstPlayer + seat) % n]!.wall += seatWall * seat;
   }
 
   const events: GameEvent[] = [
