@@ -25,6 +25,33 @@ export function preloadArt(paths: readonly string[]): Promise<void> {
   return Promise.all(pending).then(() => undefined);
 }
 
+/**
+ * Handles an illustration that fails to load. A download can fail for a
+ * moment (a dropped connection on a phone, a request cut off while the tab
+ * was in the background), and the browser never tries again on its own, so
+ * the card would stay dark for the rest of the match. Try once more after a
+ * short pause, skipping the cache, and only call `onMissing` if that fails too
+ * (the file really is not there, such as a card whose art is not painted yet).
+ */
+export function watchArt(img: HTMLImageElement, onMissing: () => void): void {
+  let retried = false;
+  img.addEventListener('error', () => {
+    if (retried) {
+      onMissing();
+      return;
+    }
+    retried = true;
+    const src = img.getAttribute('src');
+    if (!src) {
+      onMissing();
+      return;
+    }
+    window.setTimeout(() => {
+      img.src = `${src}${src.includes('?') ? '&' : '?'}retry=${Date.now()}`;
+    }, 1200);
+  });
+}
+
 /** Inline SVG icons. Drawn for this game; `currentColor` lets CSS tint them. */
 const PATHS = {
   // Resources (same shapes as the cost shield on the card frame).

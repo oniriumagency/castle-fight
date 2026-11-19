@@ -15,7 +15,7 @@ import {
 import { escapeHtml, h, html } from '../app/dom';
 import { L, locale } from '../app/i18n';
 import { settings } from '../app/settings';
-import { SCHOOL_EMBLEM, artUrl, emblemSvg, iconSvg } from './assets';
+import { SCHOOL_EMBLEM, artUrl, emblemSvg, iconSvg, watchArt } from './assets';
 
 /**
  * Card faces drawn in DOM/CSS, following the approved frame design: metal
@@ -219,8 +219,14 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
     <div class="cost ${costClass}"><span>${cost}</span>${emblemSvg(SCHOOL_EMBLEM[card.school])}</div>
     <div class="gem"></div>
     <div class="holo"></div>`;
-  // Cards whose illustration is not painted yet show a plain school-coloured panel.
-  el.querySelector('.art img')?.addEventListener('error', () => el.classList.add('no-art'), { once: true });
+  // Cards whose illustration is not painted yet show the school emblem on a school-coloured panel.
+  const img = el.querySelector<HTMLImageElement>('.art img');
+  if (img) {
+    watchArt(img, () => {
+      el.classList.add('no-art');
+      img.insertAdjacentHTML('afterend', emblemSvg(SCHOOL_EMBLEM[card.school], 'art-emblem'));
+    });
+  }
   el.setAttribute('aria-label', `${L(card.name)}. ${cost}. ${rulesOf(card)}`);
   fitName(el);
   return el;

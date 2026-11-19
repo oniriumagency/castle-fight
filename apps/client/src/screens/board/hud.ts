@@ -11,7 +11,7 @@ import {
 } from '@cardcraft-castles/engine';
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
-import { artUrl, emblemSvg, iconSvg, type EmblemName } from '../../ui/assets';
+import { artUrl, emblemSvg, iconSvg, watchArt, type EmblemName } from '../../ui/assets';
 import { discardOverlay, parseHistoryEntry, rulesOf, ultimateHtml } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
@@ -178,7 +178,7 @@ export class SidePanel {
             title: `${L(card.name)} · ${e.charges !== undefined ? t('attacksLeft', { n: e.charges }) : t('turnsLeft', { n: e.turnsLeft })}`,
             onclick: () => this.onInspect(e.cardId),
           },
-          h('img', { src: artUrl(card.art), alt: L(card.name), draggable: 'false', onerror: hideMissingArt }),
+          artImg(card.art, L(card.name)),
           h('span.enchant-turns', null, String(enchantmentLife(e))),
         );
         return el;
@@ -213,7 +213,7 @@ export class SidePanel {
               this.onInspect(entry);
             },
           },
-          h('img', { src: artUrl(card.art), alt: '', draggable: 'false', onerror: hideMissingArt }),
+          artImg(card.art, ''),
           h('span.hist-cost', null, String(card.cost)),
           discarded ? discardOverlay() : null,
           tag ? h('span.hist-boost', { 'aria-hidden': 'true' }, tag) : null,
@@ -306,6 +306,11 @@ export class CastlePlaque {
 }
 
 /** A card whose illustration is not painted yet leaves its thumbnail empty instead of showing a broken image. */
-function hideMissingArt(e: Event): void {
-  (e.target as HTMLElement).style.visibility = 'hidden';
+/** A small card illustration that retries a failed download and hides itself if the file is missing. */
+function artImg(path: string, alt: string): HTMLImageElement {
+  const img = h('img', { src: artUrl(path), alt, draggable: 'false' }) as HTMLImageElement;
+  watchArt(img, () => {
+    img.style.visibility = 'hidden';
+  });
+  return img;
 }
