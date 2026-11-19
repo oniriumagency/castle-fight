@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "balance": "tsx scripts/balance.ts",
     "ladder": "tsx scripts/ladder.ts",
-    "ffa": "tsx scripts/ffa.ts"
+    "ffa": "tsx scripts/ffa.ts",
+    "eclipse": "tsx scripts/eclipse.ts"
   },
   "dependencies": {
     "@cardcraft-castles/engine": "workspace:*"

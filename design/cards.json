@@ -1340,8 +1340,8 @@
         "en": "Eclipse"
       },
       "text": {
-        "es": "Durante 1 ronda (un turno de cada jugador), las cartas Arcanas cuestan la mitad.",
-        "en": "For 1 round (one turn for each player), Arcane cards cost half."
+        "es": "Durante 2 rondas (dos turnos de cada jugador), las cartas Arcanas cuestan la mitad.",
+        "en": "For 2 rounds (two turns for each player), Arcane cards cost half."
       },
       "art": "events/eclipse.jpg"
     },

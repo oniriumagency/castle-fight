@@ -35,14 +35,19 @@ const EVENT_TESTS: Record<string, () => void> = {
   },
   eclipse: () => {
     let { state, events } = fireAtRoundStart('eclipse');
-    expect(eventsOf(events, 'battleEventStarted')[0]).toEqual({ type: 'battleEventStarted', eventId: 'eclipse', rounds: 1 });
-    expect(state.activeEvent).toEqual({ id: 'eclipse', untilRound: 2 });
+    expect(eventsOf(events, 'battleEventStarted')[0]).toEqual({ type: 'battleEventStarted', eventId: 'eclipse', rounds: 2 });
+    expect(state.activeEvent).toEqual({ id: 'eclipse', untilRound: 3 });
     // Arcane cards cost half, rounded up; the other schools do not change.
     expect(effectiveCost(state, ME, 'reloj-de-arena')).toBe(7);
     expect(effectiveCost(state, ME, 'aliento-de-escarcha')).toBe(2);
     expect(effectiveCost(state, ME, 'ojo-del-augur')).toBe(1);
     expect(effectiveCost(state, ME, 'parapeto')).toBe(4);
-    // It lasts 1 round: one turn for each player.
+    // It lasts 2 rounds: two turns for each player.
+    state = discardCard(state).state;
+    expect(effectiveCost(state, OPP, 'reloj-de-arena')).toBe(7);
+    state = discardCard(state).state;
+    expect(state.activeEvent).toEqual({ id: 'eclipse', untilRound: 3 });
+    expect(effectiveCost(state, ME, 'reloj-de-arena')).toBe(7);
     state = discardCard(state).state;
     expect(effectiveCost(state, OPP, 'reloj-de-arena')).toBe(7);
     const end = discardCard(state);
@@ -124,19 +129,19 @@ describe('battle events', () => {
     expect(fired).toEqual([13, 25, 37]);
   });
 
-  it('a lasting event covers one turn of each of 3 players', () => {
+  it('a lasting event covers whole rounds with 3 players', () => {
     let { state } = createGame({ seed: 'lasting3', heroes: ['guardian', 'guardian', 'guardian'], rules: { turnLimit: 0, twilightRound: 0 } });
     state.upcomingEvent = { id: 'eclipse', round: 2 };
     const active: boolean[] = [];
     let ended = 0;
-    while (state.turn < 8) {
+    while (state.turn < 11) {
       const result = discardCard(state);
       ended += eventsOf(result.events, 'battleEventEnded').length;
       state = result.state;
       active.push(state.activeEvent !== null);
     }
-    // Turns 2..8: round 2 is turns 4, 5 and 6.
-    expect(active).toEqual([false, false, true, true, true, false, false]);
+    // Turns 2..11: the Eclipse covers rounds 2 and 3, turns 4 to 9.
+    expect(active).toEqual([false, false, true, true, true, true, true, true, false, false]);
     expect(ended).toBe(1);
   });
 
