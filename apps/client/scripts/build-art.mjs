@@ -48,6 +48,36 @@ async function cutOutSky(image) {
   return sharp(data, { raw: info });
 }
 
+/**
+ * A sky wide enough to drift endlessly (2.8:1 or more, as in battlefield.ts)
+ * is made exactly seamless: generated "seamless" images rarely match pixel for
+ * pixel, and any mismatch shows as a vertical line when the sky repeats. The
+ * last 6% of the width is cut off and cross-faded into the first 6%, so the
+ * right edge runs straight into the left one.
+ */
+async function closeSeam(image) {
+  const { data, info } = await image.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  if (width / height < 2.8) return sharp(data, { raw: info });
+  const band = Math.round(width * 0.06);
+  const outW = width - band;
+  const out = Buffer.alloc(outW * height * channels);
+  for (let y = 0; y < height; y++) {
+    data.copy(out, y * outW * channels, y * width * channels, (y * width + outW) * channels);
+    for (let x = 0; x < band; x++) {
+      const t = (x + 0.5) / band;
+      // Smoothstep: no visible edge where the fade starts or ends.
+      const k = t * t * (3 - 2 * t);
+      for (let c = 0; c < channels; c++) {
+        const tail = data[(y * width + outW + x) * channels + c];
+        const head = data[(y * width + x) * channels + c];
+        out[(y * outW + x) * channels + c] = Math.round(tail * (1 - k) + head * k);
+      }
+    }
+  }
+  return sharp(out, { raw: { width: outW, height, channels } });
+}
+
 let built = 0;
 let skipped = 0;
 for (const folder of FOLDERS) {
@@ -66,7 +96,12 @@ for (const folder of FOLDERS) {
     // seamless panorama can be several screens wide.
     const size = folder === 'scenery' && file.startsWith('sky') ? { height: 1200 } : { width: WIDTHS[folder] ?? WIDTH };
     const resized = sharp(input).resize({ ...size, withoutEnlargement: true });
-    const image = folder === 'scenery' && file.startsWith('terrain') ? await cutOutSky(resized) : resized;
+    const image =
+      folder === 'scenery' && file.startsWith('terrain')
+        ? await cutOutSky(resized)
+        : folder === 'scenery' && file.startsWith('sky')
+          ? await closeSeam(resized)
+          : resized;
     await image.webp({ quality: folder === 'scenery' ? 84 : 80, alphaQuality: 90 }).toFile(output);
     built++;
   }
