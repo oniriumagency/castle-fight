@@ -220,7 +220,7 @@ export class Battlefield {
   private readonly skyWash = new Container();
   private paintedSkyLoaded = false;
   private skySway = { x: 0, room: 0, time: 0 };
-  /** The drawn sun glow; a painted sky has its own light, so it is barely there. */
+  /** The drawn sun glow; a painted sky has its own light, so it is off. */
   private paintedLight = false;
   private readonly painted = new Sprite();
   /** Under the painted land, in case the screen is taller than its foreground. */
@@ -345,9 +345,14 @@ export class Battlefield {
     this.layoutBackdrop();
   }
 
-  /** The drawn sun glow over a painting: barely there by default (the painting has its own light), full for events. */
-  private sunGainFor(mood: SkyMood): number {
-    return this.paintedLight && isDefaultMood(mood) ? 0.15 : 1;
+  /**
+   * The drawn sun glow is off over a painting, events included: the painting
+   * has its own light, and at full strength (Mercado, Cosecha, Terremoto...)
+   * the glow washed the middle of the valley out to white. The events still
+   * read through the sky wash, the land tint and their weather.
+   */
+  private sunGainFor(_mood: SkyMood): number {
+    return this.paintedLight ? 0 : 1;
   }
 
   /** Covers the screen with the painting, its ground line on the castles' ground. */
