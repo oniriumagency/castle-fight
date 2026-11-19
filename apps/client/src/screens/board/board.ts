@@ -1,4 +1,5 @@
 import {
+  CARDS,
   DEFAULT_RULES,
   RESOURCES,
   getBattleEvent,
@@ -237,7 +238,9 @@ class BoardScreen implements Screen {
 
   mount(): void {
     audio.music('battle');
-    void preloadArt([...this.session.seats.map((s) => getHero(s.hero).art)]);
+    // Heroes first, then every card in the game (about 3 MB in all), so a card
+    // drawn later already has its illustration instead of a dark panel while it downloads.
+    void preloadArt(this.session.seats.map((s) => getHero(s.hero).art)).then(() => preloadArt(CARDS.map((c) => c.art)));
     this.field.setCount(this.count);
     setTableSize(this.count);
     this.field.setHeroes(this.sides().map((side) => this.session.seats[this.seatOfSide(side)].hero));

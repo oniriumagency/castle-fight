@@ -99,7 +99,8 @@
   overflow: hidden;
   aspect-ratio: 4 / 3;
   flex: none;
-  background: #0b0a12;
+  /* What shows while the illustration downloads: the school colour, not black. */
+  background: radial-gradient(circle at 50% 45%, var(--f1, #3a3450) 0%, var(--f2, #1c1828) 90%);
   box-shadow: 0 0 0 0.75cqw var(--trim2), 0 0 0 1.1cqw rgb(0 0 0 / 60%), inset 0 0 0 1px rgb(0 0 0 / 60%);
 }
 
