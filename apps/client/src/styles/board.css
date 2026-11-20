@@ -3614,6 +3614,38 @@
   visibility: visible;
 }
 
+/* The 1: a red skull carved into the ivory, in place of the pip. */
+.dice-roll .skull {
+  position: absolute;
+  inset: 14%;
+  width: 72%;
+  height: 72%;
+  visibility: hidden;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 55%)) drop-shadow(0 -1px 0 rgb(0 0 0 / 30%));
+}
+
+.dice-roll .skull.on {
+  visibility: visible;
+}
+
+.dice-roll .skull .bone {
+  fill: url(#dice-skull-red);
+  stroke: #3a0a04;
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+}
+
+.dice-roll .skull .holes {
+  fill: #2a0804;
+}
+
+.dice-roll .skull .shine {
+  fill: none;
+  stroke: rgb(255 220 200 / 70%);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
 .dice-roll strong {
   font-family: var(--display);
   font-weight: 800;
@@ -3650,9 +3682,16 @@
 }
 
 .dice-roll.backfire .die {
-  --pip: #fff1e0;
-  background: linear-gradient(145deg, #ff7a52 0%, #c8301c 60%, #7a1408 100%);
   box-shadow: 0 0 0 4px #ff5a3a, 0 0 38px 12px rgb(255 70 40 / 75%), 0 10px 26px rgb(0 0 0 / 55%);
+}
+
+.dice-roll.backfire .skull {
+  animation: skullThrob 0.9s ease-in-out 0.3s infinite;
+}
+
+@keyframes skullThrob {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 6px rgb(255 70 40 / 85%)); }
 }
 
 .dice-roll.backfire strong {
@@ -3684,7 +3723,8 @@
 }
 
 .reduced-motion .dice-roll .die,
-.reduced-motion .dice-roll.landed .die {
+.reduced-motion .dice-roll.landed .die,
+.reduced-motion .dice-roll.backfire .skull {
   animation: none;
 }
 

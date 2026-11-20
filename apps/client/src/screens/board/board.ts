@@ -1481,16 +1481,28 @@ class BoardScreen implements Screen {
     const pips = Array.from({ length: 9 }, (_, i) =>
       h('i.pip', { style: `left:${25 + (i % 3) * 25}%;top:${25 + Math.floor(i / 3) * 25}%` }),
     );
+    // The 1 is a red skull: the face that blows up in your hands.
+    const skull = html(
+      '<svg class="skull" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<defs><linearGradient id="dice-skull-red" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="#ff6a4a"/><stop offset=".55" stop-color="#c8301c"/><stop offset="1" stop-color="#7a1408"/>' +
+        '</linearGradient></defs>' +
+        '<path class="bone" d="M12 2.4c-5 0-8.6 3.5-8.6 8.1 0 2.6 1.1 4.6 2.9 5.8v2.6c0 .9.7 1.6 1.6 1.6h.9v-2.1h1.5v2.1h3.4v-2.1h1.5v2.1h.9c.9 0 1.6-.7 1.6-1.6v-2.6c1.8-1.2 2.9-3.2 2.9-5.8 0-4.6-3.6-8.1-8.6-8.1z"/>' +
+        '<path class="holes" d="M8.4 9.3c1.4 0 2.5 1 2.5 2.3S9.9 14 8.6 14 6 13 6 11.6s1-2.3 2.4-2.3zm7.2 0c1.4 0 2.4 1 2.4 2.3S17 14 15.4 14s-2.3-1-2.3-2.4 1.1-2.3 2.5-2.3zM12 14.3l1.3 2.4h-2.6z"/>' +
+        '<path class="shine" d="M7.2 5.6c1.2-1 2.8-1.5 4.3-1.5" />' +
+        '</svg>',
+    ).firstElementChild!;
     const face = (n: number): void => {
-      const on = PIPS[n] ?? [];
+      const on = n === 1 ? [] : (PIPS[n] ?? []);
       pips.forEach((pip, i) => pip.classList.toggle('on', on.includes(i)));
+      skull.classList.toggle('on', n === 1);
     };
     const caption = t(outcome === 'hit' ? 'diceHit' : outcome === 'backfire' ? 'diceBackfire' : 'diceMiss');
     const at = this.playedCard?.getBoundingClientRect() ?? this.stage.getBoundingClientRect();
     const box = h(
       'div.dice-roll',
       { 'aria-hidden': 'true', style: `left:${at.left + at.width / 2}px;top:${at.top + at.height * 0.42}px` },
-      h('div.die', null, ...pips),
+      h('div.die', null, ...pips, skull),
       h('strong', null, caption),
     );
     this.floaters.appendChild(box);
