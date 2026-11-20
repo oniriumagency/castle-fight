@@ -11,7 +11,9 @@ import { cardFace } from '../ui/card';
 import { skyFor } from '../ui/theme';
 import { hasSavedGame } from '../game/localSession';
 import { flow } from './flow';
+import { openChangelog } from './changelogModal';
 import { openHowToPlay } from './howToPlay';
+import { unseenRelease } from '../game/changelog';
 import { openRecord } from './recordModal';
 import { openSettings } from './settingsModal';
 import { muteButton } from '../ui/muteButton';
@@ -84,6 +86,7 @@ export function menuScreen(): Screen {
           'div.menu-secondary',
           null,
           h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openHowToPlay()) }, html(iconSvg('book')), t('howToPlay')),
+          h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openChangelog()) }, html(iconSvg('scroll')), t('whatsNew')),
           h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openRecord()) }, html(iconSvg('hero')), t('myRecord')),
           h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openSettings()) }, html(iconSvg('gear')), t('settings')),
           h(
@@ -141,8 +144,10 @@ export function menuScreen(): Screen {
         if (next.locale !== prev.locale) build();
       });
       unsubscribeInstall = onInstallChange(build);
+      // A new update opens its changes once; the reports bubble waits for the next visit.
+      if (unseenRelease()) openChangelog();
       // First visit only: points at the reports button, here where nothing is being played.
-      showFeedbackHint();
+      else showFeedbackHint();
     },
     unmount() {
       hideFeedbackHint();

@@ -31,6 +31,8 @@ const STRINGS = {
   watchingWaitTitle: { es: 'Esperando a que empiece la partida', en: 'Waiting for the game to start' },
   tooManySpectators: { es: 'Ya hay demasiados observadores en esta sala.', en: 'This room already has too many observers.' },
   howToPlay: { es: 'Cómo se juega', en: 'How to play' },
+  whatsNew: { es: 'Novedades', en: "What's new" },
+  whatsNewPlay: { es: '¡A jugar!', en: "Let's play!" },
   settings: { es: 'Ajustes', en: 'Settings' },
   nickname: { es: 'Tu apodo', en: 'Your nickname' },
   nicknamePlaceholder: { es: 'Escribe un apodo', en: 'Enter a nickname' },
