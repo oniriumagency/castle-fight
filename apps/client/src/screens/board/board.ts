@@ -115,6 +115,7 @@ class BoardScreen implements Screen {
   private readonly banner = h('div.turn-banner', { 'aria-live': 'polite' });
   private readonly deckPile = h('div.pile.deck-pile');
   private readonly discardPile = h('div.pile.discard-pile');
+  private readonly piles = h('div.piles', null, this.deckPile, this.discardPile);
   private readonly turnLabel = h('div.turn-label');
   private readonly timer = h('div.timer', { hidden: true });
   private readonly eventChip = h('button.event-chip', { type: 'button' });
@@ -208,7 +209,7 @@ class BoardScreen implements Screen {
       this.panels[0].el,
       // Free-for-all: the rivals' panels stack in one column, so either can grow without covering the other.
       this.count > 2 ? h('div.rival-column', null, ...this.panels.slice(1).map((p) => p.el)) : this.panels[1].el,
-      h('div.board-field', null, ...this.plaques.map((p) => p.el), h('div.piles', null, this.deckPile, this.discardPile)),
+      h('div.board-field', null, ...this.plaques.map((p) => p.el), this.piles),
       ...this.oppHands.slice(1),
       this.stage,
       this.hand.el,
@@ -425,11 +426,17 @@ class BoardScreen implements Screen {
     this.el.classList.toggle('narrow', w < 760);
     this.el.classList.toggle('phone-portrait', phonePortrait);
     this.el.classList.toggle('touch', touch);
+    // Phones in landscape: the piles go to the top bar, beside the menu, so the
+    // castles and their plaques have the field to themselves.
+    const topbar = this.el.querySelector<HTMLElement>('.topbar')!;
+    const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
+    if (short && this.piles.parentElement !== topbar) topbar.insertBefore(this.piles, topbar.children[1] ?? null);
+    else if (!short && this.piles.parentElement !== fieldEl) fieldEl.append(this.piles);
 
     const left = this.panels[0].el.getBoundingClientRect();
     // Free-for-all: both rivals' panels share a column on the right.
     const right = (this.el.querySelector('.rival-column') ?? this.panels[1].el).getBoundingClientRect();
-    const top = this.el.querySelector('.topbar')!.getBoundingClientRect();
+    const top = topbar.getBoundingClientRect();
     // Top of the resting hand, plus room for the castle plaques.
     const handTop = hgt - 6 - cardW * 1.4 * (1 - peek) - (phonePortrait ? 6 : 0);
     const plaqueRoom = short ? 30 : 46;
@@ -438,7 +445,6 @@ class BoardScreen implements Screen {
     const fieldTop = portrait ? Math.max(top.bottom, left.bottom, right.bottom) : top.bottom;
     const rect = { left: fieldLeft, top: fieldTop, width: Math.max(200, fieldRight - fieldLeft), height: Math.max(90, (handTop - plaqueRoom - fieldTop) / 0.94) };
     this.field.layout(rect);
-    const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
     Object.assign(fieldEl.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
     for (const side of this.sides()) {
       const base = this.field.anchor(side, 'base');
