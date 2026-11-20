@@ -53,6 +53,8 @@ interface Particle {
   /** Per-frame scale growth (smoke) or shrink (sparks). */
   grow: number;
   baseScale: number;
+  /** Growing smoke stops here, so a cloud never covers half the screen. */
+  maxScale: number;
   stretch: boolean;
   alpha: number;
   colorFrom: number;
@@ -694,6 +696,7 @@ export class Battlefield {
         spin: shape === 'spark' ? 0 : (Math.random() - 0.5) * (shape === 'rubble' ? 0.3 : 0.08),
         grow: opts.grow ?? (shape === 'smoke' ? 1.012 : shape === 'rubble' || shape === 'crystal' ? 1 : 0.992),
         baseScale: base,
+        maxScale: shape === 'smoke' ? base * (effectsLow() ? 2.2 : 3.5) : Infinity,
         stretch: shape === 'spark' || shape === 'flame',
         alpha,
         colorFrom: color,
@@ -985,7 +988,7 @@ export class Battlefield {
         p.sprite.scale.set(p.baseScale * Math.min(2.4, 0.7 + speed * 0.2), p.baseScale);
       } else {
         p.sprite.rotation += p.spin * step;
-        p.baseScale *= p.grow ** step;
+        p.baseScale = Math.min(p.maxScale, p.baseScale * p.grow ** step);
         p.sprite.scale.set(p.baseScale);
       }
     }
@@ -1102,6 +1105,7 @@ export class Battlefield {
           this.burst(x, -10, { count: 1, color: [0xe0a040, 0xc06a2a, 0xd8c060], speed: 1.4, angle: Math.PI / 2 + 0.4, spread: 0.6, gravity: 0.006, size: 8, life: 8000, blend: 'normal' });
           break;
         case 'dust':
+          if (effectsLow()) break;
           this.burst(x, this.groundY - Math.random() * 30, { count: 1, texture: 'smoke', color: 0xc8a070, speed: 0.8, angle: 0, spread: 0.6, gravity: -0.002, size: 50, life: 3000, alpha: 0.6, grow: 1.004 });
           break;
       }
