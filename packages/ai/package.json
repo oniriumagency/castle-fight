@@ -15,7 +15,8 @@
     "balance": "tsx scripts/balance.ts",
     "ladder": "tsx scripts/ladder.ts",
     "ffa": "tsx scripts/ffa.ts",
-    "eclipse": "tsx scripts/eclipse.ts"
+    "eclipse": "tsx scripts/eclipse.ts",
+    "seats": "tsx scripts/seats.ts"
   },
   "dependencies": {
     "@cardcraft-castles/engine": "workspace:*"

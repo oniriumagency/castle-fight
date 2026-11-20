@@ -800,6 +800,21 @@ input.shake {
   background: rgb(16 11 7 / 55%);
 }
 
+.waiting-tools {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  left: max(10px, var(--safe-l));
+  right: max(10px, var(--safe-r));
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.waiting-tools > * {
+  pointer-events: auto;
+}
+
 .waiting-box {
   width: min(520px, 100%);
   padding: 24px;
@@ -1371,6 +1386,34 @@ input.shake {
 
   .twilight-info-card .card {
     --w: 170px;
+  }
+}
+
+/* Online: your nickname, right above Back and Start so an invite link never skips it. */
+.hero-actions {
+  flex-wrap: wrap;
+}
+
+.hero-nick {
+  flex: 1 1 100%;
+}
+
+.hero-nick input {
+  text-align: center;
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  label.field.hero-nick {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .hero-nick input {
+    min-height: 36px;
+    padding-block: 4px;
+    font-size: 0.95rem;
   }
 }
 

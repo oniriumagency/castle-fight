@@ -6,7 +6,8 @@
     "keepWin": 100,
     "resourceStart": 8,
     "workerStart": 2,
-    "secondPlayerWall": 5,
+    "secondPlayerWall": 7,
+    "multiSeatWall": 3,
     "handSize": 6,
     "turnSeconds": 30,
     "maxEnchantments": 2,
@@ -1293,8 +1294,8 @@
         "en": "The Alchemist"
       },
       "text": {
-        "es": "Pasiva: +3 de un recurso al azar cada turno. Definitiva: +10 de cada recurso y +6 Castillo.",
-        "en": "Passive: +3 of a random resource each turn. Ultimate: +10 of each resource and +6 Castle."
+        "es": "Pasiva: +3 de un recurso al azar cada turno. Definitiva: +7 de cada recurso y +6 Castillo.",
+        "en": "Passive: +3 of a random resource each turn. Ultimate: +7 of each resource and +6 Castle."
       },
       "art": "heroes/alquimista.jpg"
     },

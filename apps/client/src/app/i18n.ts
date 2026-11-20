@@ -164,6 +164,7 @@ const STRINGS = {
   copyLink: { es: 'Copiar enlace', en: 'Copy link' },
   copied: { es: 'Enlace copiado', en: 'Link copied' },
   leaveRoom: { es: 'Salir de la sala', en: 'Leave room' },
+  keepWaiting: { es: 'Seguir esperando', en: 'Keep waiting' },
   connectionLost: { es: 'Se perdió la conexión con la partida.', en: 'Lost the connection to the game.' },
   reconnecting: { es: 'Reconectando…', en: 'Reconnecting…' },
   serverError: { es: 'El servidor respondió: {message}', en: 'The server said: {message}' },
