@@ -27,17 +27,18 @@ const HERO_TESTS: Record<string, () => void> = {
     expect(effectiveCost(state, ME, 'escaramuza')).toBe(1);
     expect(effectiveCost(state, OPP, 'parapeto')).toBe(4);
     expect(playCard(state, 'parapeto').state.players[ME].resources.piedra).toBe(47);
-    // Ultimate: +8 Keep and +10 Wall.
+    // Ultimate: +8 Keep, +10 Wall and +1 Mason.
     const after = ultimate(state).state.players[ME];
     expect([after.keep, after.wall]).toEqual([58, 25]);
+    expect(after.workers).toEqual({ piedra: 3, acero: 2, mana: 2 });
   },
   mariscal: () => {
     // Passive: +2 damage on every hit (the Warden's Wall starts at 22).
     const state = charged('mariscal', { hand: ['doble-salva'] });
     expect(playCard(state, 'doble-salva').state.players[OPP].wall).toBe(22 - 14);
-    // Ultimate: 10 damage (an attack, so the passive applies).
+    // Ultimate: 13 damage (an attack, so the passive applies).
     const target = ultimate(state).state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([10, 50]);
+    expect([target.wall, target.keep]).toEqual([7, 50]);
   },
   hechicera: () => {
     // Passive: Burn and Frost she applies last 1 more turn.

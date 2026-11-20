@@ -107,14 +107,14 @@
       "id": "gremio-de-canteros",
       "school": "construccion",
       "rarity": "comun",
-      "cost": 8,
+      "cost": 6,
       "name": {
         "es": "Gremio de Canteros",
         "en": "Masons' Guild"
       },
       "text": {
-        "es": "+1 Cantero.",
-        "en": "+1 Mason."
+        "es": "+1 Cantero y juega otra carta este turno.",
+        "en": "+1 Mason and play another card this turn."
       },
       "art": "cards/gremio-de-canteros.jpg"
     },
@@ -182,14 +182,14 @@
       "id": "fragua-del-gremio",
       "school": "construccion",
       "rarity": "rara",
-      "cost": 8,
+      "cost": 6,
       "name": {
         "es": "Fragua del Gremio",
         "en": "Guild Forge"
       },
       "text": {
-        "es": "+1 Herrero.",
-        "en": "+1 Smith."
+        "es": "+1 Herrero y juega otra carta este turno.",
+        "en": "+1 Smith and play another card this turn."
       },
       "art": "cards/fragua-del-gremio.jpg"
     },
@@ -197,14 +197,14 @@
       "id": "aula-de-arcanistas",
       "school": "construccion",
       "rarity": "rara",
-      "cost": 8,
+      "cost": 6,
       "name": {
         "es": "Aula de Arcanistas",
         "en": "Arcanists' Hall"
       },
       "text": {
-        "es": "+1 Arcanista.",
-        "en": "+1 Arcanist."
+        "es": "+1 Arcanista y juega otra carta este turno.",
+        "en": "+1 Arcanist and play another card this turn."
       },
       "art": "cards/aula-de-arcanistas.jpg"
     },
@@ -276,14 +276,14 @@
       "id": "maestro-de-obras",
       "school": "construccion",
       "rarity": "epica",
-      "cost": 10,
+      "cost": 9,
       "name": {
         "es": "Maestro de Obras",
         "en": "Master Builder"
       },
       "text": {
-        "es": "+1 Cantero y +10 Muralla.",
-        "en": "+1 Mason and +10 Wall."
+        "es": "+1 Cantero y +10 Muralla. Juega otra carta este turno.",
+        "en": "+1 Mason and +10 Wall. Play another card this turn."
       },
       "art": "cards/maestro-de-obras.jpg"
     },
@@ -321,14 +321,14 @@
       "id": "gremios-unidos",
       "school": "construccion",
       "rarity": "epica",
-      "cost": 12,
+      "cost": 10,
       "name": {
         "es": "Gremios Unidos",
         "en": "United Guilds"
       },
       "text": {
-        "es": "+1 Cantero, +1 Herrero y +1 Arcanista.",
-        "en": "+1 Mason, +1 Smith and +1 Arcanist."
+        "es": "+1 Cantero, +1 Herrero y +1 Arcanista. Juega otra carta este turno.",
+        "en": "+1 Mason, +1 Smith and +1 Arcanist. Play another card this turn."
       },
       "art": "cards/gremios-unidos.jpg"
     },
@@ -491,14 +491,14 @@
       "id": "leva-de-herreros",
       "school": "asalto",
       "rarity": "comun",
-      "cost": 8,
+      "cost": 6,
       "name": {
         "es": "Leva de Herreros",
         "en": "Smiths' Levy"
       },
       "text": {
-        "es": "+1 Herrero.",
-        "en": "+1 Smith."
+        "es": "+1 Herrero y juega otra carta este turno.",
+        "en": "+1 Smith and play another card this turn."
       },
       "art": "cards/leva-de-herreros.jpg"
     },
@@ -916,14 +916,14 @@
       "id": "circulo-de-estudio",
       "school": "arcano",
       "rarity": "comun",
-      "cost": 8,
+      "cost": 6,
       "name": {
         "es": "Círculo de Estudio",
         "en": "Study Circle"
       },
       "text": {
-        "es": "+1 Arcanista.",
-        "en": "+1 Arcanist."
+        "es": "+1 Arcanista y juega otra carta este turno.",
+        "en": "+1 Arcanist and play another card this turn."
       },
       "art": "cards/circulo-de-estudio.jpg"
     },
@@ -1250,8 +1250,8 @@
         "en": "The Architect"
       },
       "text": {
-        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Castillo y +10 Muralla.",
-        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Castle and +10 Wall."
+        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Castillo, +10 Muralla y +1 Cantero.",
+        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Castle, +10 Wall and +1 Mason."
       },
       "art": "heroes/arquitecta.jpg"
     },
@@ -1262,12 +1262,12 @@
         "en": "The Marshal"
       },
       "text": {
-        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 10 de daño.",
-        "en": "Passive: your attacks deal +2 damage. Ultimate: 10 damage."
+        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 13 de daño.",
+        "en": "Passive: your attacks deal +2 damage. Ultimate: 13 damage."
       },
       "textFfa": {
-        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 6 de daño a cada rival.",
-        "en": "Passive: your attacks deal +2 damage. Ultimate: 6 damage to each rival."
+        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 8 de daño a cada rival.",
+        "en": "Passive: your attacks deal +2 damage. Ultimate: 8 damage to each rival."
       },
       "art": "heroes/mariscal.jpg"
     },
