@@ -1019,8 +1019,8 @@
         "en": "Copy the effect of the last card your opponent played."
       },
       "textFfa": {
-        "es": "Copia el efecto de la última carta que jugó un rival.",
-        "en": "Copy the effect of the last card a rival played."
+        "es": "Copia el efecto de la carta más reciente jugada por cualquier rival.",
+        "en": "Copy the effect of the most recent card played by any rival."
       },
       "art": "cards/espejismo.jpg"
     },
