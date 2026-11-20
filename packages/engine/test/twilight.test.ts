@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RULES, attackBonus, createGame, getPlayerView, roundOf, twilightLevel } from '../src/index';
+import { DEFAULT_RULES, attackBonus, attackBonusParts, createGame, getPlayerView, roundOf, twilightLevel } from '../src/index';
 import type { GameState, Rules } from '../src/index';
 import { discardCard, eventsOf, playCard, scenario } from '../src/testing';
 
@@ -134,6 +134,20 @@ describe('Twilight Fury', () => {
     expect(attackBonus(state, ME)).toBe(6);
     const after = playCard(state, 'escaramuza').state;
     expect(after.players[OPP]!.keep).toBe(50 - 5 - 6);
+  });
+
+  it('lists each attack bonus apart: hero, every enchantment and the Fury', () => {
+    const state = inRound(4, {
+      heroes: ['mariscal', 'guardian'],
+      you: { enchantments: [{ cardId: 'estandarte-de-guerra', turnsLeft: 0, charges: 3, fresh: false }] },
+    });
+    expect(attackBonusParts(state, ME)).toEqual([
+      { source: 'hero', amount: 2 },
+      { source: 'enchantment', amount: 3, cardId: 'estandarte-de-guerra', charges: 3 },
+      { source: 'twilight', amount: 6 },
+    ]);
+    expect(attackBonus(state, ME)).toBe(11);
+    expect(attackBonusParts(state, OPP)).toEqual([{ source: 'twilight', amount: 6 }]);
   });
 
   it('makes cards that raise the Castle build more, per level', () => {
