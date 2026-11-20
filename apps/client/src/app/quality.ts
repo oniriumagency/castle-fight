@@ -7,7 +7,17 @@ import { settings } from './settings';
  * rays or smoke, and a lighter canvas resolution.
  */
 
+/**
+ * Consoles and TV browsers (Edge on Xbox, PlayStation, smart TVs) have little
+ * GPU memory for the page and close the tab when a scene asks too much: the
+ * Terremoto's dust once left an Xbox with a blank screen.
+ */
+export function consoleBrowser(): boolean {
+  return /Xbox|PlayStation|Nintendo|SMART-TV|SmartTV|Tizen|Web0S|webOS|CrKey|AFT[A-Z]|BRAVIA/i.test(navigator.userAgent);
+}
+
 function modestDevice(): boolean {
+  if (consoleBrowser()) return true;
   const nav = navigator as Navigator & { deviceMemory?: number };
   const cores = nav.hardwareConcurrency ?? 8;
   const memory = nav.deviceMemory ?? 8;
@@ -22,6 +32,11 @@ export function effectsLow(): boolean {
   if (q === 'low') return true;
   if (q === 'high') return false;
   return autoLow;
+}
+
+/** The graphics card dropped the page's canvas: stay light for the rest of the visit. */
+export function reportGpuTrouble(): void {
+  autoLow = true;
 }
 
 /** Called by the frame monitor when the game keeps missing frames. */
