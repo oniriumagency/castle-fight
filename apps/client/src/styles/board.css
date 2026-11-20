@@ -2692,22 +2692,29 @@
 }
 
 
-/* Phones in landscape: long texts start at the top and fade out at the bottom instead of being cut at both ends (tap shows the whole card). */
+/*
+ * Phones in landscape: every text in the hand is centred in its box, in one
+ * of two sizes (short texts a bit bigger). The sizes are in card widths only,
+ * with no pixel minimum, because a pixel minimum on a small card is what used
+ * to push long texts out of the box. Measured against every card text, in
+ * Spanish and English, from 667 to 915 px wide and with a name on two lines:
+ * the longest texts fit at 9.5 % of the card width, short ones (up to 60
+ * letters, as fitName counts them) at 12 %.
+ */
+.board.short .hand .card.compact .rules,
 .board.short .hand .card.compact:is(.mid-rules, .long-rules) .rules {
-  justify-content: flex-start;
-  padding-top: 3cqw;
-  overflow: hidden;
-  mask-image: linear-gradient(180deg, #000 80%, transparent);
+  justify-content: center;
+  font-size: 11cqw;
+  line-height: 1.12;
+}
+
+.board.short .hand .card.compact:is(.mid-rules, .long-rules) .rules {
+  font-size: 9.3cqw;
 }
 
 /* A name on two lines hangs over the top of the text box. */
-.board.short .hand .card.compact:is(.mid-name, .long-name):is(.mid-rules, .long-rules) .rules {
-  padding-top: 12cqw;
-}
-
-.board.short .hand .card.compact.long-rules .rules {
-  font-size: 8.5px;
-  line-height: 1.06;
+.board.short .hand .card.compact:is(.mid-name, .long-name) .rules {
+  padding-top: 7.2cqw;
 }
 
 /* ---------- Head-to-head on the results screen ---------- */
