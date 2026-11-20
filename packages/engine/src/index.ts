@@ -26,7 +26,7 @@ export {
   cardNeedsTarget,
 } from './actions';
 export { getPlayerView, redactEvents } from './view';
-export { isConditionMet, effectsNeedTarget } from './effects';
+export { isConditionMet, effectsNeedTarget, rollOutcomes } from './effects';
 export {
   effectiveCost,
   costResource,

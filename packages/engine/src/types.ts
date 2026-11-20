@@ -242,7 +242,28 @@ export type EffectOp =
   | { op: 'redrawHand' }
   /** You may play (or discard) one more card this turn. */
   | { op: 'extraPlay' }
-  | { op: 'if'; cond: Condition; then: EffectOp[]; else?: EffectOp[] };
+  | { op: 'if'; cond: Condition; then: EffectOp[]; else?: EffectOp[] }
+  /**
+   * Roll a die with `sides` faces and resolve the effects of the face that
+   * came up. Faces no entry lists do nothing. The roll is public (`diceRolled`).
+   */
+  | { op: 'roll'; sides: number; results: RollResult[] }
+  /**
+   * `amount` damage to yourself. Not an attack: no bonuses, Buttress or
+   * Shield. It charges your ultimate like any damage you take. With 3+
+   * players it is scaled like the hits on every rival.
+   */
+  | { op: 'selfDamage'; amount: number; kind?: DamageKind };
+
+/** How a die roll turned out: it hit the rival, fizzled, or blew up in your face. */
+export type RollOutcome = 'hit' | 'miss' | 'backfire';
+
+/** What some faces of a `roll` do. */
+export interface RollResult {
+  faces: number[];
+  outcome: RollOutcome;
+  then: EffectOp[];
+}
 
 export interface CardDef {
   id: CardId;
@@ -487,6 +508,18 @@ export interface GameState {
   upcomingEvent: UpcomingEvent;
   nextUid: number;
   result: GameResult | null;
+  /**
+   * @internal Die results to use instead of the RNG, only while an
+   * `applyAction` with `options.rolls` runs (the AI weighing each outcome).
+   * Never part of a stored state.
+   */
+  forcedRolls?: number[];
+}
+
+/** Options of `applyAction`. Only for analysis: the server never passes any. */
+export interface ApplyOptions {
+  /** Results of the die rolls this action makes, in order, instead of random ones. */
+  rolls?: readonly number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -635,6 +668,8 @@ export type GameEvent =
       boosted?: boolean;
     }
   | { type: 'cardCopied'; player: PlayerId; cardId: CardId }
+  /** A card rolled a die: `roll` is 1..`sides`, and `outcome` says what that face does. */
+  | { type: 'diceRolled'; player: PlayerId; cardId: CardId; sides: number; roll: number; outcome: RollOutcome }
   | {
       type: 'cardDiscarded';
       player: PlayerId;

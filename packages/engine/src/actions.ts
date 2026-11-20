@@ -21,6 +21,7 @@ import type {
   Action,
   Board,
   ActionResult,
+  ApplyOptions,
   CardId,
   EffectOp,
   EngineError,
@@ -254,11 +255,13 @@ function timeOut(state: GameState, events: GameEvent[]): void {
  * happened. The input state is never modified. Illegal actions return
  * `{ ok: false, error }` and change nothing.
  */
-export function applyAction(previous: GameState, action: Action): ActionResult {
+export function applyAction(previous: GameState, action: Action, options?: ApplyOptions): ActionResult {
   const error = validate(previous, action);
   if (error) return { ok: false, error };
 
   const state = cloneState(previous);
+  delete state.forcedRolls;
+  if (options?.rolls) state.forcedRolls = options.rolls.slice();
   const events: GameEvent[] = [];
   state.seq += 1;
 
@@ -293,6 +296,7 @@ export function applyAction(previous: GameState, action: Action): ActionResult {
 
   // The clock and "Ready" end the turn even when the player could still act.
   settle(state, events, action.type === 'timeout' || action.type === 'endTurn');
+  delete state.forcedRolls;
   return { ok: true, state, events };
 }
 

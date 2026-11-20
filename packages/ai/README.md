@@ -48,6 +48,7 @@ Son 1.200 partidas por pareja, con héroes al azar y cada reparto jugado desde l
 
 1. **Solo ve lo que ve un jugador.** Parte de un `PlayerView`. Para poder simular con el motor real rellena lo oculto al azar (`determinize`): la mano del rival y el orden de los mazos. Cada relleno es un «mundo», y promediar varios evita que cuente con cartas que no puede conocer.
 2. **Prueba cada jugada con el motor.** Aplica cada opción con `applyAction` y sigue su propio turno hasta el final (definitiva, jugada extra, elecciones). Ninguna carta tiene código propio en la IA: una carta nueva en `cards.json` funciona sin tocar este paquete.
+   Las cartas con dado (Barril de Pólvora) no se fían de una tirada al azar: se prueban con cada resultado (`rollOutcomes`) y se promedian según su probabilidad.
 3. **Puntúa la posición resultante** (`evaluate`): Torreón (cada punto vale más cerca de 0 y cerca de la victoria), Muralla (más cuando el Torreón está bajo), recursos, trabajadores según los turnos que quedan, Quemadura, Escarcha, Escudo, encantamientos, carga de la definitiva y el valor de las cartas que conserva en la mano.
 4. **En Difícil, mira tu respuesta.** Repite sus mejores opciones jugando también el turno del rival y se queda con la que mejor aguanta.
 
