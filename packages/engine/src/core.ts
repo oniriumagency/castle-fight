@@ -13,6 +13,7 @@ import type {
   PlayerState,
   Resource,
   ResourceMap,
+  StealLink,
   Rules,
   VisibleCard,
 } from './types';
@@ -266,6 +267,7 @@ export function changeResources(
   player: PlayerId,
   delta: Partial<ResourceMap>,
   reason: ChangeReason,
+  link: StealLink = {},
 ): Partial<ResourceMap> {
   const p = state.players[player];
   const real: Partial<ResourceMap> = {};
@@ -280,7 +282,7 @@ export function changeResources(
       changed = true;
     }
   }
-  if (changed) events.push({ type: 'resourcesChanged', player, delta: real, reason });
+  if (changed) events.push({ type: 'resourcesChanged', player, delta: real, reason, ...link });
   return real;
 }
 
@@ -291,6 +293,7 @@ export function changeWorkers(
   player: PlayerId,
   delta: Partial<ResourceMap>,
   reason: ChangeReason,
+  link: StealLink = {},
 ): Partial<ResourceMap> {
   const p = state.players[player];
   const real: Partial<ResourceMap> = {};
@@ -305,7 +308,7 @@ export function changeWorkers(
       changed = true;
     }
   }
-  if (changed) events.push({ type: 'workersChanged', player, delta: real, reason });
+  if (changed) events.push({ type: 'workersChanged', player, delta: real, reason, ...link });
   return real;
 }
 
@@ -489,11 +492,23 @@ export function saboteurSteal(state: GameState, events: GameEvent[], player: Pla
   if (!steal) return false;
   const opponent = isMultiplayer(state) ? defaultTarget(state, player) : other(player);
   const resource = highestOf(state.players[opponent].resources);
-  const reason = { kind: 'hero' as const, id: self.hero };
-  const taken = changeResources(state, events, opponent, { [resource]: -steal }, reason);
-  const amount = -(taken[resource] ?? 0);
-  if (amount > 0) changeResources(state, events, player, { [resource]: amount }, reason);
+  stealResource(state, events, player, opponent, resource, steal, { kind: 'hero', id: self.hero });
   return true;
+}
+
+/** Move up to `amount` of one resource from `victim` to `thief`. Returns what was taken. */
+export function stealResource(
+  state: GameState,
+  events: GameEvent[],
+  thief: PlayerId,
+  victim: PlayerId,
+  resource: Resource,
+  amount: number,
+  reason: ChangeReason,
+): number {
+  const taken = -(changeResources(state, events, victim, { [resource]: -amount }, reason, { to: thief })[resource] ?? 0);
+  if (taken > 0) changeResources(state, events, thief, { [resource]: taken }, reason, { from: victim });
+  return taken;
 }
 
 /** Move a card from a hand to its owner's discard pile. Returns false if it is not there. */
@@ -549,10 +564,7 @@ export function eliminate(state: GameState, events: GameEvent[], player: PlayerI
   events.push({ type: 'playerEliminated', player, by });
   const bounty = state.rules.eliminationBounty;
   if (by !== null && by !== player && bounty > 0) {
-    changeResources(state, events, by, { piedra: bounty, acero: bounty, mana: bounty }, {
-      kind: 'hero',
-      id: state.players[by]!.hero,
-    });
+    changeResources(state, events, by, { piedra: bounty, acero: bounty, mana: bounty }, { kind: 'bounty', id: 'elimination' });
   }
   if (state.active === player && state.phase !== 'finished') {
     // The fallen player's turn is over: drop any pending choice.

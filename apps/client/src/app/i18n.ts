@@ -305,6 +305,16 @@ const STRINGS = {
   logTimedOut: { es: '{who} agotó el tiempo', en: '{who} ran out of time' },
   logGameOver: { es: 'Fin de la partida', en: 'Game over' },
   logEliminated: { es: '{who} queda fuera de la partida', en: '{who} is out of the game' },
+  logStole: { es: '{who} roba {what} a {victim}', en: '{who} steals {what} from {victim}' },
+  logChanged: { es: '{who}: {what}', en: '{who}: {what}' },
+  logBounty: { es: 'recompensa', en: 'bounty' },
+  logRedrawn: { es: '{who} cambia su mano entera ({n} cartas)', en: '{who} swaps their whole hand ({n} cards)' },
+  logBurnApplied: { es: '{who} recibe Quemadura ({n} turnos)', en: '{who} is set on fire: Burn ({n} turns)' },
+  logFrostApplied: { es: '{who}: Escarcha en {res} ({n} turnos)', en: '{who}: {res} is Frozen ({n} turns)' },
+  logShield: { es: '{who} levanta el Escudo ({n})', en: '{who} raises the Shield ({n})' },
+  logCleansed: { es: '{who} se libra de Quemadura y Escarcha', en: '{who} is cleansed of Burn and Frost' },
+  logHandRevealed: { es: 'La mano de {who} queda al descubierto', en: "{who}'s hand is revealed" },
+  logExtraPlay: { es: '{who} gana una jugada extra', en: '{who} gains an extra play' },
 
   // Results
   victory: { es: 'Victoria', en: 'Victory' },
