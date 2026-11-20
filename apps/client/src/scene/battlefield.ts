@@ -126,9 +126,16 @@ function lerpColor(a: number, b: number, t: number): number {
  * A single `backdrop.jpg` (sky and land in one) also works. Missing files keep
  * the drawn landscape for that layer.
  */
-const SKY = 'scenery/sky.jpg';
-const TERRAIN = 'scenery/terrain.png';
-const BACKDROP = 'scenery/backdrop.jpg';
+/**
+ * Consoles, phones and low effects load the light copies (`-lite`, about
+ * 2,400 px of sky instead of ~4,000): the full ones cost too much GPU memory
+ * there. PCs keep the full ones.
+ */
+function liteScenery(): boolean {
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return consoleBrowser() || effectsLow() || coarse;
+}
+const scenery = (name: string, ext: string, lite: boolean): string => `scenery/${name}${lite ? '-lite' : ''}.${ext}`;
 const TERRAIN_GROUND = 0.72;
 /** The sky is drawn this much wider than the screen, and sways across the extra. */
 const SKY_OVERSCAN = 0.12;
@@ -311,8 +318,9 @@ export class Battlefield {
 
   /** Swaps the drawn sky and land for the painted layers that exist. */
   private async loadBackdrop(): Promise<void> {
-    const [sky, terrain] = await Promise.all([loadArt(SKY), loadArt(TERRAIN)]);
-    const land = terrain ?? (await loadArt(BACKDROP));
+    const lite = liteScenery();
+    const [sky, terrain] = await Promise.all([loadArt(scenery('sky', 'jpg', lite)), loadArt(scenery('terrain', 'png', lite))]);
+    const land = terrain ?? (await loadArt(scenery('backdrop', 'jpg', lite)));
     if (sky) {
       this.paintedSky.texture = sky;
       this.skyTile.texture = sky;
