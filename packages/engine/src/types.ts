@@ -53,6 +53,11 @@ export interface Rules {
   workerStart: number;
   /** Extra Wall for the player who moves second, to make up for the lost tempo. */
   secondPlayerWall: number;
+  /**
+   * With 3+ players: extra Wall per seat after the first (seat 2 gets 1×, seat 3 gets 2×).
+   * Smaller than the duel bonus, since in a free-for-all moving first is worth much less.
+   */
+  multiSeatWall: number;
   /** Cards in hand; the hand refills to this size when your turn starts. */
   handSize: number;
   /** Most cards one discard action can throw away. */

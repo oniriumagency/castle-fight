@@ -9,7 +9,7 @@ function threeWay(rules: Partial<Rules> = {}): GameState {
     seed: 3,
     heroes: ['guardian', 'guardian', 'guardian'],
     firstPlayer: 0,
-    rules: { secondPlayerWall: 0, ...rules },
+    rules: { secondPlayerWall: 0, multiSeatWall: 0, ...rules },
   });
   for (const p of state.players) {
     p.resources = { piedra: 50, acero: 50, mana: 50 };
@@ -25,7 +25,8 @@ describe('three players', () => {
     expect(state.players).toHaveLength(3);
     expect(state.players.every((p) => p.hand.length === state.rules.handSize)).toBe(true);
     // Later seats get a taller Wall for the lost tempo.
-    const step = state.rules.secondPlayerWall;
+    const step = state.rules.multiSeatWall;
+    expect(step).toBe(3);
     expect(state.players[2]!.wall - state.players[1]!.wall).toBe(step);
     expect(state.players[0]!.wall - state.players[1]!.wall).toBe(2 * step);
 

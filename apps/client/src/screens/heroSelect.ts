@@ -10,6 +10,7 @@ import { artUrl, iconSvg } from '../ui/assets';
 import { heroCard, heroParts, rulesHtml, setTableSize } from '../ui/card';
 import { heroCss } from '../ui/theme';
 import { flow } from './flow';
+import { requireNickname } from './lobby';
 
 /** `ffa`: free-for-all, you against two AIs. */
 export type HeroSelectMode = 'ai' | 'ffa' | 'local' | 'online';
@@ -62,6 +63,33 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
 
   const el = h('div.hero-screen');
 
+  /**
+   * Online, the name the others will see. An invite link opens this screen
+   * straight away, without the menu or the lobby, so it is asked for here.
+   * Kept across rebuilds so typing is never lost; saved for next time.
+   */
+  const nickInput =
+    mode === 'online' && !rematch
+      ? h('input', {
+          type: 'text',
+          maxlength: 20,
+          autocomplete: 'nickname',
+          enterkeyhint: 'go',
+          placeholder: t('nicknamePlaceholder'),
+          value: settings.get().nickname,
+        })
+      : null;
+  nickInput?.addEventListener('change', () => {
+    const value = nickInput.value.trim().slice(0, 20);
+    if (value) settings.set({ nickname: value });
+  });
+  nickInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirm();
+    }
+  });
+
   const title = (): string => {
     const base = mode === 'local' ? t('chooseHeroFor', { who: step === 0 ? t('player1') : t('player2') }) : t('chooseHero');
     if (rematch) return `${t('rematch')} · ${base}`;
@@ -75,6 +103,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
   };
 
   const confirm = (): void => {
+    if (nickInput && !requireNickname(nickInput)) return;
     audio.play('uiClick');
     remember(LAST_HERO, picked);
     if (rematch) {
@@ -121,6 +150,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
       h(
         'div.hero-actions',
         null,
+        nickInput ? h('label.field.hero-nick', null, t('nickname'), nickInput) : null,
         h('button.btn', { type: 'button', onclick: back }, html(iconSvg('arrow')), t('back')),
         h(
           'button.btn.primary.big',

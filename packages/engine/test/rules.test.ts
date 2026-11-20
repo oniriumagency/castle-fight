@@ -36,7 +36,7 @@ describe('setup', () => {
     expect(state.turn).toBe(1);
     expect(state.phase).toBe('action');
     // Player 1 moves first, so player 0 gets the second player's taller Wall.
-    expect(state.players.map((p) => p.wall)).toEqual([20, 15]);
+    expect(state.players.map((p) => p.wall)).toEqual([22, 15]);
     for (const p of state.players) {
       expect(p.keep).toBe(50);
       expect(p.workers).toEqual({ piedra: 2, acero: 2, mana: 2 });
