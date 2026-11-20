@@ -456,7 +456,8 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[OPP].resources.acero).toBe(52 - 3);
   },
   'manantial-de-mana': () => {
-    let { state } = play('manantial-de-mana', { keepTurn: false });
+    // No battle event (a Harvest or a Market would change the count).
+    let { state } = play('manantial-de-mana', { keepTurn: false, rules: { eventEveryRounds: 99 } });
     const base = { ...state.players[ME].resources };
     // +2 of each resource at the start of my next 4 turns, on top of production.
     for (let i = 1; i <= 5; i++) {
@@ -596,6 +597,60 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.active).toBe(OPP);
     // The hand stays empty until my next turn starts.
     expect(state.players[ME].hand).toHaveLength(0);
+  },
+  'barril-de-polvora': () => {
+    const start = scenario({ hand: ['barril-de-polvora', 'cimientos'] });
+    const uid = start.players[ME].hand[0]!.uid;
+    const roll = (n: number) => {
+      const result = applyAction(start, { type: 'play', player: ME, uid }, { rolls: [n] });
+      if (!result.ok) throw new Error(result.error.message);
+      return result;
+    };
+    // 3 to 6: 35 damage to the rival (15 Wall, 20 Keep).
+    for (const n of [3, 4, 5, 6]) {
+      const { state, events } = roll(n);
+      expect(eventsOf(events, 'diceRolled')).toEqual([
+        { type: 'diceRolled', player: ME, cardId: 'barril-de-polvora', sides: 6, roll: n, outcome: 'hit' },
+      ]);
+      expect(state.players[OPP].wall).toBe(0);
+      expect(state.players[OPP].keep).toBe(30);
+      expect(state.players[ME].keep).toBe(50);
+      expect(state.players[ME].resources.acero).toBe(50 - getCard('barril-de-polvora').cost);
+    }
+    // 2: the fuse goes out.
+    const miss = roll(2);
+    expect(eventsOf(miss.events, 'diceRolled')[0]!.outcome).toBe('miss');
+    expect(eventsOf(miss.events, 'damage')).toEqual([]);
+    // 1: it blows up in your face. Not an attack: no Shield, but it charges your ultimate.
+    const boomStart = scenario({ hand: ['barril-de-polvora', 'cimientos'], you: { shield: 1 } });
+    const boom = applyAction(boomStart, { type: 'play', player: ME, uid: boomStart.players[ME].hand[0]!.uid }, { rolls: [1] });
+    if (!boom.ok) throw new Error(boom.error.message);
+    expect(eventsOf(boom.events, 'diceRolled')[0]!.outcome).toBe('backfire');
+    expect(boom.state.players[ME].wall).toBe(0);
+    expect(boom.state.players[ME].keep).toBe(30);
+    expect(boom.state.players[ME].shield).toBe(1);
+    expect(boom.state.players[ME].ultimateCharge).toBe(35);
+    expect(boom.state.players[OPP].keep).toBe(50);
+    // Unforced, the die is random but follows the seed, and every face comes up.
+    const faces = new Set<number>();
+    for (let seed = 0; seed < 60; seed++) {
+      const s = scenario({ hand: ['barril-de-polvora', 'cimientos'] });
+      s.rng = seed * 7919;
+      const a = applyAction(s, { type: 'play', player: ME, uid: s.players[ME].hand[0]!.uid });
+      const b = applyAction(s, { type: 'play', player: ME, uid: s.players[ME].hand[0]!.uid });
+      if (!a.ok || !b.ok) throw new Error('play failed');
+      const rolled = eventsOf(a.events, 'diceRolled')[0]!.roll;
+      expect(eventsOf(b.events, 'diceRolled')[0]!.roll).toBe(rolled);
+      faces.add(rolled);
+    }
+    expect([...faces].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+    // A backfire at Keep 0 loses the game.
+    const lethal = scenario({ hand: ['barril-de-polvora', 'cimientos'], you: { keep: 10, wall: 0 } });
+    const lost = applyAction(lethal, { type: 'play', player: ME, uid: lethal.players[ME].hand[0]!.uid }, { rolls: [1] });
+    if (!lost.ok) throw new Error(lost.error.message);
+    expect(lost.state.result).toEqual({ winner: OPP, reason: 'keepDestroyed' });
+    // The forced rolls never stay in the state.
+    expect('forcedRolls' in lost.state).toBe(false);
   },
   'ofrenda-arcana': () => {
     let { state } = playCard(scenario({ hand: ['ofrenda-arcana', 'escaramuza', 'parapeto', 'catapulta'] }), 'ofrenda-arcana');

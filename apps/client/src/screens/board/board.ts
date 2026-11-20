@@ -1047,6 +1047,9 @@ class BoardScreen implements Screen {
         await this.showPlayed(e.cardId, from, boostOf(e), this.heroOf(e.player));
         break;
       }
+      case 'diceRolled':
+        await this.showDice(e.roll, e.sides, e.outcome);
+        break;
       case 'cardCopied':
         this.shownHistory[e.player] = noteCopy(this.shownHistory[e.player], e.cardId);
         this.render();
@@ -1349,6 +1352,54 @@ class BoardScreen implements Screen {
     if (getCard(cardId).rarity === 'legendaria') this.showLegendaryCall(landed);
     await fx.cardLanded(cardId, { x: landed.left + landed.width / 2, y: landed.top + landed.height / 2 }, combo, this.fxContext());
     await wait(combo ? 520 : 380);
+  }
+
+  /**
+   * A die tumbling over the played card, then landing on `roll` with the
+   * colour and word of its outcome: gold for a hit, grey for nothing, red when
+   * it backfires. What it does follows as the next events.
+   */
+  private async showDice(roll: number, sides: number, outcome: 'hit' | 'miss' | 'backfire'): Promise<void> {
+    // Pips on a 3x3 grid, numbered 0-8 left to right, top to bottom.
+    const PIPS: Record<number, number[]> = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+    const pips = Array.from({ length: 9 }, (_, i) =>
+      h('i.pip', { style: `left:${25 + (i % 3) * 25}%;top:${25 + Math.floor(i / 3) * 25}%` }),
+    );
+    const face = (n: number): void => {
+      const on = PIPS[n] ?? [];
+      pips.forEach((pip, i) => pip.classList.toggle('on', on.includes(i)));
+    };
+    const caption = t(outcome === 'hit' ? 'diceHit' : outcome === 'backfire' ? 'diceBackfire' : 'diceMiss');
+    const at = this.playedCard?.getBoundingClientRect() ?? this.stage.getBoundingClientRect();
+    const box = h(
+      'div.dice-roll',
+      { 'aria-hidden': 'true', style: `left:${at.left + at.width / 2}px;top:${at.top + at.height * 0.42}px` },
+      h('div.die', null, ...pips),
+      h('strong', null, caption),
+    );
+    this.floaters.appendChild(box);
+    const quick = settings.get().reducedMotion;
+    if (!quick) {
+      const spins = 9;
+      let last = 0;
+      for (let i = 0; i < spins; i++) {
+        let n = 1 + Math.floor(Math.random() * Math.min(sides, 6));
+        if (n === last) n = (n % 6) + 1;
+        last = n;
+        face(n);
+        audio.play('tick', 0.3);
+        await wait(70 + i * 9);
+      }
+    }
+    face(roll);
+    box.classList.add('landed', outcome);
+    audio.play(outcome === 'hit' ? 'combo' : outcome === 'backfire' ? 'error' : 'cardDiscard', 0.7);
+    await wait(outcome === 'miss' ? 900 : 650);
+    // The die fades while the blast (or the silence) plays out.
+    setTimeout(() => {
+      box.classList.add('out');
+      setTimeout(() => box.remove(), 400);
+    }, 700 * animScale());
   }
 
   /** "¡Legendaria!" bursting out over a legendary card as it lands. */

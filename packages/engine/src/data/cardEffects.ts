@@ -110,6 +110,17 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
     { op: 'discardOwn', count: 'hand' },
     { op: 'damage', amount: 0, perDiscard: 6, perDiscardAll: 4 },
   ],
+  'barril-de-polvora': [
+    {
+      op: 'roll',
+      sides: 6,
+      results: [
+        { faces: [3, 4, 5, 6], outcome: 'hit', then: [{ op: 'damage', amount: 35 }] },
+        { faces: [2], outcome: 'miss', then: [] },
+        { faces: [1], outcome: 'backfire', then: [{ op: 'selfDamage', amount: 35 }] },
+      ],
+    },
+  ],
 
   // ----- Arcano ------------------------------------------------------------
   'chispa-arcana': [{ op: 'damage', amount: 5, kind: 'piercing' }],

@@ -26,6 +26,10 @@ export function describeEvent(event: GameEvent, name: (seat: PlayerId) => string
       return event.combo && comboBonusText(event.cardId)
         ? t('logPlayedCombo', { who: name(event.player), card: card(event.cardId), bonus: comboBonusText(event.cardId) })
         : t('logPlayed', { who: name(event.player), card: card(event.cardId) });
+    case 'diceRolled': {
+      const key = event.outcome === 'hit' ? 'logRollHit' : event.outcome === 'backfire' ? 'logRollBackfire' : 'logRollMiss';
+      return t(key, { who: name(event.player), roll: event.roll, card: card(event.cardId) });
+    }
     case 'cardCopied':
       return t('logCopied', { who: name(event.player), card: card(event.cardId) });
     case 'cardDiscarded':

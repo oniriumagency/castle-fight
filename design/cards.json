@@ -821,6 +821,25 @@
       "art": "cards/todo-o-nada.jpg"
     },
     {
+      "id": "barril-de-polvora",
+      "school": "asalto",
+      "rarity": "rara",
+      "cost": 7,
+      "name": {
+        "es": "Barril de Pólvora",
+        "en": "Powder Keg"
+      },
+      "text": {
+        "es": "Tira un dado. 3-6: 35 de daño. 2: nada. 1: te explota y el daño lo recibes tú.",
+        "en": "Roll a die. 3-6: 35 damage. 2: nothing. 1: it blows up and you take the damage."
+      },
+      "textFfa": {
+        "es": "Tira un dado. 3-6: 21 de daño a cada rival. 2: nada. 1: te explota y recibes tú 21.",
+        "en": "Roll a die. 3-6: 21 damage to each rival. 2: nothing. 1: it blows up and you take 21."
+      },
+      "art": "cards/barril-de-polvora.jpg"
+    },
+    {
       "id": "chispa-arcana",
       "school": "arcano",
       "rarity": "comun",
