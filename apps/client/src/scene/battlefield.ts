@@ -120,6 +120,8 @@ export class Battlefield {
   readonly castles: Castle[];
   /** Castles on the field: two in a duel, three in a free-for-all. */
   private count = 2;
+  /** Castles taken off the field (fallen ones, when an observer's phone needs the room). */
+  private readonly offField = new Set<PlayerId>();
   /** Layer above the castles for effects. */
   readonly fxLayer = new Container();
 
@@ -214,9 +216,29 @@ export class Battlefield {
     const next = Math.max(2, Math.min(3, count));
     if (next === this.count) return;
     this.count = next;
-    this.castles[2].visible = next > 2;
+    this.offField.clear();
+    this.castles.forEach((castle, i) => (castle.visible = i < next));
     if (next === 2) this.setAura(2, { burn: 0, frost: 0, danger: 0 });
     this.layout(this.lastRect);
+  }
+
+  /**
+   * Takes these castles off the field and spreads the others over it, as in
+   * a duel when two are left. For an observer on a phone: the fallen castles
+   * give their room to the ones still fighting. An empty list puts them back.
+   */
+  setOffField(players: readonly PlayerId[]): void {
+    const next = players.filter((p) => p < this.count);
+    if (next.length === this.offField.size && next.every((p) => this.offField.has(p))) return;
+    this.offField.clear();
+    for (const p of next) this.offField.add(p);
+    this.castles.forEach((castle, i) => (castle.visible = i < this.count && !this.offField.has(i)));
+    this.layout(this.lastRect);
+  }
+
+  /** Whether a castle stands on the field now. */
+  onField(player: PlayerId): boolean {
+    return player < this.count && !this.offField.has(player);
   }
 
   /** Castles on the field. */
@@ -253,16 +275,29 @@ export class Battlefield {
 
     // The castles sit in the field between the panels.
     const sideRoom = Math.min(rect.width * 0.23, 260);
-    const three = this.count > 2;
+    // Left to right: the player, the middle rival, the next rival.
+    const order = (this.count > 2 ? [0, 2, 1] : [0, 1]).filter((p) => !this.offField.has(p));
+    const three = order.length > 2;
     const keepWidth = Math.max(three ? 28 : 34, Math.min(rect.width * (three ? 0.062 : 0.075), three ? 84 : 96));
     // A winning Keep (or Wall) reaches the top edge of the screen, roof beyond
     // it, so every point gained or lost is plainly visible.
     const unit = Math.max(1.2, (this.groundY - 6) / this.maxPoints);
     const common = { groundY: this.groundY, unit, keepWidth, wallWidth: keepWidth * 0.42, gap: keepWidth * 0.55, maxPoints: this.maxPoints * 1.1 };
-    this.castles[0].setLayout({ ...common, x: rect.left + sideRoom * 0.75 });
-    this.castles[1].setLayout({ ...common, x: rect.left + rect.width - sideRoom * 0.75 });
-    // The middle castle sits a little right of centre so its Wall (facing left) stays clear of the others.
-    this.castles[2].setLayout({ ...common, x: rect.left + rect.width * 0.56 });
+    const leftX = rect.left + sideRoom * 0.75;
+    const rightX = rect.left + rect.width - sideRoom * 0.75;
+    if (order.length === 2 && this.count > 2) {
+      // Two of three still standing: they take the duel places. A castle off
+      // the field keeps a place out of sight, for effects aimed at it.
+      const [a, b] = order as [PlayerId, PlayerId];
+      this.castles[a].setLayout({ ...common, x: leftX });
+      this.castles[b].setLayout({ ...common, x: rightX });
+      for (const p of this.offField) this.castles[p].setLayout({ ...common, x: p === 0 ? rect.left - rect.width : rect.left + rect.width * 2 });
+    } else {
+      this.castles[0].setLayout({ ...common, x: leftX });
+      this.castles[1].setLayout({ ...common, x: rightX });
+      // The middle castle sits a little right of centre so its Wall (facing left) stays clear of the others.
+      this.castles[2].setLayout({ ...common, x: rect.left + rect.width * 0.56 });
+    }
 
     this.flashOverlay.clear().rect(0, 0, this.width, this.height).fill({ color: 0xffffff });
     this.flashOverlay.alpha = 0;
@@ -821,6 +856,7 @@ export class Battlefield {
   private updateAuras(dt: number): void {
     if (settings.get().reducedMotion) return;
     for (let player = 0; player < this.count; player++) {
+      if (this.offField.has(player)) continue;
       const aura = this.auras[player]!;
       const dome = this.castles[player].dome;
       if (!aura.burn && !aura.danger && !aura.frost && !dome) continue;

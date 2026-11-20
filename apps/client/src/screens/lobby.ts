@@ -11,6 +11,7 @@ import { audio } from '../fx/audio';
 import { online } from '../net/online';
 import { iconSvg } from '../ui/assets';
 import { flow } from './flow';
+import { watchOnline } from './online';
 import { openTwilightInfo } from '../game/twilight';
 
 /** Nickname for online play; asks for one if it is empty. */
@@ -154,19 +155,33 @@ export function lobbyScreen(): Screen {
           ),
           h('span.room-status', null, statusText(room.status)),
           h('span.room-players', null, html(iconSvg('users')), t('players', { n: room.players, max: room.size ?? 2 })),
-          h(
-            'button.btn.primary',
-            {
-              type: 'button',
-              disabled: room.status !== 'waiting' || room.players >= (room.size ?? 2),
-              onclick: () => {
-                if (!requireNickname(nickname)) return;
-                audio.play('uiClick');
-                flow.heroSelect('online', room.id);
-              },
-            },
-            room.status === 'waiting' && room.players < (room.size ?? 2) ? t('join') : t('watchFull'),
-          ),
+          room.status === 'waiting' && room.players < (room.size ?? 2)
+            ? h(
+                'button.btn.primary',
+                {
+                  type: 'button',
+                  onclick: () => {
+                    if (!requireNickname(nickname)) return;
+                    audio.play('uiClick');
+                    flow.heroSelect('online', room.id);
+                  },
+                },
+                t('join'),
+              )
+            : // A full room: watch its game as an observer (no nickname needed, nobody sees you).
+              h(
+                'button.btn.watch-btn',
+                {
+                  type: 'button',
+                  title: t('watchingFullRoom'),
+                  onclick: () => {
+                    audio.play('uiClick');
+                    watchOnline(room.id);
+                  },
+                },
+                html(iconSvg('eye')),
+                t('watchGame'),
+              ),
         ),
       ),
     );

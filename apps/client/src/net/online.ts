@@ -24,6 +24,7 @@ function presenceOf(room: RoomInfo): Presence {
       s ? { connected: s.connected, reconnectBy: s.reconnectBy, left: s.left, wantsRematch: s.rematch } : null,
     ),
     score: room.score,
+    spectators: room.spectators ?? 0,
   };
 }
 
@@ -40,11 +41,14 @@ function seatsOf(room: RoomInfo | null, fallback: Seat[]): Seat[] {
 /** One online match, wrapping a room connection of the SDK. */
 export class OnlineSession extends BaseSession implements MatchSession {
   readonly kind = 'online' as const;
+  /** Watching without a seat (`OnlineClient.spectateRoom`). */
+  readonly spectator: boolean;
   seats: Seat[];
   private unsubscribers: (() => void)[] = [];
 
   constructor(readonly connection: RoomConnection) {
     super();
+    this.spectator = connection.spectating;
     this.seats = seatsOf(connection.room, [PLACEHOLDER, PLACEHOLDER]);
     const c = connection;
     this.unsubscribers.push(
@@ -76,7 +80,7 @@ export class OnlineSession extends BaseSession implements MatchSession {
   }
 
   isLocal(seat: PlayerId): boolean {
-    return seat === this.connection.seat;
+    return !this.spectator && seat === this.connection.seat;
   }
 
   act(action: PlayerAction): void {
@@ -111,6 +115,7 @@ export class OnlineSession extends BaseSession implements MatchSession {
   }
 
   rematch(heroes?: Partial<Record<PlayerId, HeroId>>): void {
+    if (this.spectator) return;
     const hero: HeroChoice | undefined = heroes?.[this.seat];
     this.connection.rematch(hero);
   }
@@ -121,11 +126,14 @@ export class OnlineSession extends BaseSession implements MatchSession {
 
   /** One key per room; the game number keeps a rematch from reusing the last game's figures. */
   statsKey(): string | null {
+    if (this.spectator) return null;
     const room = this.connection.room;
     return room ? `cardcraft-castles:stats:${this.connection.roomId}:${room.games}` : null;
   }
 
   gameId(): string | null {
+    // A spectator's games never count in their win/loss record.
+    if (this.spectator) return null;
     const room = this.connection.room;
     return room ? `${this.connection.roomId}:${room.games}` : null;
   }

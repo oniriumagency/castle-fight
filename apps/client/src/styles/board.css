@@ -3630,3 +3630,75 @@
 .reduced-motion .dice-roll.landed .die {
   animation: none;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Observer mode: a spectator, or a player whose castle fell in a free-for-all */
+/* ------------------------------------------------------------------------- */
+
+.observer-tag,
+.spectator-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgb(12 10 22 / 72%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 14%), 0 2px 8px rgb(0 0 0 / 40%);
+  white-space: nowrap;
+}
+
+.observer-tag {
+  text-transform: uppercase;
+  color: #cfe4ff;
+}
+
+.spectator-chip {
+  align-self: center;
+  color: var(--muted);
+}
+
+.observer-tag svg,
+.spectator-chip svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  flex: none;
+}
+
+.observer-tag[hidden],
+.spectator-chip[hidden] {
+  display: none;
+}
+
+/* No hand, no buttons to play it, no deck of one's own. */
+.board.observer .hand,
+.board.observer .ult-hero,
+.board.observer .ult-aura,
+.board.observer .ready-btn,
+.board.observer .deck-pile {
+  display: none !important;
+}
+
+/* A phone gives the fallen castle's room, and its panel's, to the castles still fighting. */
+.board.self-off .side-0:not(.side-1) {
+  display: none;
+}
+
+.opp-hand.off-field {
+  display: none;
+}
+
+.board.short .observer-tag,
+.board.phone-portrait .observer-tag {
+  padding: 3px 8px;
+  font-size: 0.66rem;
+}
+
+.board.short .observer-tag span,
+.board.phone-portrait .observer-tag span {
+  display: none;
+}
