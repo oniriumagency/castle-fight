@@ -7,11 +7,12 @@ export const HERO_EFFECTS: Record<HeroId, { passive: HeroPassive; ultimate: Effe
     ultimate: [
       { op: 'keep', amount: 8 },
       { op: 'wall', amount: 10 },
+      { op: 'gainWorker', worker: 'piedra', amount: 1 },
     ],
   },
   mariscal: {
     passive: { attackBonus: 2 },
-    ultimate: [{ op: 'damage', amount: 10 }],
+    ultimate: [{ op: 'damage', amount: 13 }],
   },
   hechicera: {
     passive: { statusDurationBonus: 1 },

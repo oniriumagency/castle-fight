@@ -1,0 +1,145 @@
+/*
+ * Materials: the warm "carved wood, tanned leather and aged brass" finish.
+ *
+ * Loaded after the other sheets so it only dresses surfaces; layout lives
+ * where it was. Everything is gradients and one tiny inline SVG of noise:
+ * no images to download and no backdrop blur, which is costly over the
+ * animated battlefield on mid-range phones.
+ */
+
+:root {
+  /* Brass for frames and rivets. */
+  --brass: #b88a3a;
+  --brass-l: #f3d58a;
+  --brass-d: #5e4216;
+  /* Leather and wood surfaces. */
+  --leather-1: #2e2219;
+  --leather-2: #1b140f;
+  --wood-1: #4a3626;
+  --wood-2: #2a1e15;
+  /* Resources: fired clay, forged steel, royal amethyst. */
+  --res-brick: #c0673a;
+  --res-weapon: #6f8fa1;
+  --res-gem: #9a62c4;
+
+  /* Fine grain, tiled. Kept faint so text stays crisp. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.42 0 0 0 0 0.28 0 0 0 0.10 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* One brass rivet, placed in each corner by the panels below. */
+  --rivet: radial-gradient(circle at 45% 40%, var(--brass-l) 0 1.3px, var(--brass) 2px, var(--brass-d) 3.2px, rgb(0 0 0 / 55%) 3.8px, transparent 4.4px);
+  /* Carved bevel: light on the top edge, shadow on the bottom, brass outline. */
+  --bevel: inset 0 1px 0 rgb(255 226 170 / 14%), inset 0 -2px 0 rgb(0 0 0 / 40%), inset 0 0 0 1px rgb(0 0 0 / 55%), inset 0 0 28px rgb(0 0 0 / 35%);
+}
+
+/* ---------- Framed panels: modals, side panels, hero detail, lobby ---------- */
+
+.panel,
+.modal,
+.side {
+  border: 1px solid var(--brass-d);
+  border-radius: 6px;
+  background:
+    var(--rivet) left 3px top 3px / 10px 10px no-repeat,
+    var(--rivet) right 3px top 3px / 10px 10px no-repeat,
+    var(--rivet) left 3px bottom 3px / 10px 10px no-repeat,
+    var(--rivet) right 3px bottom 3px / 10px 10px no-repeat,
+    var(--grain),
+    linear-gradient(180deg, rgb(255 220 160 / 5%), transparent 40%),
+    linear-gradient(180deg, var(--leather-1), var(--leather-2));
+  box-shadow: var(--bevel), 0 0 0 1px rgb(0 0 0 / 60%), 0 0 0 3px rgb(140 104 44 / 35%), 0 16px 40px rgb(0 0 0 / 55%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* The side panels sit over the battlefield: a touch of transparency keeps the scene breathing. */
+.side {
+  background:
+    var(--rivet) left 2px top 2px / 10px 10px no-repeat,
+    var(--rivet) right 2px top 2px / 10px 10px no-repeat,
+    var(--rivet) left 2px bottom 2px / 10px 10px no-repeat,
+    var(--rivet) right 2px bottom 2px / 10px 10px no-repeat,
+    var(--grain),
+    linear-gradient(180deg, rgb(46 34 25 / 94%), rgb(27 20 15 / 88%));
+}
+
+/* ---------- Main menu: the modes sit on one carved board ---------- */
+
+.menu-main {
+  padding: 22px 20px 16px;
+  border: 1px solid var(--brass-d);
+  border-radius: 6px;
+  background:
+    var(--rivet) left 4px top 4px / 10px 10px no-repeat,
+    var(--rivet) right 4px top 4px / 10px 10px no-repeat,
+    var(--rivet) left 4px bottom 4px / 10px 10px no-repeat,
+    var(--rivet) right 4px bottom 4px / 10px 10px no-repeat,
+    var(--grain),
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0%) 0 22px, rgb(0 0 0 / 6%) 22px 23px, rgb(0 0 0 / 0%) 23px 61px),
+    linear-gradient(180deg, rgb(64 46 32 / 94%), rgb(36 26 19 / 94%));
+  box-shadow: var(--bevel), 0 0 0 1px rgb(0 0 0 / 60%), 0 0 0 4px rgb(140 104 44 / 40%), 0 0 0 5px rgb(0 0 0 / 50%), 0 24px 60px rgb(0 0 0 / 60%);
+}
+
+.mode-btn {
+  border-color: var(--brass-d);
+  border-radius: 5px;
+  background:
+    var(--grain),
+    linear-gradient(180deg, rgb(255 220 160 / 7%), transparent 45%),
+    linear-gradient(100deg, rgb(72 52 34 / 96%), rgb(38 28 20 / 96%));
+  box-shadow: var(--bevel), 0 4px 12px rgb(0 0 0 / 45%);
+}
+
+.mode-btn:hover,
+.mode-btn:focus-visible {
+  border-color: var(--brass);
+  box-shadow: var(--bevel), 0 0 18px rgb(227 182 86 / 28%), 0 4px 12px rgb(0 0 0 / 45%);
+}
+
+/* ---------- Buttons: carved wood with a brass edge; primary is polished brass ---------- */
+
+.btn {
+  --b-top: #574131;
+  --b-bot: #2a1f17;
+  border-radius: 4px;
+  background: var(--grain), linear-gradient(180deg, var(--b-top), var(--b-bot));
+  box-shadow: inset 0 1px 0 rgb(255 226 170 / 16%), inset 0 -2px 0 rgb(0 0 0 / 35%), inset 0 0 0 1px rgb(0 0 0 / 50%), 0 3px 10px rgb(0 0 0 / 45%);
+}
+
+.btn.primary {
+  --b-top: #f6d27a;
+  --b-bot: #a5701f;
+  background: linear-gradient(180deg, rgb(255 255 255 / 22%), transparent 48%), linear-gradient(180deg, var(--b-top), var(--b-bot));
+  box-shadow: inset 0 1px 0 rgb(255 248 220 / 70%), inset 0 -2px 0 rgb(90 52 10 / 55%), 0 0 0 1px rgb(0 0 0 / 45%), 0 4px 14px rgb(0 0 0 / 45%);
+}
+
+.btn.ghost {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Toggles: the chosen option is pressed in and lit, the other stays raised. */
+.segmented {
+  border-color: var(--brass-d);
+  border-radius: 4px;
+  background: rgb(0 0 0 / 38%);
+  box-shadow: inset 0 2px 5px rgb(0 0 0 / 60%);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: linear-gradient(180deg, rgb(255 255 255 / 25%), transparent 50%), linear-gradient(180deg, #f6d27a, #a5701f);
+  box-shadow: inset 0 1px 0 rgb(255 248 220 / 70%), inset 0 -2px 0 rgb(90 52 10 / 50%), 0 0 10px rgb(227 182 86 / 35%);
+  text-shadow: 0 1px 0 rgb(255 240 200 / 60%);
+}
+
+input[type='text'] {
+  border-radius: 4px;
+  background: var(--grain), rgb(0 0 0 / 38%);
+  box-shadow: inset 0 2px 5px rgb(0 0 0 / 55%);
+}
+
+/* ---------- Respect the player's settings ---------- */
+
+@media (prefers-reduced-transparency: reduce) {
+  .side {
+    background: var(--grain), linear-gradient(180deg, var(--leather-1), var(--leather-2));
+  }
+}

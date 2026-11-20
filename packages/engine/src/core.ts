@@ -136,12 +136,34 @@ export function cloneState(s: GameState): GameState {
 // Modifiers
 // ---------------------------------------------------------------------------
 
-/** Flat damage added to each attack of `player` (hero passive and enchantments). */
-export function attackBonus(state: Board, player: PlayerId): number {
+/** One source of the flat damage added to each attack: the hero, an enchantment or the Twilight Fury. */
+export interface AttackBonusPart {
+  source: 'hero' | 'enchantment' | 'twilight';
+  amount: number;
+  /** The enchantment's card, for `source: 'enchantment'`. */
+  cardId?: CardId;
+  /** Attacks the enchantment still lasts, when it is counted in attacks. */
+  charges?: number;
+}
+
+/** What adds damage to each attack of `player`, one entry per source (only the ones that add something). */
+export function attackBonusParts(state: Board, player: PlayerId): AttackBonusPart[] {
   const p = state.players[player];
-  let bonus = getHero(p.hero).passive.attackBonus ?? 0;
-  for (const e of p.enchantments) bonus += getEnchantmentModifiers(e.cardId)?.attackBonus ?? 0;
-  return bonus + twilightLevel(state) * (state.rules.twilightAttackBonus ?? 0);
+  const parts: AttackBonusPart[] = [];
+  const hero = getHero(p.hero).passive.attackBonus ?? 0;
+  if (hero) parts.push({ source: 'hero', amount: hero });
+  for (const e of p.enchantments) {
+    const amount = getEnchantmentModifiers(e.cardId)?.attackBonus ?? 0;
+    if (amount) parts.push({ source: 'enchantment', amount, cardId: e.cardId, ...(e.charges !== undefined ? { charges: e.charges } : {}) });
+  }
+  const twilight = twilightLevel(state) * (state.rules.twilightAttackBonus ?? 0);
+  if (twilight) parts.push({ source: 'twilight', amount: twilight });
+  return parts;
+}
+
+/** Flat damage added to each attack of `player` (hero passive, enchantments and the Twilight Fury). */
+export function attackBonus(state: Board, player: PlayerId): number {
+  return attackBonusParts(state, player).reduce((sum, part) => sum + part.amount, 0);
 }
 
 /** How long an enchantment still lasts: attacks left, or owner turns left. */

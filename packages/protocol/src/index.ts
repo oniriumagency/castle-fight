@@ -102,7 +102,7 @@ export const CLOSE_CODES = {
   replaced: 4000,
   /** The room was closed (everyone left, or it expired). */
   roomClosed: 4001,
-  /** Every seat is taken and you hold no seat token. */
+  /** Every seat is taken and you hold no seat token (you may still `watch`). */
   roomFull: 4003,
   /** Too many invalid or too frequent messages. */
   abuse: 4008,
@@ -272,7 +272,12 @@ export type RoomClientMessage =
    */
   | { type: 'leave' }
   /** Ask for a full snapshot (`room`, then `state` if there is a game). */
-  | { type: 'sync' };
+  | { type: 'sync' }
+  /**
+   * Watch the game without a seat (a full room). The server answers
+   * `watching` and then sends `state` with a spectator's view: no hidden hand.
+   */
+  | { type: 'watch'; v: number };
 
 export interface SeatInfo {
   nickname: string;
@@ -320,7 +325,12 @@ export interface RoomInfo {
   games: number;
   ending: GameEnding | null;
   timings: RoomTimings;
+  /** People watching without a seat. Absent from old servers: 0. */
+  spectators?: number;
 }
+
+/** Spectators a room lets in at once. */
+export const MAX_SPECTATORS = 8;
 
 export type RoomErrorCode =
   | 'badMessage'
@@ -335,11 +345,15 @@ export type RoomErrorCode =
   | 'badHero'
   | 'rematchUnavailable'
   | 'rateLimited'
+  /** The room already has `MAX_SPECTATORS` watching. */
+  | 'tooManySpectators'
   | EngineErrorCode;
 
 export type RoomServerMessage =
   /** You are seated (after `join` or `resume`). Keep `token` to resume later. */
   | { type: 'welcome'; seat: PlayerId; token: string; room: RoomInfo; now: number }
+  /** You are watching (after `watch`): `state` messages follow with a spectator's view. */
+  | { type: 'watching'; room: RoomInfo; now: number }
   /** Seats, presence, score or status changed. Also sent on connect, before joining. */
   | { type: 'room'; room: RoomInfo; now: number }
   /**

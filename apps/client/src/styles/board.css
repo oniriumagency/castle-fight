@@ -24,7 +24,7 @@
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(180deg, rgb(8 6 16 / 85%), rgb(8 6 16 / 0%));
+  background: linear-gradient(180deg, rgb(16 11 7 / 85%), rgb(16 11 7 / 0%));
   z-index: 20;
 }
 
@@ -76,7 +76,7 @@
   font-size: 1.15rem;
   color: var(--gold-l);
   background:
-    radial-gradient(circle, #14111e 58%, transparent 60%),
+    radial-gradient(circle, #201812 58%, transparent 60%),
     conic-gradient(var(--gold) calc(var(--p) * 360deg), rgb(255 255 255 / 12%) 0);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%), 0 4px 12px rgb(0 0 0 / 50%);
 }
@@ -105,7 +105,7 @@
   padding: 4px 10px 4px 4px;
   border-radius: 8px;
   border: 1px solid rgb(227 182 86 / 35%);
-  background: rgb(16 14 26 / 80%);
+  background: rgb(28 20 14 / 80%);
   cursor: pointer;
   text-align: left;
 }
@@ -257,7 +257,7 @@
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgb(16 14 26 / 86%), rgb(16 14 26 / 70%));
+  background: linear-gradient(180deg, rgb(28 20 14 / 86%), rgb(28 20 14 / 70%));
   border: 1px solid rgb(227 182 86 / 22%);
   box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
   z-index: 10;
@@ -332,7 +332,7 @@
   border-radius: 50%;
   object-fit: cover;
   object-position: 50% 28%;
-  box-shadow: 0 0 0 2px #120f1a, 0 0 0 3px var(--hero, var(--gold));
+  box-shadow: 0 0 0 2px #1c150f, 0 0 0 3px var(--hero, var(--gold));
 }
 
 .ult-ring {
@@ -366,7 +366,7 @@
   transform: translateX(-50%);
   padding: 0 6px;
   border-radius: 6px;
-  background: rgb(10 8 16 / 92%);
+  background: rgb(17 12 8 / 92%);
   border: 1px solid rgb(227 182 86 / 40%);
   font-family: var(--display);
   font-size: 0.62rem;
@@ -638,7 +638,7 @@
   gap: 2px 12px;
   padding: 5px 12px 7px;
   border-radius: 10px;
-  background: rgb(12 10 20 / 82%);
+  background: rgb(21 15 10 / 82%);
   border: 1px solid rgb(227 182 86 / 35%);
   box-shadow: 0 6px 16px rgb(0 0 0 / 50%);
   pointer-events: auto;
@@ -653,7 +653,7 @@
   max-width: 170px;
   padding: 2px 10px 3px;
   border-radius: 7px 7px 0 0;
-  background: rgb(12 10 20 / 88%);
+  background: rgb(21 15 10 / 88%);
   border: 1px solid rgb(227 182 86 / 35%);
   border-bottom: 0;
   color: var(--ink);
@@ -770,7 +770,7 @@
   font-family: var(--numeral);
   font-weight: 800;
   font-size: 0.9rem;
-  background: #120f1a;
+  background: #1c150f;
   border: 1px solid var(--gold-d);
   z-index: 2;
 }
@@ -783,6 +783,32 @@
 
 .deck-pile.pulse {
   animation: pulse 0.6s ease;
+}
+
+/* Phones in landscape: the piles sit small in the top bar, beside the menu. */
+.board.short .topbar {
+  grid-template-columns: auto auto 1fr auto auto;
+}
+
+.board.short .topbar .piles {
+  position: static;
+  transform: none;
+  gap: 18px;
+  padding-right: 12px;
+}
+
+.board.short .topbar .pile,
+.board.short .topbar .pile .card {
+  --w: 26px;
+}
+
+.board.short .topbar .pile-count {
+  right: -15px;
+  bottom: -5px;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.72rem;
 }
 
 /* ---------- Opponent hand ---------- */
@@ -919,7 +945,7 @@
 .board.touch .inspect {
   inset: 0;
   padding: 12px;
-  background: rgb(5 4 10 / 72%);
+  background: rgb(10 7 4 / 72%);
 }
 
 .board.touch .inspect-card .card {
@@ -1045,7 +1071,12 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--gold-l);
-  text-shadow: 0 0 18px rgb(255 170 60 / 70%), 0 2px 4px #000;
+  text-shadow:
+    0 0 18px rgb(255 170 60 / 70%),
+    0 0 6px rgb(0 0 0 / 95%),
+    0 2px 4px #000,
+    0 0 2px #000;
+  text-align: center;
   order: -1;
 }
 
@@ -1277,7 +1308,7 @@
   display: grid;
   place-items: center;
   padding: calc(var(--top-h) + var(--safe-t)) 16px 12px;
-  background: rgb(5 4 10 / 68%);
+  background: rgb(10 7 4 / 68%);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -1332,7 +1363,7 @@
   margin: 0;
   padding: 12px 14px;
   border-radius: 10px;
-  background: rgb(16 14 26 / 90%);
+  background: rgb(28 20 14 / 90%);
   border: 1px solid var(--line);
   font-size: 0.95rem;
 }
@@ -1350,6 +1381,33 @@
 
 .glossary dd:last-child {
   margin-bottom: 0;
+}
+
+/* One bonus on the inspected card: its "+X" (coloured like on the card) and where it comes from. */
+.glossary .buff {
+  display: inline-block;
+  min-width: 2.2em;
+  padding: 0 6px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 700;
+  color: #fff;
+}
+
+.glossary .hero-buff {
+  background: #9b1f86;
+}
+
+.glossary .enchantment-buff {
+  background: #19763c;
+}
+
+.glossary .twilight-buff {
+  background: #b5400c;
+}
+
+.glossary dd.buff-line {
+  margin-bottom: 4px;
 }
 
 .inspect-reason {
@@ -1385,7 +1443,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgb(5 4 10 / 55%);
+  background: rgb(10 7 4 / 55%);
   padding: 16px;
 }
 
@@ -1442,15 +1500,17 @@
   position: absolute;
   inset: 0;
   display: flex;
-  padding: 16px;
-  background: radial-gradient(circle at 50% 40%, rgb(40 28 10 / 55%), rgb(5 4 10 / 82%));
+  /* The whole results panel fits the screen: sizes below follow the window height, so it never needs scrolling. */
+  padding: clamp(6px, 2vh, 16px) 16px;
+  padding: max(clamp(6px, 2dvh, 16px), env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(clamp(6px, 2dvh, 16px), env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: radial-gradient(circle at 50% 40%, rgb(40 28 10 / 55%), rgb(10 7 4 / 82%));
   opacity: 0;
   transition: opacity 0.5s, background 0.3s;
   overflow-y: auto;
 }
 
 .results.defeat {
-  background: radial-gradient(circle at 50% 40%, rgb(40 10 10 / 55%), rgb(5 4 10 / 85%));
+  background: radial-gradient(circle at 50% 40%, rgb(40 10 10 / 55%), rgb(10 7 4 / 85%));
 }
 
 .results.in {
@@ -1475,10 +1535,10 @@
 .results-box {
   margin: auto;
   width: min(560px, 100%);
-  padding: 22px;
+  padding: clamp(12px, 2.6vh, 22px) clamp(14px, 4vw, 22px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(8px, 2vh, 16px);
   align-items: stretch;
   text-align: center;
   animation: resultsIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -1489,8 +1549,9 @@
 }
 
 .results-crest h1 {
-  font-size: clamp(2.2rem, 7vw, 3.8rem);
+  font-size: clamp(2rem, min(7vw, 7.5vh), 3.8rem);
   font-weight: 800;
+  line-height: 1.1;
   background: linear-gradient(180deg, #fff6d0 10%, #f3c766 45%, #b8741c 90%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1526,12 +1587,12 @@
 }
 
 .results-hero img {
-  width: 72px;
-  height: 72px;
+  width: clamp(44px, 8vh, 72px);
+  height: clamp(44px, 8vh, 72px);
   border-radius: 50%;
   object-fit: cover;
   object-position: 50% 28%;
-  box-shadow: 0 0 0 2px #120f1a, 0 0 0 3px var(--hero);
+  box-shadow: 0 0 0 2px #1c150f, 0 0 0 3px var(--hero);
 }
 
 .results-hero.winner {
@@ -1539,7 +1600,7 @@
 }
 
 .results-hero.winner img {
-  box-shadow: 0 0 0 2px #120f1a, 0 0 0 4px #ffd36a, 0 0 24px #ffb02e;
+  box-shadow: 0 0 0 2px #1c150f, 0 0 0 4px #ffd36a, 0 0 24px #ffb02e;
 }
 
 .results-hero small {
@@ -1554,14 +1615,14 @@
 
 .results-stats td,
 .results-stats th {
-  padding: 5px 8px;
+  padding: clamp(2px, 0.55vh, 5px) 8px;
   border-bottom: 1px solid rgb(227 182 86 / 15%);
 }
 
 .results-stats td {
   font-family: var(--numeral);
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 2.4vh, 1.25rem);
   width: 25%;
 }
 
@@ -1586,12 +1647,17 @@
   min-height: 1.2em;
 }
 
+/* No empty line under the stats until there is something to say. */
+.rematch-note:empty {
+  display: none;
+}
+
 /* Rematch: the hero screen again, over the board and the results. */
 .rematch-pick {
   position: absolute;
   inset: 0;
   z-index: 60;
-  background: radial-gradient(circle at 50% 35%, #181228, #05040a);
+  background: radial-gradient(circle at 50% 35%, #2b1d12, #0a0704);
 }
 
 .curtain {
@@ -1601,7 +1667,7 @@
   display: grid;
   place-items: center;
   padding: 16px;
-  background: radial-gradient(circle, rgb(20 16 32 / 92%), rgb(5 4 10 / 98%));
+  background: radial-gradient(circle, rgb(34 24 16 / 92%), rgb(10 7 4 / 98%));
 }
 
 .curtain[hidden] {
@@ -1650,7 +1716,7 @@
   z-index: 30;
   padding: 12px;
   border-radius: 12px;
-  background: rgb(12 10 20 / 94%);
+  background: rgb(21 15 10 / 94%);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -1930,29 +1996,104 @@
   }
 }
 
-@media (max-height: 560px) {
+/* Short landscape screens (phones on their side): two columns, the title, heroes and head-to-head
+   on the left and the statistics on the right, with the buttons underneath. */
+@media (max-height: 560px) and (orientation: landscape) {
   .results-box {
-    width: min(720px, 100%);
-    padding: 12px 16px;
-    gap: 8px;
+    width: min(760px, 100%);
+    padding: 10px 16px;
+    gap: 6px 18px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-areas:
+      'crest stats'
+      'heroes stats'
+      'h2h stats'
+      'note note'
+      'actions actions';
     align-items: center;
   }
 
-  .results-crest,
-  .rematch-note,
-  .results-actions {
-    grid-column: 1 / -1;
-  }
+  .results-crest { grid-area: crest; }
+  .results-heroes { grid-area: heroes; }
+  .results-h2h { grid-area: h2h; align-self: start; }
+  .results-stats { grid-area: stats; }
+  .rematch-note { grid-area: note; }
+  .results-actions { grid-area: actions; }
 
   .results-crest h1 {
-    font-size: 2rem;
+    font-size: clamp(1.6rem, 9vh, 2.2rem);
+  }
+
+  .results-crest p {
+    font-size: 0.9rem;
+    line-height: 1.2;
+  }
+
+  .results-hero {
+    gap: 2px;
   }
 
   .results-hero img {
-    width: 48px;
-    height: 48px;
+    width: clamp(36px, 11vh, 52px);
+    height: clamp(36px, 11vh, 52px);
+  }
+
+  .results-hero strong {
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .results-hero small {
+    font-size: 0.75rem;
+  }
+
+  .results-stats td {
+    font-size: 1rem;
+  }
+
+  .results-stats th {
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+
+  .results-stats td,
+  .results-stats th {
+    padding: clamp(2px, 1vh, 6px) 6px;
+  }
+
+  .results-actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .results-actions .btn {
+    min-height: 38px;
+    padding: 4px 16px;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+}
+
+/* Narrow upright windows: compact text and the three buttons in one row. */
+@media (max-width: 480px) and (orientation: portrait) {
+  .results-actions {
+    gap: 6px;
+  }
+
+  .results-actions .btn {
+    min-height: 40px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .results-stats th {
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
   }
 
   .results-stats td {
@@ -1961,12 +2102,61 @@
 
   .results-stats td,
   .results-stats th {
-    padding: 2px 6px;
+    padding-inline: 4px;
   }
 
-  .results-actions .btn.big {
-    min-height: 40px;
-    padding-block: 6px;
+  .results .results-h2h {
+    padding: 4px 8px;
+    column-gap: 8px;
+  }
+
+  .results .results-h2h .h2h-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+  }
+
+  .results .results-h2h small {
+    display: none;
+  }
+
+  .results .h2h-score {
+    font-size: 1.3rem;
+  }
+
+  .results-crest p {
+    font-size: 0.95rem;
+    line-height: 1.2;
+  }
+
+  .results-hero strong {
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .results-hero small {
+    font-size: 0.75rem;
+  }
+}
+
+/* Very small upright windows: a little tighter still. */
+@media (max-width: 480px) and (max-height: 620px) and (orientation: portrait) {
+  .results-box {
+    gap: 6px;
+    padding-block: 10px;
+  }
+
+  .results-crest h1 {
+    font-size: 1.8rem;
+  }
+
+  .results-hero img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .results-stats td,
+  .results-stats th {
+    padding-block: 1px;
   }
 }
 
@@ -1993,7 +2183,7 @@
   padding: 6px 8px 9px;
   border-radius: 9px;
   border: 1px solid rgb(227 182 86 / 28%);
-  background: rgb(10 8 16 / 70%);
+  background: rgb(17 12 8 / 70%);
   color: var(--muted);
   font: inherit;
   text-align: left;
@@ -2317,7 +2507,7 @@
   font-weight: 800;
   font-size: 0.75rem;
   color: #f3ead8;
-  background: #120f1a;
+  background: #1c150f;
   border: 1px solid var(--gold-d);
 }
 
@@ -2401,25 +2591,24 @@
   font-size: 0.62rem;
 }
 
-/* A battle event stays in the middle until the player closes it. */
+/* A battle event stays in the middle until the player closes it: just its title
+   floating over the darkened board and the card, with no panel around them. */
 .event-hold {
   position: absolute;
   left: 50%;
   top: 46%;
   transform: translate(-50%, -50%);
   z-index: 4;
-  padding: 16px 20px 18px;
-  border-radius: 16px;
-  background: radial-gradient(ellipse at 50% 40%, rgb(30 24 44 / 92%), rgb(12 10 20 / 88%));
-  border: 1px solid rgb(227 182 86 / 35%);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 70%);
+  /* Without a panel the title is the widest part: keep it on one line when it fits. */
+  width: max-content;
+  max-width: calc(100vw - 32px);
 }
 
 /* The rest of the screen darkens behind a dialog shown on the table (battle event). */
 .dialog-scrim {
   position: absolute;
   inset: 0;
-  background: rgb(5 4 10 / 62%);
+  background: rgb(10 7 4 / 62%);
   opacity: 0;
   transition: opacity 0.25s;
 }
@@ -2503,22 +2692,29 @@
 }
 
 
-/* Phones in landscape: long texts start at the top and fade out at the bottom instead of being cut at both ends (tap shows the whole card). */
+/*
+ * Phones in landscape: every text in the hand is centred in its box, in one
+ * of two sizes (short texts a bit bigger). The sizes are in card widths only,
+ * with no pixel minimum, because a pixel minimum on a small card is what used
+ * to push long texts out of the box. Measured against every card text, in
+ * Spanish and English, from 667 to 915 px wide and with a name on two lines:
+ * the longest texts fit at 9.5 % of the card width, short ones (up to 60
+ * letters, as fitName counts them) at 12 %.
+ */
+.board.short .hand .card.compact .rules,
 .board.short .hand .card.compact:is(.mid-rules, .long-rules) .rules {
-  justify-content: flex-start;
-  padding-top: 3cqw;
-  overflow: hidden;
-  mask-image: linear-gradient(180deg, #000 80%, transparent);
+  justify-content: center;
+  font-size: 11cqw;
+  line-height: 1.12;
+}
+
+.board.short .hand .card.compact:is(.mid-rules, .long-rules) .rules {
+  font-size: 9.3cqw;
 }
 
 /* A name on two lines hangs over the top of the text box. */
-.board.short .hand .card.compact:is(.mid-name, .long-name):is(.mid-rules, .long-rules) .rules {
-  padding-top: 12cqw;
-}
-
-.board.short .hand .card.compact.long-rules .rules {
-  font-size: 8.5px;
-  line-height: 1.06;
+.board.short .hand .card.compact:is(.mid-name, .long-name) .rules {
+  padding-top: 7.2cqw;
 }
 
 /* ---------- Head-to-head on the results screen ---------- */
@@ -2673,7 +2869,7 @@
 /* Viewing the board after the game: the call stays visible next to the buttons. */
 .results.peek .results-box > .rematch-note.request {
   display: inline-flex;
-  background: rgb(20 16 30 / 92%);
+  background: rgb(32 23 16 / 92%);
 }
 
 /* ---------- Free-for-all: three castles ---------- */
@@ -3162,7 +3358,7 @@
 }
 
 .ult-hero:disabled .ult-hero-label {
-  background: rgb(10 8 16 / 90%);
+  background: rgb(17 12 8 / 90%);
   color: var(--gold-l);
   border-color: rgb(227 182 86 / 50%);
 }
@@ -3557,6 +3753,38 @@
   visibility: visible;
 }
 
+/* The 1: a red skull carved into the ivory, in place of the pip. */
+.dice-roll .skull {
+  position: absolute;
+  inset: 14%;
+  width: 72%;
+  height: 72%;
+  visibility: hidden;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 55%)) drop-shadow(0 -1px 0 rgb(0 0 0 / 30%));
+}
+
+.dice-roll .skull.on {
+  visibility: visible;
+}
+
+.dice-roll .skull .bone {
+  fill: url(#dice-skull-red);
+  stroke: #3a0a04;
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+}
+
+.dice-roll .skull .holes {
+  fill: #2a0804;
+}
+
+.dice-roll .skull .shine {
+  fill: none;
+  stroke: rgb(255 220 200 / 70%);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
 .dice-roll strong {
   font-family: var(--display);
   font-weight: 800;
@@ -3593,9 +3821,16 @@
 }
 
 .dice-roll.backfire .die {
-  --pip: #fff1e0;
-  background: linear-gradient(145deg, #ff7a52 0%, #c8301c 60%, #7a1408 100%);
   box-shadow: 0 0 0 4px #ff5a3a, 0 0 38px 12px rgb(255 70 40 / 75%), 0 10px 26px rgb(0 0 0 / 55%);
+}
+
+.dice-roll.backfire .skull {
+  animation: skullThrob 0.9s ease-in-out 0.3s infinite;
+}
+
+@keyframes skullThrob {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 6px rgb(255 70 40 / 85%)); }
 }
 
 .dice-roll.backfire strong {
@@ -3627,6 +3862,79 @@
 }
 
 .reduced-motion .dice-roll .die,
-.reduced-motion .dice-roll.landed .die {
+.reduced-motion .dice-roll.landed .die,
+.reduced-motion .dice-roll.backfire .skull {
   animation: none;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Observer mode: a spectator, or a player whose castle fell in a free-for-all */
+/* ------------------------------------------------------------------------- */
+
+.observer-tag,
+.spectator-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgb(12 10 22 / 72%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 14%), 0 2px 8px rgb(0 0 0 / 40%);
+  white-space: nowrap;
+}
+
+.observer-tag {
+  text-transform: uppercase;
+  color: #cfe4ff;
+}
+
+.spectator-chip {
+  align-self: center;
+  color: var(--muted);
+}
+
+.observer-tag svg,
+.spectator-chip svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  flex: none;
+}
+
+.observer-tag[hidden],
+.spectator-chip[hidden] {
+  display: none;
+}
+
+/* No hand, no buttons to play it, no deck of one's own. */
+.board.observer .hand,
+.board.observer .ult-hero,
+.board.observer .ult-aura,
+.board.observer .ready-btn,
+.board.observer .deck-pile {
+  display: none !important;
+}
+
+/* A phone gives the fallen castle's room, and its panel's, to the castles still fighting. */
+.board.self-off .side-0:not(.side-1) {
+  display: none;
+}
+
+.opp-hand.off-field {
+  display: none;
+}
+
+.board.short .observer-tag,
+.board.phone-portrait .observer-tag {
+  padding: 3px 8px;
+  font-size: 0.66rem;
+}
+
+.board.short .observer-tag span,
+.board.phone-portrait .observer-tag span {
+  display: none;
 }

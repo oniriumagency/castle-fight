@@ -1,0 +1,70 @@
+name: Preview
+
+# Publishes a test copy of the game from a branch to its own Worker on
+# workers.dev (`cardcraft-castles-preview`). It never touches
+# games.onirium.agency: production is only published from `main` by deploy.yml.
+on:
+  push:
+    branches:
+      - 'claude/project-thread-sqcjza'
+      - 'preview/**'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-preview
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: Publish the preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check the Cloudflare secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets. See 'Despliegue' in the README."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build the client
+        run: pnpm --filter @cardcraft-castles/client build
+
+      # Same layout as production: the game under /cardcraft-castles/.
+      - name: Build the site
+        run: pnpm --filter @cardcraft-castles/library build
+
+      - name: Publish the preview Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @cardcraft-castles/server run deploy:preview 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+
+      - name: Show the preview address
+        run: |
+          url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -n1)
+          echo "Preview: $url"
+          echo "### Preview: $url" >> "$GITHUB_STEP_SUMMARY"

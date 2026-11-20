@@ -46,12 +46,16 @@ export interface Presence {
   /** One entry per seat (two in a duel, three in a free-for-all). */
   seats: (SeatPresence | null)[];
   score: number[];
+  /** People watching without a seat (online). */
+  spectators?: number;
 }
 
 export type SessionListener = (event: SessionEvent) => void;
 
 export interface MatchSession {
   readonly kind: SessionKind;
+  /** Online: watching a full room without a seat. The board shows no hand and takes no input. */
+  readonly spectator?: boolean;
   /** One per player: two in a duel, three in a free-for-all. */
   readonly seats: Seat[];
   /** Whether this device plays that seat (both seats on a shared device). */

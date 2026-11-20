@@ -76,18 +76,20 @@ Con la IA en nivel normal, 10.800 partidas (`pnpm balance --games 300 --seed 33`
 
 | | |
 | --- | --- |
-| Duración | Con la Furia del Ocaso (por defecto): 24,2 turnos de media entre los dos jugadores (mediana 25; el 10 % pasa de 32). Sin ella: 35 de media (mediana 30; el 10 % pasa de 64) |
-| Quien sale primero gana | 50,4 % |
-| Finales | Con la Furia: 91 % derribando el Castillo rival, 9 % construyendo hasta 100. Sin ella: 82 % y 18 % |
+| Duración | Con la Furia del Ocaso (por defecto): 22,8 turnos de media entre los dos jugadores (mediana 24; el 10 % pasa de 31). Sin ella: 35 de media (mediana 30; el 10 % pasa de 64) |
+| Quien sale primero gana | 49,0 % |
+| Finales | Con la Furia: 92 % derribando el Castillo rival, 8 % construyendo hasta 100. Sin ella: 82 % y 18 % |
 
 | Héroe | Victorias |
 | --- | --- |
-| El Alquimista | 51,4 % |
-| La Arquitecta | 50,9 % |
-| El Mariscal | 50,9 % |
-| La Hechicera | 49,1 % |
-| La Saboteadora | 49,1 % |
-| El Guardián | 48,6 % |
+| El Guardián | 51,0 % |
+| El Mariscal | 50,3 % |
+| La Hechicera | 50,0 % |
+| La Saboteadora | 49,6 % |
+| La Arquitecta | 49,6 % |
+| El Alquimista | 49,5 % |
+
+Las cartas que dan trabajadores no gastan el turno (dan otra jugada), así que valen la pena aunque la Furia acorte la partida: se juegan unas 0,5 veces por partida cada una y quien las juega gana entre el 48 % y el 55 %. Antes, a coste 8 y sin jugada extra, se jugaban 0,1 veces y ganaba el 40 %.
 
 En nivel difícil los seis quedan entre el 48 % y el 53 %.
 

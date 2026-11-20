@@ -1,7 +1,8 @@
-import { Application, Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { consoleBrowser, density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
+import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle } from './castle';
 import {
@@ -114,12 +115,101 @@ function lerpColor(a: number, b: number, t: number): number {
   return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t);
 }
 
+/**
+ * The painted battlefield, in two layers from `art/scenery/` (see
+ * design/art-prompts.md):
+ * - `sky.jpg`: clouds only. A panorama at least 2.8 times wider than tall is
+ *   taken as seamless and drifts endlessly; any other sky covers the screen
+ *   with a little room to spare and sways slowly from side to side.
+ * - `terrain.png`: mountains, hills and the valley floor with the sky cut out.
+ *   Its ground line, where the castles stand, is TERRAIN_GROUND down the image.
+ * A single `backdrop.jpg` (sky and land in one) also works. Missing files keep
+ * the drawn landscape for that layer.
+ */
+/**
+ * Consoles, phones and low effects load the light copies (`-lite`, about
+ * 2,400 px of sky instead of ~4,000): the full ones cost too much GPU memory
+ * there. PCs keep the full ones.
+ */
+function liteScenery(): boolean {
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return consoleBrowser() || effectsLow() || coarse;
+}
+const scenery = (name: string, ext: string, lite: boolean): string => `scenery/${name}${lite ? '-lite' : ''}.${ext}`;
+const TERRAIN_GROUND = 0.72;
+/** The sky is drawn this much wider than the screen, and sways across the extra. */
+const SKY_OVERSCAN = 0.12;
+/** One full sway, left and back, in milliseconds. */
+const SKY_SWAY_MS = 180_000;
+/** Endless drift of a seamless sky, in screen pixels per second. */
+const SKY_DRIFT = 5;
+const SEAMLESS_ASPECT = 2.8;
+/**
+ * The painted sky sits this far (of its height) above the horizon, so its
+ * clouds clear the mountains; below it, its own horizon colour fills down.
+ */
+const SKY_LIFT = 0.2;
+const SKY_HORIZON = 0xbe8364;
+/**
+ * Over a painted sky, a battle event's own sky gradient is multiplied on top
+ * this strongly, so an eclipse, a storm or the dusk of the Twilight Fury
+ * still reads at a glance. The default mood leaves the painting alone.
+ */
+const SKY_WASH = 0.8;
+
+function isDefaultMood(mood: SkyMood): boolean {
+  return mood.top === DEFAULT_SKY.top && mood.middle === DEFAULT_SKY.middle;
+}
+
+async function loadArt(path: string): Promise<Texture | null> {
+  try {
+    const texture = await Assets.load<Texture>({ src: artUrl(path), parser: 'loadTextures' });
+    return texture?.width ? texture : null;
+  } catch {
+    return null;
+  }
+}
+
+function hexColor(css: string): number {
+  return parseInt(css.replace('#', ''), 16);
+}
+
+/** Per channel, how far `c` is from `base` (lighter or darker), as a tint that leaves `base` unchanged. */
+function ratioTint(pairs: [number, number][]): number {
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const k = pairs.reduce((sum, [c, base]) => sum + (((c >> shift) & 255) + 24) / (((base >> shift) & 255) + 24), 0) / pairs.length;
+    out |= Math.round(Math.min(1, Math.max(0.3, k)) * 255) << shift;
+  }
+  return out;
+}
+
+function skyTint(mood: SkyMood): number {
+  return ratioTint([
+    [hexColor(mood.top), hexColor(DEFAULT_SKY.top)],
+    [hexColor(mood.middle), hexColor(DEFAULT_SKY.middle)],
+  ]);
+}
+
+/**
+ * Battle events recolour the painted backdrop by how far their land colours
+ * are from the default ones: the default mood leaves it as painted.
+ */
+function paintTint(mood: SkyMood): number {
+  return ratioTint([
+    [mood.far, DEFAULT_SKY.far],
+    [mood.near, DEFAULT_SKY.near],
+  ]);
+}
+
 export class Battlefield {
   readonly tweens: Tweens;
   /** Every castle the scene can show; only the first `count` are on the field. */
   readonly castles: Castle[];
   /** Castles on the field: two in a duel, three in a free-for-all. */
   private count = 2;
+  /** Castles taken off the field (fallen ones, when an observer's phone needs the room). */
+  private readonly offField = new Set<PlayerId>();
   /** Layer above the castles for effects. */
   readonly fxLayer = new Container();
 
@@ -132,6 +222,21 @@ export class Battlefield {
   private readonly mid = new Graphics();
   private readonly near = new Graphics();
   private readonly ground = new Graphics();
+  private readonly paintedSky = new Sprite();
+  /** A seamless sky, drawn instead of `paintedSky`. */
+  private readonly skyTile = new TilingSprite();
+  /** Horizon colour under the lifted sky, behind the mountains. */
+  private readonly skyFloor = new Graphics();
+  /** Holds the gradient skies when they wash over a painted one. */
+  private readonly skyWash = new Container();
+  private paintedSkyLoaded = false;
+  private skySway = { x: 0, room: 0, time: 0 };
+  /** The drawn sun glow; a painted sky has its own light, so it is off. */
+  private paintedLight = false;
+  private readonly painted = new Sprite();
+  /** Under the painted land, in case the screen is taller than its foreground. */
+  private readonly paintedFloor = new Graphics();
+  private paintedTint = { from: 0xffffff, to: 0xffffff, skyFrom: 0xffffff, skyTo: 0xffffff };
   private readonly weather = new Container();
   private readonly particles: Particle[] = [];
   private readonly pool: Sprite[] = [];
@@ -200,13 +305,109 @@ export class Battlefield {
     ];
     this.castles[2].visible = false;
 
-    this.world.addChild(this.skyA, this.skyB, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
+    this.painted.visible = false;
+    this.paintedSky.visible = false;
+    this.skyTile.visible = false;
+    this.world.addChild(this.skyA, this.skyB, this.skyFloor, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
     this.skyB.alpha = 0;
 
     app.ticker.add((t) => this.update(t.deltaMS));
+    void this.loadBackdrop();
+  }
+
+  /** Swaps the drawn sky and land for the painted layers that exist. */
+  private async loadBackdrop(): Promise<void> {
+    const lite = liteScenery();
+    const [sky, terrain] = await Promise.all([loadArt(scenery('sky', 'jpg', lite)), loadArt(scenery('terrain', 'png', lite))]);
+    const land = terrain ?? (await loadArt(scenery('backdrop', 'jpg', lite)));
+    if (sky) {
+      this.paintedSky.texture = sky;
+      this.skyTile.texture = sky;
+      const seamless = sky.width / sky.height >= SEAMLESS_ASPECT;
+      this.paintedSky.visible = !seamless;
+      this.skyTile.visible = seamless;
+      this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = skyTint(this.mood);
+      // The gradient skies move above the painting, multiplied, as the events' wash.
+      this.paintedSkyLoaded = true;
+      this.skyA.blendMode = this.skyB.blendMode = 'multiply';
+      this.skyWash.addChild(this.skyA, this.skyB);
+      this.world.addChildAt(this.skyWash, this.world.getChildIndex(this.skyTile) + 1);
+      this.skyWash.alpha = isDefaultMood(this.mood) ? 0 : SKY_WASH;
+      // Painted clouds are in the picture; the drawn ones only drift faintly over it.
+      for (const cloud of this.clouds) cloud.alpha *= 0.45;
+    }
+    if (land) {
+      this.painted.texture = land;
+      this.painted.visible = true;
+      this.painted.tint = this.paintedFloor.tint = paintTint(this.mood);
+      for (const layer of [this.far, this.mid, this.near, this.ground]) layer.visible = false;
+      // A whole backdrop brings its own sky.
+      if (!terrain && !sky) {
+        this.skyA.visible = this.skyB.visible = false;
+        for (const cloud of this.clouds) cloud.alpha *= 0.45;
+      }
+    }
+    if (sky || (land && !terrain)) {
+      this.paintedLight = true;
+      this.sun.alpha = this.mood.sunAlpha * this.sunGainFor(this.mood);
+    }
+    this.layoutBackdrop();
+  }
+
+  /**
+   * The drawn sun glow is off over a painting, events included: the painting
+   * has its own light, and at full strength (Mercado, Cosecha, Terremoto...)
+   * the glow washed the middle of the valley out to white. The events still
+   * read through the sky wash, the land tint and their weather.
+   */
+  private sunGainFor(_mood: SkyMood): number {
+    return this.paintedLight ? 0 : 1;
+  }
+
+  /** Covers the screen with the painting, its ground line on the castles' ground. */
+  private layoutBackdrop(): void {
+    const skyTex = this.paintedSky.texture;
+    this.skyFloor.clear();
+    if ((this.skyTile.visible || this.paintedSky.visible) && skyTex.width) {
+      const full = this.groundY + 8;
+      this.skyFloor.rect(0, full * (1 - SKY_LIFT) - 4, this.width, full * SKY_LIFT + 4).fill({ color: SKY_HORIZON });
+    }
+    if (this.skyTile.visible && skyTex.width) {
+      const h = (this.groundY + 8) * (1 - SKY_LIFT);
+      const k = Math.max(h / skyTex.height, this.width / skyTex.width);
+      this.skyTile.width = this.width;
+      this.skyTile.height = h;
+      this.skyTile.tileScale.set(k);
+      this.skyTile.tilePosition.y = h - skyTex.height * k;
+    }
+    if (this.paintedSky.visible && skyTex.width) {
+      // The sky covers the screen down to just below the ground line, where
+      // the terrain covers it, with its warm bottom glow on the horizon.
+      const h = (this.groundY + 8) * (1 - SKY_LIFT);
+      const k = Math.max(h / skyTex.height, (this.width * (1 + SKY_OVERSCAN)) / skyTex.width);
+      this.paintedSky.scale.set(k);
+      const room = skyTex.width * k - this.width;
+      this.skySway = { ...this.skySway, x: -room / 2, room };
+      this.paintedSky.position.set(this.skySway.x, h - skyTex.height * k);
+    }
+    const tex = this.painted.texture;
+    if (!this.painted.visible || !tex.width) return;
+    const groundPx = tex.height * TERRAIN_GROUND;
+    // Wide enough for the screen and tall enough to reach the top; a short
+    // screen below the ground is filled with the floor colour, not by zooming in.
+    const scale = Math.max(this.width / tex.width, this.groundY / groundPx);
+    // On a screen taller than the painting below its ground line, the painting
+    // moves down (the meadow is flat, so the castles still stand on it) as long
+    // as its top stays above the screen; only then is the floor colour needed.
+    const y = Math.min(0, Math.max(this.groundY - groundPx * scale, this.height - tex.height * scale));
+    const bottom = y + tex.height * scale;
+    this.paintedFloor.clear();
+    if (bottom < this.height) this.paintedFloor.rect(0, bottom - 2, this.width, this.height - bottom + 2).fill({ color: 0x2c2f1e });
+    this.painted.scale.set(scale);
+    this.painted.position.set((this.width - tex.width * scale) / 2, y);
   }
 
   /** Two castles for a duel, three for a free-for-all (the third stands in the middle). */
@@ -214,9 +415,29 @@ export class Battlefield {
     const next = Math.max(2, Math.min(3, count));
     if (next === this.count) return;
     this.count = next;
-    this.castles[2].visible = next > 2;
+    this.offField.clear();
+    this.castles.forEach((castle, i) => (castle.visible = i < next));
     if (next === 2) this.setAura(2, { burn: 0, frost: 0, danger: 0 });
     this.layout(this.lastRect);
+  }
+
+  /**
+   * Takes these castles off the field and spreads the others over it, as in
+   * a duel when two are left. For an observer on a phone: the fallen castles
+   * give their room to the ones still fighting. An empty list puts them back.
+   */
+  setOffField(players: readonly PlayerId[]): void {
+    const next = players.filter((p) => p < this.count);
+    if (next.length === this.offField.size && next.every((p) => this.offField.has(p))) return;
+    this.offField.clear();
+    for (const p of next) this.offField.add(p);
+    this.castles.forEach((castle, i) => (castle.visible = i < this.count && !this.offField.has(i)));
+    this.layout(this.lastRect);
+  }
+
+  /** Whether a castle stands on the field now. */
+  onField(player: PlayerId): boolean {
+    return player < this.count && !this.offField.has(player);
   }
 
   /** Castles on the field. */
@@ -233,6 +454,10 @@ export class Battlefield {
   }
 
   layout(field?: FieldRect): void {
+    // The screens lay out on the window's resize event, before Pixi's own
+    // (deferred) resize: bring the canvas to the window size first, or the
+    // scene would be laid out for the old size.
+    this.app.resize();
     this.width = this.app.screen.width;
     this.height = this.app.screen.height;
     if (field) this.lastRect = field;
@@ -250,19 +475,33 @@ export class Battlefield {
       cloud.scale.set((this.width / 512) * (0.5 + (i % 2) * 0.25));
     });
     this.drawLandscape();
+    this.layoutBackdrop();
 
     // The castles sit in the field between the panels.
     const sideRoom = Math.min(rect.width * 0.23, 260);
-    const three = this.count > 2;
+    // Left to right: the player, the middle rival, the next rival.
+    const order = (this.count > 2 ? [0, 2, 1] : [0, 1]).filter((p) => !this.offField.has(p));
+    const three = order.length > 2;
     const keepWidth = Math.max(three ? 28 : 34, Math.min(rect.width * (three ? 0.062 : 0.075), three ? 84 : 96));
     // A winning Keep (or Wall) reaches the top edge of the screen, roof beyond
     // it, so every point gained or lost is plainly visible.
     const unit = Math.max(1.2, (this.groundY - 6) / this.maxPoints);
     const common = { groundY: this.groundY, unit, keepWidth, wallWidth: keepWidth * 0.42, gap: keepWidth * 0.55, maxPoints: this.maxPoints * 1.1 };
-    this.castles[0].setLayout({ ...common, x: rect.left + sideRoom * 0.75 });
-    this.castles[1].setLayout({ ...common, x: rect.left + rect.width - sideRoom * 0.75 });
-    // The middle castle sits a little right of centre so its Wall (facing left) stays clear of the others.
-    this.castles[2].setLayout({ ...common, x: rect.left + rect.width * 0.56 });
+    const leftX = rect.left + sideRoom * 0.75;
+    const rightX = rect.left + rect.width - sideRoom * 0.75;
+    if (order.length === 2 && this.count > 2) {
+      // Two of three still standing: they take the duel places. A castle off
+      // the field keeps a place out of sight, for effects aimed at it.
+      const [a, b] = order as [PlayerId, PlayerId];
+      this.castles[a].setLayout({ ...common, x: leftX });
+      this.castles[b].setLayout({ ...common, x: rightX });
+      for (const p of this.offField) this.castles[p].setLayout({ ...common, x: p === 0 ? rect.left - rect.width : rect.left + rect.width * 2 });
+    } else {
+      this.castles[0].setLayout({ ...common, x: leftX });
+      this.castles[1].setLayout({ ...common, x: rightX });
+      // The middle castle sits a little right of centre so its Wall (facing left) stays clear of the others.
+      this.castles[2].setLayout({ ...common, x: rect.left + rect.width * 0.56 });
+    }
 
     this.flashOverlay.clear().rect(0, 0, this.width, this.height).fill({ color: 0xffffff });
     this.flashOverlay.alpha = 0;
@@ -319,11 +558,16 @@ export class Battlefield {
     this.applySky(mood, this.skyB);
     this.skyB.alpha = 0;
     const sunFrom = this.sun.alpha;
+    const sunTo = mood.sunAlpha * this.sunGainFor(mood);
+    const washFrom = this.skyWash.alpha;
+    const washTo = this.paintedSkyLoaded && !isDefaultMood(mood) ? SKY_WASH : 0;
+    this.paintedTint = { from: this.painted.tint as number, to: paintTint(mood), skyFrom: this.paintedSky.tint as number, skyTo: skyTint(mood) };
     this.sun.texture = glowTexture(mood.sun, 256);
     return this.tweens
       .run(ms, (t) => {
         this.skyB.alpha = t;
-        this.sun.alpha = sunFrom + (mood.sunAlpha - sunFrom) * t;
+        this.sun.alpha = sunFrom + (sunTo - sunFrom) * t;
+        this.skyWash.alpha = washFrom + (washTo - washFrom) * t;
         this.tint = {
           far: lerpColor(from.far, to.far, t),
           mid: lerpColor(from.mid, to.mid, t),
@@ -331,6 +575,8 @@ export class Battlefield {
           ground: lerpColor(from.ground, to.ground, t),
         };
         this.applyTints();
+        this.painted.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
+        this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
       .then(() => {
         this.applySky(mood, this.skyA);
@@ -742,6 +988,15 @@ export class Battlefield {
     this.monitorFrames(dt);
     const calm = settings.get().reducedMotion;
     for (const castle of this.castles) castle.tick(dt, calm);
+    if (this.skyTile.visible && !calm) {
+      const span = this.skyTile.texture.width * this.skyTile.tileScale.x;
+      this.skyTile.tilePosition.x = (this.skyTile.tilePosition.x - (SKY_DRIFT * dt) / 1000) % span;
+    }
+    if (this.paintedSky.visible && !calm) {
+      this.skySway.time = (this.skySway.time + dt) % SKY_SWAY_MS;
+      const swing = Math.sin((this.skySway.time / SKY_SWAY_MS) * Math.PI * 2) * 0.45;
+      this.paintedSky.x = this.skySway.x + swing * this.skySway.room;
+    }
     // Clouds drift.
     for (const [i, cloud] of this.clouds.entries()) {
       cloud.x += (0.06 + i * 0.02) * step;
@@ -821,6 +1076,7 @@ export class Battlefield {
   private updateAuras(dt: number): void {
     if (settings.get().reducedMotion) return;
     for (let player = 0; player < this.count; player++) {
+      if (this.offField.has(player)) continue;
       const aura = this.auras[player]!;
       const dome = this.castles[player].dome;
       if (!aura.burn && !aura.danger && !aura.frost && !dome) continue;

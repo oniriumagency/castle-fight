@@ -6,7 +6,6 @@ import {
   isComboActive,
   isConditionMet,
   playBlocker,
-  type HeroId,
   type PlayerId,
   type PlayerView,
   type VisibleCard,
@@ -16,7 +15,7 @@ import { L, t } from '../../app/i18n';
 import { effectsLow } from '../../app/quality';
 import { audio } from '../../fx/audio';
 import { boostTag } from '../../game/combo';
-import { cardBack, cardFace, glossaryFor } from '../../ui/card';
+import { boardBuffs, buffsKey, buffsOnCard, cardBack, cardFace, glossaryFor, rulesInnerHtml, type CardBuffs } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import '../../styles/combo-aura.css';
 
@@ -180,9 +179,17 @@ export class Hand {
   refreshStates(): void {
     const ctx = this.ctx;
     if (!ctx) return;
+    const buffs = this.buffs();
+    const key = buffsKey(buffs);
     for (const slot of this.slots) {
       if (!slot.cardId) continue;
       const card = getCard(slot.cardId);
+      // An enchantment came or went (or spent a charge): the "+X" after the numbers follow.
+      if ((slot.el.dataset.buffs ?? '') !== key) {
+        const rules = slot.el.querySelector('.rules > span');
+        if (rules) rules.innerHTML = rulesInnerHtml(slot.cardId, buffs);
+        slot.el.dataset.buffs = key;
+      }
       const reason = blockReason(ctx, slot.cardId);
       const myTurn = ctx.canAct;
       slot.el.classList.toggle('playable', myTurn && !reason);
@@ -238,7 +245,7 @@ export class Hand {
     const slot = this.slots.find((s) => s.uid === uid);
     if (!host || !slot?.cardId || this.selected !== null) return;
     this.hidePreview();
-    const big = cardFace(slot.cardId, { calm: true, hero: this.hero() });
+    const big = cardFace(slot.cardId, { calm: true, buffs: this.buffs() });
     const costEl = slot.el.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     big.classList.add('hover-preview');
@@ -246,12 +253,12 @@ export class Hand {
     big.classList.toggle('boosted', slot.el.classList.contains('boosted'));
     if (big.classList.contains('boosted')) big.append(boostTag(slot.cardId, big.classList.contains('combo')));
     big.classList.toggle('blocked', slot.el.classList.contains('blocked'));
-    const r = slot.el.getBoundingClientRect();
     const hostRect = host.getBoundingClientRect();
     const handTop = this.el.getBoundingClientRect().top;
-    // As large as the inspect view, standing on the hand and kept on screen.
+    // As large as the inspect view, standing on the hand in the middle of the
+    // table (over the deck), so it never hides a castle or a player's panel.
     const w = Math.round(Math.min(300, Math.max(200, (handTop - hostRect.top - 70) / 1.4)));
-    const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    const x = Math.min(Math.max(8, window.innerWidth / 2 - w / 2), window.innerWidth - w - 8);
     big.style.setProperty('--w', `${w}px`);
     big.style.left = `${x - hostRect.left}px`;
     big.style.top = `${Math.max(64, handTop - w * 1.4 - 12) - hostRect.top}px`;
@@ -274,13 +281,13 @@ export class Hand {
     this.onSelect(uid);
   }
 
-  /** Hero of the player holding these cards. */
-  private hero(): HeroId | undefined {
-    return this.ctx ? this.ctx.view.players[this.ctx.seat].hero : undefined;
+  /** What adds to the numbers on these cards now: the holder's hero, enchantments and the Twilight Fury. */
+  buffs(): CardBuffs | null {
+    return this.ctx ? boardBuffs(this.ctx.view, this.ctx.seat) : null;
   }
 
   private makeCard(card: VisibleCard): HTMLElement {
-    const el = card.cardId ? cardFace(card.cardId, { tilt: true, calm: true, hero: this.hero() }) : cardBack();
+    const el = card.cardId ? cardFace(card.cardId, { tilt: true, calm: true, buffs: this.buffs() }) : cardBack();
     el.classList.add('hand-card');
     el.setAttribute('role', 'listitem');
     el.tabIndex = 0;
@@ -385,8 +392,27 @@ export function inspectPanel(opts: {
   extra?: HTMLElement | null;
   actions?: { play: () => void; discard: () => void; reason: string | null; canAct: boolean };
   close: () => void;
+  /** Bonuses raising the card's numbers, explained one per source. */
+  buffs?: ReturnType<typeof buffsOnCard>;
 }): InspectPanel {
   const gloss = glossaryFor(opts.text);
+  const buffEntries = (buffs: NonNullable<typeof opts.buffs>): HTMLElement[] =>
+    (['attack', 'status'] as const).flatMap((kind) => {
+      const list = buffs.filter((b) => b.kind === kind);
+      if (!list.length) return [];
+      return [
+        h('dt.buff-line', null, t(kind === 'attack' ? 'buffDamage' : 'buffTurns')),
+        ...list.map(({ buff }) => h('dd.buff-line', null, h(`b.buff.${buff.source}-buff`, null, `+${buff.amount}`), ' ', buff.label)),
+      ];
+    });
+  const glossary = h('dl.glossary', null, ...buffEntries(opts.buffs ?? []), gloss.flatMap((g) => [h('dt', null, g.word), h('dd', null, g.text)]));
+  /** Follows the bonuses while open: an enchantment running out takes its line away. */
+  const updateBuffs = (buffs: NonNullable<typeof opts.buffs>): void => {
+    glossary.querySelectorAll(':scope > .buff-line').forEach((el) => el.remove());
+    glossary.prepend(...buffEntries(buffs));
+    glossary.hidden = !glossary.childElementCount;
+  };
+  glossary.hidden = !glossary.childElementCount;
   const a = opts.actions;
   const reasonEl = h('p.inspect-reason');
   const playBtn = h('button.btn.primary.big', { type: 'button', onclick: () => a?.play() }, t('play'));
@@ -418,23 +444,20 @@ export function inspectPanel(opts: {
       h(
         'div.inspect-side',
         null,
-        gloss.length
-          ? h(
-              'dl.glossary',
-              null,
-              gloss.flatMap((g) => [h('dt', null, g.word), h('dd', null, g.text)]),
-            )
-          : null,
+        glossary,
         a ? reasonEl : null,
         a ? h('div.inspect-actions', null, playBtn, discardBtn) : null,
         a ? hintEl : null,
       ),
     ),
   );
-  return Object.assign(panel, { updateActions });
+  return Object.assign(panel, { updateActions, updateBuffs });
 }
 
-export type InspectPanel = HTMLDivElement & { updateActions: (reason: string | null, canAct: boolean) => void };
+export type InspectPanel = HTMLDivElement & {
+  updateActions: (reason: string | null, canAct: boolean) => void;
+  updateBuffs: (buffs: ReturnType<typeof buffsOnCard>) => void;
+};
 
 /**
  * The magic aura around a card in hand whose Combo is on: a soft halo

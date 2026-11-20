@@ -538,6 +538,8 @@ export interface RoomEvents {
   status: ConnectionStatus;
   /** You took (or took back) a seat. Comes again after every reconnection. */
   welcome: { seat: PlayerId; room: RoomInfo };
+  /** You are watching without a seat (`spectateRoom`). Comes again after every reconnection. */
+  watching: { room: RoomInfo };
   /** Room info. `seats[i].reconnectBy` is already on the local clock. */
   room: RoomInfo;
   state: RoomStateUpdate;
@@ -563,8 +565,9 @@ interface StoredSeat {
 
 /**
  * One room. Created by `OnlineClient.joinRoom` (takes a seat, or takes back
- * the one this browser already had) or `OnlineClient.watchRoom` (only room
- * info, for an invite page).
+ * the one this browser already had), `OnlineClient.watchRoom` (only room
+ * info, for an invite page) or `OnlineClient.spectateRoom` (the game without
+ * a seat, every hand hidden).
  */
 export class RoomConnection extends ManagedSocket<RoomEvents> {
   private currentSeat: PlayerId | null = null;
@@ -580,6 +583,8 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
     url: string,
     platform: Platform,
     private join: JoinOptions | null,
+    /** Watch the game as a spectator instead of taking a seat. */
+    readonly spectating = false,
   ) {
     super(url, platform);
     this.start();
@@ -610,12 +615,12 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
 
   isMyTurn(): boolean {
     const view = this.currentView;
-    return !!view && view.phase !== 'finished' && view.active === view.viewer;
+    return !!view && !view.spectator && view.phase !== 'finished' && view.active === view.viewer;
   }
 
   /** Every move you can make now (empty when it is not your turn). */
   legalActions(): ActionIntent[] {
-    if (!this.currentView) return [];
+    if (!this.currentView || this.currentView.spectator) return [];
     return legalActions(this.currentView).flatMap((action): ActionIntent[] => {
       switch (action.type) {
         case 'play':
@@ -699,6 +704,10 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
   }
 
   protected onOpen(): void {
+    if (this.spectating) {
+      this.send({ type: 'watch', v: PROTOCOL_VERSION });
+      return;
+    }
     const stored = this.storedSeat();
     if (stored) this.send({ type: 'resume', v: PROTOCOL_VERSION, token: stored.token });
     else if (this.join) this.send({ type: 'join', v: PROTOCOL_VERSION, ...this.join });
@@ -706,7 +715,7 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
 
   protected onTerminalClose(code: number, reason: string): void {
     const why = closeReasonOf(code) ?? 'roomClosed';
-    if (why !== 'replaced') this.forgetSeat();
+    if (why !== 'replaced' && !this.spectating) this.forgetSeat();
     this.finishWith(why, reason);
   }
 
@@ -723,6 +732,14 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
           JSON.stringify({ token: message.token, seat: message.seat, at: Date.now() } satisfies StoredSeat),
         );
         this.emit('welcome', { seat: message.seat, room });
+        this.emit('room', room);
+        break;
+      }
+      case 'watching': {
+        this.clockOffset = message.now - Date.now();
+        const room = this.localRoom(message.room);
+        this.currentRoom = room;
+        this.emit('watching', { room });
         this.emit('room', room);
         break;
       }
@@ -919,6 +936,15 @@ export class OnlineClient {
    */
   watchRoom(roomId: string): RoomConnection {
     return new RoomConnection(roomId, this.socketUrl(ROUTES.roomSocket(roomId)), this.platform, null);
+  }
+
+  /**
+   * Watch a room's game without a seat, for a full room. You get `room`
+   * updates and every `state` with a spectator's view (no hidden hand, ever:
+   * the server leaves it out). You cannot act, emote or ask for a rematch.
+   */
+  spectateRoom(roomId: string): RoomConnection {
+    return new RoomConnection(roomId, this.socketUrl(ROUTES.roomSocket(roomId)), this.platform, null, true);
   }
 
   /** True if this browser holds a seat in that room (so `joinRoom` will resume it). */

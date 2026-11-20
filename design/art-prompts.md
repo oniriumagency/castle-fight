@@ -507,3 +507,26 @@ Blank scrolls bursting into cyan fire on the shelves of an enemy library tower a
 ```
 A stonemason in a leather apron, a soot-stained blacksmith with a hammer and a robed arcanist holding a glowing crystal clasping hands over a workbench in a busy guild hall, apprentices of all three trades gathering behind them. Painterly dark-fantasy trading card illustration, digital oil painting with visible confident brushwork, semi-realistic proportions, dramatic cinematic lighting with a strong warm rim light and deep cool shadows, rich saturated color, subtle gold accent highlights, fine atmospheric haze and drifting dust motes, highly detailed focal subject with a softer painterly background. World: a medieval high-fantasy mountain valley of weathered pale-sandstone castles with slate-blue roofs and plain teal-and-gold cloth banners without any symbols. Color palette: warm amber, honey sandstone, bronze and soft teal, lit by golden-hour sunlight. Composition: one clear focal subject centered, medium-wide shot, eye-level camera, generous empty margin on all four sides so the image can be cropped. Aspect ratio 4:3 landscape. No text, no letters, no numbers, no runes that look like writing, no logos, no card frame, no border, no watermark, no signature, no user interface.
 ```
+
+## Escenario pintado: dos capas (`art/scenery/`)
+
+El fondo del tablero y del menú va en dos imágenes, sin castillos: los castillos los dibuja el juego encima y crecen con su valor.
+
+- `art/scenery/sky.jpg`: solo cielo. El juego lo dibuja un poco más ancho que la pantalla y lo mece despacio de lado a lado (se para con "Reducir movimiento"), así que no hace falta que sea tileable. También lo tiñe con cada evento.
+- `art/scenery/terrain.png` (o .jpg): montañas, colinas y el valle, sobre un cielo magenta plano (#FF00FF). Los generadores de imágenes no dan transparencias, así que `scripts/build-art.mjs` convierte el magenta en transparente. Un PNG ya transparente también sirve. El suelo donde se apoyan los castillos está al 80 % de la altura.
+
+Si solo existe una de las dos, la otra se sigue dibujando. Una imagen única con todo, `art/scenery/backdrop.jpg`, también funciona.
+
+### Cielo (`art/scenery/sky.jpg`, 21:9)
+
+Para que sea tileable de verdad, genera en ComfyUI con tiling solo en el eje X, o desplaza la imagen la mitad de su ancho y haz inpaint de la costura.
+
+```
+Seamless horizontally tileable texture of a painted dusk sky, made to repeat side by side as a scrolling game background. A wide, continuous band of cumulus and stratocumulus clouds stretching evenly across the whole width, like a straight-on strip cut from a 360-degree panorama: clouds of similar size and density spread uniformly from the left edge to the right edge, all drifting parallel to the horizon. No focal point, no central opening or gap in the clouds, no vanishing point, no radial, swirling or converging perspective, no symmetry, no single large hero cloud. The light changes only from top to bottom, never from left to right: deep slate blue at the top, warm amber and soft rose through the middle, a bright warm hazy glow along the bottom fifth with very little detail. The left and right edges have the same colours, brightness and cloud density, and the clouds continue past both edges. Nothing but sky: no land, no mountains, no sun disc, no birds. Painterly dark-fantasy illustration, digital oil painting with visible confident brushwork, rich but calm colour. Aspect ratio 21:9 (or 2:1) landscape, very high resolution. No text, no letters, no logos, no frame, no border, no vignette, no watermark, no signature.
+```
+
+### Terreno (`art/scenery/terrain.png`, 16:9)
+
+```
+A wide panoramic painted landscape without sky, for the background of a strategy card game, seen from a slightly elevated eye-level camera. The bottom fifth of the image is a broad, flat, empty grassy valley floor with a worn dirt path crossing it from left to right, with a few small rocks and puddles: no buildings, no castles, no towers, no people, no animals on it, so game pieces can stand on the left and right thirds. Behind it, gentle rolling green hills and dark pine forests, then a distant range of weathered blue-grey mountains with a little snow, their peaks reaching about halfway up the image, lit warm from a low sun behind them. Everything above the mountains is a perfectly flat, uniform, pure magenta background (#FF00FF): no clouds, no sun, no glow, no haze and no gradient in the magenta, and a crisp clean edge where the mountains meet it. Painterly dark-fantasy illustration, digital oil painting with visible confident brushwork, semi-realistic, rich but calm colour. Composition: flat ground line at about 80 % of the height, balanced weight left and right, low detail along the bottom so interface panels read clearly over it. Colour palette: warm amber, honey, moss green and slate blue. Aspect ratio 16:9 landscape, very high resolution. No castles, no buildings, no text, no letters, no logos, no frame, no border, no watermark, no signature.
+```

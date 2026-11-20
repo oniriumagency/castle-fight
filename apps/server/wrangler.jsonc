@@ -21,6 +21,30 @@
   // `--env production` is games.onirium.agency: the same Worker, plus the built
   // site (games library + game) as static assets, on its own domain. See the README.
   "env": {
+    // A test copy of the game for branches (see .github/workflows/preview.yml):
+    // its own Worker, rooms and reports on workers.dev, so nothing reaches
+    // games.onirium.agency or its players.
+    "preview": {
+      "name": "cardcraft-castles-preview",
+      "workers_dev": true,
+      "preview_urls": false,
+      // Same site layout as production (game under /cardcraft-castles/), but
+      // without LIBRARY: the root sends straight to the game.
+      "assets": {
+        "directory": "../library/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page",
+        "run_worker_first": ["/", "/api/*", "/reportes"]
+      },
+      "observability": { "enabled": true },
+      "durable_objects": {
+        "bindings": [
+          { "name": "LOBBY", "class_name": "Lobby" },
+          { "name": "ROOM", "class_name": "Room" },
+          { "name": "REPORTS", "class_name": "Reports" }
+        ]
+      }
+    },
     "production": {
       // Keep the Worker's name instead of the default `cardcraft-castles-production`.
       "name": "cardcraft-castles",

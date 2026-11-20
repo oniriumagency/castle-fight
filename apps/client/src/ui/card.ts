@@ -1,18 +1,21 @@
 import {
   DEFAULT_RULES,
+  attackBonusParts,
   SCHOOL_NAMES,
   TERMS,
   getBattleEvent,
   getCard,
   getHero,
   type BattleEventId,
+  type Board,
   type CardId,
   type EffectOp,
   type HeroId,
   type LocalizedText,
+  type PlayerId,
 } from '@cardcraft-castles/engine';
 import { escapeHtml, h, html } from '../app/dom';
-import { L, locale } from '../app/i18n';
+import { L, locale, t } from '../app/i18n';
 import { settings } from '../app/settings';
 import { SCHOOL_EMBLEM, artUrl, emblemSvg, iconSvg, watchArt } from './assets';
 
@@ -102,10 +105,58 @@ export function rulesHtml(text: string): string {
   );
 }
 
-/** What a hero's passive adds to the numbers printed on cards. */
-export function heroBuffs(heroId: HeroId): { attack: number; status: number } {
-  const passive = getHero(heroId).passive;
-  return { attack: passive.attackBonus ?? 0, status: passive.statusDurationBonus ?? 0 };
+/** Where a bonus to a printed number comes from. Each source is shown as its own "+X". */
+export type BuffSource = 'hero' | 'enchantment' | 'twilight';
+
+export interface NumberBuff {
+  source: BuffSource;
+  amount: number;
+  /** Who gives it, for the tooltip and the inspect view ("Estandarte de Guerra (3 more attacks)"). */
+  label: string;
+}
+
+/** What is added to the numbers printed on a card: per attack, and to Burn/Frost/Rust durations. */
+export interface CardBuffs {
+  attack: NumberBuff[];
+  status: NumberBuff[];
+}
+
+function heroStatusBuffs(heroId: HeroId): NumberBuff[] {
+  const n = getHero(heroId).passive.statusDurationBonus ?? 0;
+  return n ? [{ source: 'hero', amount: n, label: t('buffHero', { name: L(getHero(heroId).name) }) }] : [];
+}
+
+/** What a hero's passive adds to the numbers printed on cards (when nothing else is known). */
+export function heroBuffs(heroId: HeroId): CardBuffs {
+  const attack = getHero(heroId).passive.attackBonus ?? 0;
+  return {
+    attack: attack ? [{ source: 'hero', amount: attack, label: t('buffHero', { name: L(getHero(heroId).name) }) }] : [],
+    status: heroStatusBuffs(heroId),
+  };
+}
+
+/**
+ * Everything that adds to the numbers on `seat`'s cards right now: the
+ * hero's passive, each enchantment on the table and the Twilight Fury, each
+ * as its own entry, in the same order the engine adds them.
+ */
+export function boardBuffs(board: Board, seat: PlayerId): CardBuffs {
+  const heroId = board.players[seat]!.hero;
+  const attack = attackBonusParts(board, seat).map((part): NumberBuff => {
+    if (part.source === 'hero') return { source: 'hero', amount: part.amount, label: t('buffHero', { name: L(getHero(heroId).name) }) };
+    if (part.source === 'twilight') return { source: 'twilight', amount: part.amount, label: t('twilightName') };
+    const name = L(getCard(part.cardId!).name);
+    const label =
+      part.charges === undefined ? name : t(part.charges === 1 ? 'buffAttackLeft' : 'buffAttacksLeft', { name, n: part.charges });
+    return { source: 'enchantment', amount: part.amount, label };
+  });
+  return { attack, status: heroStatusBuffs(heroId) };
+}
+
+/** Changes whenever the buffs shown on a card would. */
+export function buffsKey(buffs: CardBuffs | null | undefined): string {
+  if (!buffs) return '';
+  return [...buffs.attack, ...buffs.status].map((b) => `${b.source}:${b.amount}:${b.label}`).join('|');
 }
 
 /** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
@@ -142,40 +193,63 @@ function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>
   return out;
 }
 
-// Markers around a buffed number, put in before escaping and turned into a span after.
+// Markers around a buff after a number ("\u0001a0\u0002" is attack buff 0),
+// put in before escaping and turned into a span after.
 const BUFF_OPEN = '\u0001';
 const BUFF_CLOSE = '\u0002';
 
 /**
- * Card text with what the player's hero adds to its numbers: "13 damage"
- * becomes "13+2 damage" for the Marshal, "for 4 turns" becomes "for 4+1
- * turns" for the Sorceress. Hits that are not single attacks
- * (per card discarded, Burn ticks) and other modifiers stay as printed.
+ * Card text with what is added to its numbers, each source on its own:
+ * "13 damage" becomes "13+2+3 damage" for the Marshal with a War Banner up,
+ * "for 4 turns" becomes "for 4+1 turns" for the Sorceress. Hits that are not
+ * single attacks (per card discarded, Burn ticks) stay as printed.
  */
-function buffText(ops: readonly EffectOp[], text: string, heroId: HeroId): string {
-  const buffs = heroBuffs(heroId);
-  if (!buffs.attack && !buffs.status) return text;
+function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): string {
+  if (!buffs.attack.length && !buffs.status.length) return text;
   const numbers = effectNumbers(ops);
-  const mark = (n: number, bonus: number): string => `${n}${BUFF_OPEN}+${bonus}${BUFF_CLOSE}`;
+  const marks = (kind: 'a' | 's', list: NumberBuff[]): string => list.map((_, i) => `${BUFF_OPEN}${kind}${i}${BUFF_CLOSE}`).join('');
   const es = locale() === 'es';
   let out = text;
-  if (buffs.attack && numbers.damage.size) {
+  if (buffs.attack.length && numbers.damage.size) {
     const damage = es ? /(?<![+\d])(\d+)(?= de daño(?! menos| por))/g : /(?<![+\d])(\d+)(?= (?:piercing )?damage(?! per| for each))/g;
-    out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? mark(Number(m), buffs.attack) : m));
+    out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? `${m}${marks('a', buffs.attack)}` : m));
   }
-  if (buffs.status && numbers.status.size) {
+  if (buffs.status.length && numbers.status.size) {
     const turns = es ? /(?<=durante )(\d+) turnos?/g : /(?<=for )(\d+) turns?/g;
     out = out.replace(turns, (m, n: string) => {
       if (!numbers.status.has(Number(n))) return m;
       const plural = es ? 'turnos' : 'turns';
-      return `${mark(Number(n), buffs.status)} ${plural}`;
+      return `${n}${marks('s', buffs.status)} ${plural}`;
     });
   }
   return out;
 }
 
-function buffHtml(html: string): string {
-  return html.replace(/\u0001([^\u0002]*)\u0002/g, '<span class="hero-buff">$1</span>');
+function buffHtml(html: string, buffs: CardBuffs): string {
+  return html.replace(/\u0001([as])(\d+)\u0002/g, (_, kind: string, i: string) => {
+    const b = (kind === 'a' ? buffs.attack : buffs.status)[Number(i)];
+    if (!b) return '';
+    const cls = b.source === 'hero' ? 'buff hero-buff' : `buff ${b.source}-buff`;
+    return `<span class="${cls}" title="${escapeHtml(b.label)}">+${b.amount}</span>`;
+  });
+}
+
+/** A card's rules text as HTML, with its buffs (if any) marked after the numbers they raise. */
+export function rulesInnerHtml(cardId: CardId, buffs?: CardBuffs | null): string {
+  const card = getCard(cardId);
+  return buffs ? buffHtml(rulesHtml(buffText(card.effects, rulesOf(card), buffs)), buffs) : rulesHtml(rulesOf(card));
+}
+
+/** The buffs that raise a number printed on this card, to explain them beside it. */
+export function buffsOnCard(cardId: CardId, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: 'attack' | 'status' }[] {
+  if (!buffs) return [];
+  const card = getCard(cardId);
+  const text = rulesOf(card);
+  const raises = (only: CardBuffs): boolean => buffText(card.effects, text, only) !== text;
+  return [
+    ...(buffs.attack.length && raises({ attack: buffs.attack, status: [] }) ? buffs.attack.map((buff) => ({ buff, kind: 'attack' as const })) : []),
+    ...(buffs.status.length && raises({ attack: [], status: buffs.status }) ? buffs.status.map((buff) => ({ buff, kind: 'status' as const })) : []),
+  ];
 }
 
 /** Explanations for the keywords a text uses, for the inspect view. */
@@ -202,6 +276,11 @@ export interface CardOptions {
   calm?: boolean;
   /** The hero of whoever holds or played the card: numbers its passive improves show with the bonus. */
   hero?: HeroId;
+  /**
+   * Everything that adds to the card's numbers right now (hero, enchantments,
+   * Twilight Fury), each shown as its own "+X". Takes the place of `hero`.
+   */
+  buffs?: CardBuffs | null;
 }
 
 function frame(classes: string, opts: CardOptions): HTMLDivElement {
@@ -217,11 +296,13 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
   el.dataset.cardId = cardId;
   const cost = opts.cost ?? card.cost;
   const costClass = cost < card.cost ? 'down' : cost > card.cost ? 'up' : '';
+  const buffs = opts.buffs ?? (opts.hero ? heroBuffs(opts.hero) : null);
+  if (buffs) el.dataset.buffs = buffsKey(buffs);
   el.innerHTML = `
     <div class="trim"><div class="body">
       <div class="art"><img alt="" draggable="false" ${opts.lazy ? 'loading="lazy"' : ''} src="${artUrl(card.art)}"></div>
       <div class="type">${escapeHtml(L(SCHOOL_NAMES[card.school]))}</div>
-      <div class="rules"><span>${opts.hero ? buffHtml(rulesHtml(buffText(card.effects, rulesOf(card), opts.hero))) : rulesHtml(rulesOf(card))}</span></div>
+      <div class="rules"><span>${rulesInnerHtml(cardId, buffs)}</span></div>
     </div></div>
     <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(L(card.name))}</b></div>
     <div class="cost ${costClass}"><span>${cost}</span>${emblemSvg(SCHOOL_EMBLEM[card.school])}</div>
@@ -295,7 +376,8 @@ function parseBase(entry: string): { cardId: string; discarded: boolean; boost: 
 
 /** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */
 export function ultimateHtml(heroId: HeroId): string {
-  return buffHtml(rulesHtml(buffText(getHero(heroId).ultimate, heroParts(heroId).ultimate, heroId)));
+  const buffs = heroBuffs(heroId);
+  return buffHtml(rulesHtml(buffText(getHero(heroId).ultimate, heroParts(heroId).ultimate, buffs)), buffs);
 }
 
 export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement {
