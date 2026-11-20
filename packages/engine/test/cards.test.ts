@@ -446,7 +446,9 @@ const CARD_TESTS: Record<string, () => void> = {
   },
   'maldicion-de-oxido': () => {
     let { state } = play('maldicion-de-oxido', { keepTurn: false });
-    expect(state.players[ME].enchantments[0]).toMatchObject({ cardId: 'maldicion-de-oxido', turnsLeft: 3 });
+    // A status on the opponent, not an enchantment of mine.
+    expect(state.players[ME].enchantments).toEqual([]);
+    expect(state.players[OPP].rust).toBe(3);
     // The opponent's Assault cards cost 2 more; other schools and my own cards do not change.
     expect(effectiveCost(state, OPP, 'escaramuza')).toBe(3);
     expect(effectiveCost(state, OPP, 'parapeto')).toBe(4);
@@ -454,6 +456,14 @@ const CARD_TESTS: Record<string, () => void> = {
     setHand(state, OPP, ['escaramuza']);
     state = playCard(state, 'escaramuza').state;
     expect(state.players[OPP].resources.acero).toBe(52 - 3);
+    // It lasts for the opponent's next 3 turns, then wears off.
+    expect(state.players[OPP].rust).toBe(2);
+    state = pass(pass(state));
+    expect(state.players[OPP].rust).toBe(1);
+    expect(effectiveCost(state, OPP, 'escaramuza')).toBe(3);
+    state = pass(pass(state));
+    expect(state.players[OPP].rust).toBe(0);
+    expect(effectiveCost(state, OPP, 'escaramuza')).toBe(1);
   },
   'manantial-de-mana': () => {
     // No battle event (a Harvest or a Market would change the count).

@@ -3,6 +3,7 @@ import {
   RESOURCES,
   costResource,
   effectiveCost,
+  RUST,
   enchantmentLife,
   getCard,
   getHero,
@@ -73,7 +74,7 @@ export interface Weights {
   discard: number;
   /** Value of each card missing from a hand at the start of its owner's turn. */
   cardSlot: number;
-  /** Per-turn value of enchantment modifiers, per point. */
+  /** Per-turn value of enchantment modifiers (and of Rust), per point. */
   enchantAttack: number;
   enchantWallReduction: number;
   enchantCostIncrease: number;
@@ -169,6 +170,8 @@ function opNominal(op: EffectOp, w: Weights): number {
       return op.turns * DEFAULT_RULES.burnDamage * w.burn;
     case 'frost':
       return op.turns * (op.scope === 'all' ? 6 : 2) * w.frost;
+    case 'rust':
+      return op.turns * RUST.costIncrease * w.enchantCostIncrease;
     case 'shield':
       return op.charges * w.shield;
     case 'cleanse':
@@ -342,6 +345,8 @@ function sideValue(
   }
 
   if (p.burn > 0) value -= w.burn * rules.burnDamage * p.burn * (1 + exposure);
+  const rust = p.rust ?? 0;
+  if (rust > 0) value -= w.enchantCostIncrease * RUST.costIncrease * Math.min(rust, turnsLeft);
   value += w.shield * p.shield;
 
   for (const e of p.enchantments) {

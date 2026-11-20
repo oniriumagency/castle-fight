@@ -342,7 +342,7 @@ export const fx = {
     await Promise.all(seats.map((seat) => ctx.field.animateCastle(ctx.side(seat), keeps[seat], walls[seat], ms(800))));
   },
 
-  async status(kind: 'burn' | 'frost' | 'shield' | 'cleanse', seat: PlayerId, ctx: FxContext, shield = 0): Promise<void> {
+  async status(kind: 'burn' | 'frost' | 'rust' | 'shield' | 'cleanse', seat: PlayerId, ctx: FxContext, shield = 0): Promise<void> {
     const field = ctx.field;
     const side = ctx.side(seat);
     const at = field.anchor(side, 'keep');
@@ -357,6 +357,11 @@ export const fx = {
       field.ring(at.x, at.y + 30, 0xbff3ff, 160, 700, 0.9);
       field.burst(at.x, at.y + 30, { count: 30, texture: 'crystal', color: [0xbff3ff, 0x7fdcf5, 0xffffff], speed: 3, gravity: 0.03, size: 14, life: 1100 });
       field.hitCastle(side, 0xa0e8ff, 0.2);
+    } else if (kind === 'rust') {
+      audio.play('enchant', 0.5, { pan: p });
+      field.ring(at.x, at.y + 30, 0xc0652a, 150, 700, 0.8);
+      field.burst(at.x, at.y + 30, { count: 26, color: [0xb85c28, 0x8a4a22, 0xe0915a], speed: 1.8, gravity: 0.08, size: 9, life: 1100, area: { w: 50, h: 30 } });
+      field.hitCastle(side, 0xb85c28, 0.2);
     } else if (kind === 'shield') {
       audio.play('shield', 0.5, { pan: p });
       if (legendaryNow()) holyFire(seat, ctx);

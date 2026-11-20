@@ -155,11 +155,12 @@ export class SidePanel {
     }
 
     // Statuses and enchantments change rarely; rebuild only when they do.
-    const key = JSON.stringify([p.burn, p.shield, p.drawbridge, p.handRevealed, p.extraTurns, p.enchantments, p.deckCount, p.discardCount]);
+    const key = JSON.stringify([p.burn, p.rust, p.shield, p.drawbridge, p.handRevealed, p.extraTurns, p.enchantments, p.deckCount, p.discardCount]);
     if (key === this.lastKey) return;
     this.lastKey = key;
     const chips: HTMLElement[] = [];
     if (p.burn > 0) chips.push(this.chip('burn', String(p.burn), t('burnTurns', { n: p.burn }), 'burn'));
+    if (p.rust > 0) chips.push(this.chip('rust', String(p.rust), t('rustTurns', { n: p.rust }), 'rust'));
     if (p.shield > 0) chips.push(this.chip('shield', String(p.shield), t('shieldCharges', { n: p.shield }), 'shield'));
     if (p.drawbridge) chips.push(this.chip('drawbridge', '', t('drawbridgeUp'), 'drawbridge'));
     if (p.handRevealed) chips.push(this.chip('eye', '', t('handVisible'), 'revealed'));

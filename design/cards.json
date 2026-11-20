@@ -1053,12 +1053,12 @@
         "en": "Rust Curse"
       },
       "text": {
-        "es": "Encantamiento (3 turnos): las cartas de Asalto del rival cuestan 2 más.",
-        "en": "Enchantment (3 turns): your opponent's Assault cards cost 2 more."
+        "es": "Óxido al rival durante 3 turnos: sus cartas de Asalto cuestan 2 más.",
+        "en": "Rust on your opponent for 3 turns: their Assault cards cost 2 more."
       },
       "textFfa": {
-        "es": "Encantamiento (3 turnos): las cartas de Asalto de tus rivales cuestan 2 más.",
-        "en": "Enchantment (3 turns): your rivals' Assault cards cost 2 more."
+        "es": "Óxido a cada rival durante 3 turnos: sus cartas de Asalto cuestan 2 más.",
+        "en": "Rust on each rival for 3 turns: their Assault cards cost 2 more."
       },
       "art": "cards/maldicion-de-oxido.jpg"
     },

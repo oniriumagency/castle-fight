@@ -60,6 +60,13 @@ const GLOSSARY: { words: LocalizedText; text: LocalizedText }[] = [
     text: { es: 'El recurso congelado no produce mientras dure.', en: 'The frozen resource does not produce while it lasts.' },
   },
   {
+    words: { es: 'Óxido', en: 'Rust' },
+    text: {
+      es: 'Las cartas de Asalto del jugador oxidado cuestan 2 más durante sus próximos turnos.',
+      en: 'The rusted player’s Assault cards cost 2 more during their next turns.',
+    },
+  },
+  {
     words: { es: 'Combo', en: 'Combo' },
     text: {
       es: 'Bonificación si la última carta que jugaste es de la misma escuela. Descartar rompe la cadena.',
@@ -101,7 +108,7 @@ export function heroBuffs(heroId: HeroId): { attack: number; status: number } {
   return { attack: passive.attackBonus ?? 0, status: passive.statusDurationBonus ?? 0 };
 }
 
-/** Attack amounts and Burn/Frost durations among a card's effects, to tell which printed numbers they are. */
+/** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
 /** Players at the table being shown: with 3+, cards read their free-for-all text. */
 let tableSize = 2;
 
@@ -124,7 +131,7 @@ function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>
   for (const op of ops) {
     if (op.op === 'damage') out.damage.add(tableAmount(op.amount));
     else if (op.op === 'burn') out.status.add(tableAmount(op.turns));
-    else if (op.op === 'frost') out.status.add(op.turns);
+    else if (op.op === 'frost' || op.op === 'rust') out.status.add(op.turns);
     else if (op.op === 'if') {
       effectNumbers(op.then, out);
       if (op.else) effectNumbers(op.else, out);
