@@ -15,7 +15,10 @@ import type {
  * redacted event list.
  */
 
-function publicPlayer(state: GameState, player: PlayerId, viewer: PlayerId): PlayerPublicState {
+/** `null` is a spectator: they see no hand but the revealed ones. */
+type Viewer = PlayerId | null;
+
+function publicPlayer(state: GameState, player: PlayerId, viewer: Viewer): PlayerPublicState {
   const p = state.players[player];
   const visible = player === viewer || p.handRevealed;
   return {
@@ -46,8 +49,12 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: PlayerId): Pla
   };
 }
 
-/** The game as `viewer` is allowed to see it. */
-export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
+/**
+ * The game as `viewer` is allowed to see it. `null` gives a spectator's view:
+ * every hand hidden (unless revealed), no player's choice options, and
+ * `viewer: 0` with `spectator: true` so a board can lay it out from seat 0.
+ */
+export function getPlayerView(state: GameState, viewer: Viewer): PlayerView {
   let pending: PendingChoiceView | null = null;
   if (state.pending) {
     const mine = state.pending.player === viewer;
@@ -63,7 +70,8 @@ export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
     };
   }
   return {
-    viewer,
+    viewer: viewer ?? 0,
+    ...(viewer === null ? { spectator: true as const } : {}),
     rules: state.rules,
     seq: state.seq,
     turn: state.turn,
@@ -84,9 +92,10 @@ export function getPlayerView(state: GameState, viewer: PlayerId): PlayerView {
 /**
  * The events `viewer` is allowed to see: cards the opponent draws are hidden
  * (unless their hand is revealed) and so are the details of choices the
- * opponent is making. Everything else in the log is public.
+ * opponent is making. Everything else in the log is public. A spectator
+ * (`null`) sees nobody's draws or choices.
  */
-export function redactEvents(events: readonly GameEvent[], viewer: PlayerId): GameEvent[] {
+export function redactEvents(events: readonly GameEvent[], viewer: Viewer): GameEvent[] {
   return events.map((event) => {
     switch (event.type) {
       case 'cardsDrawn':
