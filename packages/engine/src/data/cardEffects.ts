@@ -13,7 +13,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'bastida-de-granito': [{ op: 'wall', amount: 20 }],
   cimientos: [{ op: 'keep', amount: 7 }],
   'andamio-real': [{ op: 'keep', amount: 17 }],
-  'gremio-de-canteros': [{ op: 'gainWorker', worker: 'piedra', amount: 1 }],
+  'gremio-de-canteros': [{ op: 'gainWorker', worker: 'piedra', amount: 1 }, { op: 'extraPlay' }],
   'cantera-abierta': [{ op: 'gainResource', resource: 'piedra', amount: 4 }],
   almenas: [
     { op: 'wall', amount: 7 },
@@ -28,8 +28,8 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
       else: [{ op: 'keep', amount: 7 }],
     },
   ],
-  'fragua-del-gremio': [{ op: 'gainWorker', worker: 'acero', amount: 1 }],
-  'aula-de-arcanistas': [{ op: 'gainWorker', worker: 'mana', amount: 1 }],
+  'fragua-del-gremio': [{ op: 'gainWorker', worker: 'acero', amount: 1 }, { op: 'extraPlay' }],
+  'aula-de-arcanistas': [{ op: 'gainWorker', worker: 'mana', amount: 1 }, { op: 'extraPlay' }],
   'torre-vigia': [{ op: 'keep', amount: 12 }, { op: 'revealHand' }],
   contrafuertes: [{ op: 'enchant', charges: 4, modifiers: { wallDamageReduction: 3 } }],
   'fortaleza-viva': [
@@ -39,6 +39,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'maestro-de-obras': [
     { op: 'gainWorker', worker: 'piedra', amount: 1 },
     { op: 'wall', amount: 10 },
+    { op: 'extraPlay' },
   ],
   'bastion-ciclopeo': [{ op: 'wall', amount: 37 }],
   'aguja-celeste': [{ op: 'keep', amount: 33 }],
@@ -46,6 +47,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
     { op: 'gainWorker', worker: 'piedra', amount: 1 },
     { op: 'gainWorker', worker: 'acero', amount: 1 },
     { op: 'gainWorker', worker: 'mana', amount: 1 },
+    { op: 'extraPlay' },
   ],
   'ciudadela-eterna': [{ op: 'keep', amount: 33 }, { op: 'wall', amount: 25 }, { op: 'cleanse' }],
   'escombros-utiles': [
@@ -68,7 +70,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'doble-salva': [{ op: 'damage', amount: 5, times: 2 }],
   'saetas-negras': [{ op: 'damage', amount: 10, kind: 'piercing' }],
   'ariete-de-hierro': [{ op: 'damage', amount: 10, wallMultiplier: 2 }],
-  'leva-de-herreros': [{ op: 'gainWorker', worker: 'acero', amount: 1 }],
+  'leva-de-herreros': [{ op: 'gainWorker', worker: 'acero', amount: 1 }, { op: 'extraPlay' }],
   'saqueo-nocturno': [{ op: 'stealResource', amount: 5 }],
   'carga-de-caballeria': [{ op: 'damage', amount: 22 }],
   hostigamiento: [{ op: 'damage', amount: 7, comboBonus: 8 }],
@@ -127,7 +129,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'lluvia-de-ascuas': [{ op: 'burn', turns: 4 }],
   'egida-lunar': [{ op: 'shield', charges: 1 }],
   'aliento-de-escarcha': [{ op: 'frost', scope: 'choice', turns: 2 }],
-  'circulo-de-estudio': [{ op: 'gainWorker', worker: 'mana', amount: 1 }],
+  'circulo-de-estudio': [{ op: 'gainWorker', worker: 'mana', amount: 1 }, { op: 'extraPlay' }],
   transmutacion: [
     { op: 'gainResource', resource: 'piedra', amount: 3 },
     { op: 'gainResource', resource: 'acero', amount: 3 },
