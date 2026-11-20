@@ -32,9 +32,15 @@ export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
     // Duels and free-for-all rooms share the board; it sizes itself to the seats.
     flow.board(session);
   });
-  const offClosed = connection.on('closed', ({ message }) => {
+  const offClosed = connection.on('closed', ({ reason, message }) => {
     if (opened) return;
     cleanup();
+    // Someone took the last seat first: watch the game instead.
+    if (reason === 'roomFull') {
+      toast(t('watchingFullRoom'), 'info', 4000);
+      watchOnline(roomId);
+      return;
+    }
     toast(message || t('connectionLost'), 'warn', 4000);
     audio.play('error');
     flow.lobby();
@@ -52,7 +58,48 @@ export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
   }));
 }
 
-function waitingScreen(session: OnlineSession, cancel: () => void): Screen {
+/**
+ * Watches a full room's game without a seat. The server sends a spectator's
+ * view (no hand, ever), and the board opens in observer mode with it.
+ */
+export function watchOnline(roomId: string): void {
+  setRoomInUrl(roomId);
+  const connection = online.spectateRoom(roomId);
+  const session = new OnlineSession(connection);
+  let opened = false;
+
+  const offState = connection.on('state', () => {
+    if (opened) return;
+    opened = true;
+    cleanup();
+    flow.board(session);
+  });
+  const offError = connection.on('error', ({ code }) => {
+    if (code === 'tooManySpectators') toast(t('tooManySpectators'), 'warn', 4000);
+  });
+  const offClosed = connection.on('closed', ({ message }) => {
+    if (opened) return;
+    cleanup();
+    toast(message || t('connectionLost'), 'warn', 4000);
+    audio.play('error');
+    flow.lobby();
+  });
+  const cleanup = (): void => {
+    offState();
+    offError();
+    offClosed();
+  };
+
+  // A room still waiting (someone left before it filled): wait for its game.
+  setScreenName('onlineWatching');
+  show(waitingScreen(session, () => {
+    cleanup();
+    session.leave();
+    flow.lobby();
+  }, true));
+}
+
+function waitingScreen(session: OnlineSession, cancel: () => void, watching = false): Screen {
   const el = h('div.waiting-screen');
   const seatsBox = h('div.waiting-seats');
   const link = online.inviteUrl(session.connection.roomId);
@@ -102,7 +149,7 @@ function waitingScreen(session: OnlineSession, cancel: () => void): Screen {
     h(
       'div.waiting-box.panel',
       null,
-      h('h1', null, t('waitingTitle')),
+      h('h1', null, watching ? t('watchingWaitTitle') : t('waitingTitle')),
       h('div.spinner.big'),
       seatsBox,
       h('p', null, t('waitingHint')),

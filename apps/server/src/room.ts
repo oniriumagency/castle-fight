@@ -12,6 +12,8 @@ interface Attachment {
   at: number;
   /** We closed it; it no longer counts even if the other side never answers. */
   closed?: boolean;
+  /** A spectator (`watch`). */
+  watching?: boolean;
 }
 
 /**
@@ -65,6 +67,11 @@ export class Room extends DurableObject<Env> {
       sockets: () => this.ctx.getWebSockets().filter((ws) => this.live(ws)),
       seatOf: (ws) => this.attachment(ws).seat,
       setSeat: (ws, seat) => ws.serializeAttachment({ ...this.attachment(ws), seat } satisfies Attachment),
+      isWatching: (ws) => !!this.attachment(ws).watching,
+      setWatching: (ws, on) => {
+        const { watching: _, ...rest } = this.attachment(ws);
+        ws.serializeAttachment((on ? { ...rest, watching: true } : rest) satisfies Attachment);
+      },
       send: (ws, message: RoomServerMessage) => {
         try {
           ws.send(JSON.stringify(message));
@@ -161,7 +168,12 @@ export class Room extends DurableObject<Env> {
   private attachment(ws: WebSocket): Attachment {
     const value = ws.deserializeAttachment() as Partial<Attachment> | null;
     // Sockets accepted by an older version only stored the seat.
-    return { seat: value?.seat ?? null, at: value?.at ?? 0, ...(value?.closed ? { closed: true } : {}) };
+    return {
+      seat: value?.seat ?? null,
+      at: value?.at ?? 0,
+      ...(value?.closed ? { closed: true } : {}),
+      ...(value?.watching ? { watching: true } : {}),
+    };
   }
 
   /** Open, not closed by us, and heard from recently. */

@@ -22,6 +22,7 @@ import {
 } from '@cardcraft-castles/engine';
 import {
   CLOSE_CODES,
+  MAX_SPECTATORS,
   PROTOCOL_VERSION,
   cleanNickname,
   parseRoomClientMessage,
@@ -42,8 +43,11 @@ import { TokenBucket } from './limits';
 
 /** Housekeeping limits that are not part of the protocol. */
 export const ROOM_LIMITS = {
-  /** Open sockets per room: two players plus a reconnecting tab or an invite page or two. */
-  maxSockets: 6,
+  /**
+   * Open sockets per room: up to three players, a reconnecting tab or an
+   * invite page or two, and the spectators.
+   */
+  maxSockets: 6 + MAX_SPECTATORS,
   /** Per socket: burst of messages, then this many per second. */
   messageBurst: 20,
   messagesPerSecond: 5,
@@ -112,6 +116,9 @@ export interface RoomHost<S> {
   sockets(): S[];
   seatOf(socket: S): PlayerId | null;
   setSeat(socket: S, seat: PlayerId | null): void;
+  /** The socket watches the game without a seat (`watch`). */
+  isWatching(socket: S): boolean;
+  setWatching(socket: S, on: boolean): void;
   send(socket: S, message: RoomServerMessage): void;
   close(socket: S, code: number, reason: string): void;
   /** Unguessable secret for seat tokens. */
@@ -182,11 +189,12 @@ export class RoomCore<S> {
       return;
     }
     // Over the limit, make room by closing the oldest sockets without a seat
-    // (invite pages, tabs that never resumed) rather than turning this one
-    // away: it may be a player coming back for their seat.
+    // (invite pages, tabs that never resumed, then spectators) rather than
+    // turning this one away: it may be a player coming back for their seat.
     let others = this.host.sockets().filter((s) => s !== socket);
     while (others.length >= ROOM_LIMITS.maxSockets) {
-      const spare = others.find((s) => this.host.seatOf(s) === null);
+      const seatless = others.filter((s) => this.host.seatOf(s) === null);
+      const spare = seatless.find((s) => !this.host.isWatching(s)) ?? seatless[0];
       if (spare === undefined) break;
       this.host.close(spare, CLOSE_CODES.tooManyConnections, 'Too many connections to this room');
       others = others.filter((s) => s !== spare);
@@ -222,6 +230,8 @@ export class RoomCore<S> {
         return this.leave(socket);
       case 'sync':
         return this.sync(socket);
+      case 'watch':
+        return this.watch(socket, message.v);
     }
   }
 
@@ -229,6 +239,11 @@ export class RoomCore<S> {
   disconnected(socket: S): void {
     this.buckets.delete(socket);
     this.strikes.delete(socket);
+    // One spectator fewer: the players see the count.
+    if (this.host.isWatching(socket)) {
+      if (this.record.status !== 'closed') this.broadcastRoom();
+      return;
+    }
     const seat = this.host.seatOf(socket);
     if (seat === null || this.isConnected(seat)) return;
     const record = this.record.seats[seat];
@@ -329,6 +344,7 @@ export class RoomCore<S> {
       games: room.games,
       ending: room.ending,
       timings: room.timings,
+      spectators: this.spectators().length,
     };
   }
 
@@ -373,6 +389,8 @@ export class RoomCore<S> {
       return;
     }
     const seat = free as PlayerId;
+    // A spectator of a waiting room (someone left) may take the free seat.
+    this.host.setWatching(socket, false);
     room.seats[seat] = {
       nickname: cleanNickname(nickname) ?? `Jugador ${seat + 1}`,
       pid: pid ?? null,
@@ -464,6 +482,11 @@ export class RoomCore<S> {
   }
 
   private leave(socket: S): void {
+    if (this.host.isWatching(socket)) {
+      this.host.setWatching(socket, false);
+      this.broadcastRoom();
+      return;
+    }
     const seat = this.host.seatOf(socket);
     if (seat === null) return;
     this.host.setSeat(socket, null);
@@ -496,6 +519,28 @@ export class RoomCore<S> {
     this.host.send(socket, { type: 'room', room: this.info(), now: this.host.now() });
     const seat = this.host.seatOf(socket);
     if (seat !== null && this.record.game) this.sendState(socket, seat, [], true);
+    else if (this.host.isWatching(socket) && this.record.game) this.sendState(socket, null, [], true);
+  }
+
+  /**
+   * Watch without a seat. The spectator gets the room and then, like the
+   * players, every state, but with every hand hidden: the server decides
+   * what they may see, never the client.
+   */
+  private watch(socket: S, version: number): void {
+    if (!this.checkVersion(socket, version)) return;
+    if (this.host.seatOf(socket) !== null) return this.error(socket, 'alreadySeated', 'You already have a seat');
+    if (!this.host.isWatching(socket)) {
+      if (this.spectators().length >= MAX_SPECTATORS) {
+        this.error(socket, 'tooManySpectators', 'Too many people are watching this room');
+        this.host.close(socket, CLOSE_CODES.tooManyConnections, 'Too many people are watching this room');
+        return;
+      }
+      this.host.setWatching(socket, true);
+      this.broadcastRoom();
+    }
+    this.host.send(socket, { type: 'watching', room: this.info(), now: this.host.now() });
+    if (this.record.game) this.sendState(socket, null, [], true);
   }
 
   // -------------------------------------------------------------------------
@@ -572,11 +617,13 @@ export class RoomCore<S> {
     for (const socket of this.host.sockets()) {
       const seat = this.host.seatOf(socket);
       if (seat !== null) this.sendState(socket, seat, events, false);
+      else if (this.host.isWatching(socket)) this.sendState(socket, null, events, false);
     }
     if (state.result) this.broadcastRoom();
   }
 
-  private sendState(socket: S, seat: PlayerId, events: GameEvent[], resumed: boolean): void {
+  /** `seat` null: a spectator's view. */
+  private sendState(socket: S, seat: PlayerId | null, events: GameEvent[], resumed: boolean): void {
     const game = this.record.game!;
     this.host.send(socket, {
       type: 'state',
@@ -604,6 +651,10 @@ export class RoomCore<S> {
 
   private seatIds(): PlayerId[] {
     return this.record.seats.map((_, i) => i);
+  }
+
+  private spectators(): S[] {
+    return this.host.sockets().filter((socket) => this.host.isWatching(socket));
   }
 
   private isConnected(seat: PlayerId): boolean {
