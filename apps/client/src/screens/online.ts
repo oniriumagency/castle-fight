@@ -3,11 +3,14 @@ import type { RoomInfo } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
 import { setScreenName } from '../app/reportContext';
-import { show, type Screen } from '../app/router';
+import { modal, show, type Screen } from '../app/router';
 import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
 import { OnlineSession, online } from '../net/online';
 import { iconSvg } from '../ui/assets';
+import { muteButton } from '../ui/muteButton';
+import { openHowToPlay } from './howToPlay';
+import { openSettings } from './settingsModal';
 import { flow, nickname, setRoomInUrl } from './flow';
 
 /**
@@ -67,7 +70,34 @@ function waitingScreen(session: OnlineSession, cancel: () => void): Screen {
     );
   };
 
+  const leave = (): void => {
+    audio.play('uiBack');
+    cancel();
+  };
+
+  // The same menu and sound controls as on the board, so a long wait can still be set up.
+  const openMenu = (): void => {
+    audio.play('uiClick');
+    modal((close) =>
+      h(
+        'div.modal.panel.game-menu',
+        null,
+        h('h2', null, t('menu')),
+        h('button.btn.big', { type: 'button', onclick: () => close() }, t('keepWaiting')),
+        h('button.btn', { type: 'button', onclick: () => (close(), openSettings()) }, html(iconSvg('gear')), t('settings')),
+        h('button.btn', { type: 'button', onclick: () => (close(), openHowToPlay()) }, html(iconSvg('book')), t('howToPlay')),
+        h('button.btn.danger', { type: 'button', onclick: () => (close(), leave()) }, t('leaveRoom')),
+      ),
+    );
+  };
+
   el.append(
+    h(
+      'div.waiting-tools',
+      null,
+      h('button.btn.icon-only.menu-btn', { type: 'button', 'aria-label': t('menu'), onclick: openMenu }, html(iconSvg('menu'))),
+      muteButton(),
+    ),
     h(
       'div.waiting-box.panel',
       null,
@@ -101,7 +131,7 @@ function waitingScreen(session: OnlineSession, cancel: () => void): Screen {
           t('copyLink'),
         ),
       ),
-      h('button.btn', { type: 'button', onclick: () => (audio.play('uiBack'), cancel()) }, t('leaveRoom')),
+      h('button.btn', { type: 'button', onclick: leave }, t('leaveRoom')),
     ),
   );
 
