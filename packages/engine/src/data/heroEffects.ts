@@ -24,7 +24,7 @@ export const HERO_EFFECTS: Record<HeroId, { passive: HeroPassive; ultimate: Effe
   alquimista: {
     passive: { randomResourcePerTurn: 3 },
     ultimate: [
-      { op: 'gainResource', resource: 'all', amount: 10 },
+      { op: 'gainResource', resource: 'all', amount: 7 },
       { op: 'keep', amount: 6 },
     ],
   },

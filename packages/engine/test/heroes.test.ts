@@ -56,9 +56,9 @@ const HERO_TESTS: Record<string, () => void> = {
     const total = Object.values(state.players[ME].resources).reduce((a, b) => a + b, 0);
     expect(total).toBe(3 * 8 + 3 * 2 + 3);
     expect(eventsOf(events, 'resourcesChanged')[0]!.reason).toEqual({ kind: 'hero', id: 'alquimista' });
-    // Ultimate: +10 of each resource and +6 Keep.
+    // Ultimate: +7 of each resource and +6 Keep.
     const after = ultimate(charged('alquimista')).state.players[ME];
-    expect(after.resources).toEqual({ piedra: 60, acero: 60, mana: 60 });
+    expect(after.resources).toEqual({ piedra: 57, acero: 57, mana: 57 });
     expect(after.keep).toBe(56);
   },
   saboteadora: () => {
