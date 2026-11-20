@@ -27,6 +27,7 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: PlayerId): Pla
     enchantments: p.enchantments.map((e) => ({ ...e })),
     burn: p.burn,
     frost: { ...p.frost },
+    rust: p.rust ?? 0,
     shield: p.shield,
     drawbridge: p.drawbridge,
     handRevealed: p.handRevealed,

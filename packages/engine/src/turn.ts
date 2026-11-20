@@ -253,6 +253,9 @@ export function endTurn(state: GameState, events: GameEvent[]): void {
   const self = state.players[player]!;
   state.actionsLeft = 0;
 
+  // Rust lasts for the rusted player's next N turns: it wears off as each of them ends.
+  if ((self.rust ?? 0) > 0) self.rust! -= 1;
+
   // Enchantments last for the owner's next N turns: the turn they are played
   // on does not count.
   for (const enchantment of [...self.enchantments]) {
