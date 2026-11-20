@@ -1500,7 +1500,9 @@
   position: absolute;
   inset: 0;
   display: flex;
-  padding: 16px;
+  /* The whole results panel fits the screen: sizes below follow the window height, so it never needs scrolling. */
+  padding: clamp(6px, 2vh, 16px) 16px;
+  padding: max(clamp(6px, 2dvh, 16px), env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(clamp(6px, 2dvh, 16px), env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: radial-gradient(circle at 50% 40%, rgb(40 28 10 / 55%), rgb(5 4 10 / 82%));
   opacity: 0;
   transition: opacity 0.5s, background 0.3s;
@@ -1533,10 +1535,10 @@
 .results-box {
   margin: auto;
   width: min(560px, 100%);
-  padding: 22px;
+  padding: clamp(12px, 2.6vh, 22px) clamp(14px, 4vw, 22px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(8px, 2vh, 16px);
   align-items: stretch;
   text-align: center;
   animation: resultsIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -1547,8 +1549,9 @@
 }
 
 .results-crest h1 {
-  font-size: clamp(2.2rem, 7vw, 3.8rem);
+  font-size: clamp(2rem, min(7vw, 7.5vh), 3.8rem);
   font-weight: 800;
+  line-height: 1.1;
   background: linear-gradient(180deg, #fff6d0 10%, #f3c766 45%, #b8741c 90%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1584,8 +1587,8 @@
 }
 
 .results-hero img {
-  width: 72px;
-  height: 72px;
+  width: clamp(44px, 8vh, 72px);
+  height: clamp(44px, 8vh, 72px);
   border-radius: 50%;
   object-fit: cover;
   object-position: 50% 28%;
@@ -1612,14 +1615,14 @@
 
 .results-stats td,
 .results-stats th {
-  padding: 5px 8px;
+  padding: clamp(2px, 0.55vh, 5px) 8px;
   border-bottom: 1px solid rgb(227 182 86 / 15%);
 }
 
 .results-stats td {
   font-family: var(--numeral);
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 2.4vh, 1.25rem);
   width: 25%;
 }
 
@@ -1642,6 +1645,11 @@
 .rematch-note {
   color: var(--muted);
   min-height: 1.2em;
+}
+
+/* No empty line under the stats until there is something to say. */
+.rematch-note:empty {
+  display: none;
 }
 
 /* Rematch: the hero screen again, over the board and the results. */
@@ -1988,29 +1996,104 @@
   }
 }
 
-@media (max-height: 560px) {
+/* Short landscape screens (phones on their side): two columns, the title, heroes and head-to-head
+   on the left and the statistics on the right, with the buttons underneath. */
+@media (max-height: 560px) and (orientation: landscape) {
   .results-box {
-    width: min(720px, 100%);
-    padding: 12px 16px;
-    gap: 8px;
+    width: min(760px, 100%);
+    padding: 10px 16px;
+    gap: 6px 18px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-areas:
+      'crest stats'
+      'heroes stats'
+      'h2h stats'
+      'note note'
+      'actions actions';
     align-items: center;
   }
 
-  .results-crest,
-  .rematch-note,
-  .results-actions {
-    grid-column: 1 / -1;
-  }
+  .results-crest { grid-area: crest; }
+  .results-heroes { grid-area: heroes; }
+  .results-h2h { grid-area: h2h; align-self: start; }
+  .results-stats { grid-area: stats; }
+  .rematch-note { grid-area: note; }
+  .results-actions { grid-area: actions; }
 
   .results-crest h1 {
-    font-size: 2rem;
+    font-size: clamp(1.6rem, 9vh, 2.2rem);
+  }
+
+  .results-crest p {
+    font-size: 0.9rem;
+    line-height: 1.2;
+  }
+
+  .results-hero {
+    gap: 2px;
   }
 
   .results-hero img {
-    width: 48px;
-    height: 48px;
+    width: clamp(36px, 11vh, 52px);
+    height: clamp(36px, 11vh, 52px);
+  }
+
+  .results-hero strong {
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .results-hero small {
+    font-size: 0.75rem;
+  }
+
+  .results-stats td {
+    font-size: 1rem;
+  }
+
+  .results-stats th {
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+
+  .results-stats td,
+  .results-stats th {
+    padding: clamp(2px, 1vh, 6px) 6px;
+  }
+
+  .results-actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .results-actions .btn {
+    min-height: 38px;
+    padding: 4px 16px;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+}
+
+/* Narrow upright windows: compact text and the three buttons in one row. */
+@media (max-width: 480px) and (orientation: portrait) {
+  .results-actions {
+    gap: 6px;
+  }
+
+  .results-actions .btn {
+    min-height: 40px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .results-stats th {
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
   }
 
   .results-stats td {
@@ -2019,12 +2102,61 @@
 
   .results-stats td,
   .results-stats th {
-    padding: 2px 6px;
+    padding-inline: 4px;
   }
 
-  .results-actions .btn.big {
-    min-height: 40px;
-    padding-block: 6px;
+  .results .results-h2h {
+    padding: 4px 8px;
+    column-gap: 8px;
+  }
+
+  .results .results-h2h .h2h-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+  }
+
+  .results .results-h2h small {
+    display: none;
+  }
+
+  .results .h2h-score {
+    font-size: 1.3rem;
+  }
+
+  .results-crest p {
+    font-size: 0.95rem;
+    line-height: 1.2;
+  }
+
+  .results-hero strong {
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .results-hero small {
+    font-size: 0.75rem;
+  }
+}
+
+/* Very small upright windows: a little tighter still. */
+@media (max-width: 480px) and (max-height: 620px) and (orientation: portrait) {
+  .results-box {
+    gap: 6px;
+    padding-block: 10px;
+  }
+
+  .results-crest h1 {
+    font-size: 1.8rem;
+  }
+
+  .results-hero img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .results-stats td,
+  .results-stats th {
+    padding-block: 1px;
   }
 }
 
