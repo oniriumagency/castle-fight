@@ -1,6 +1,6 @@
 import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
-import { density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
+import { consoleBrowser, density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
 import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
@@ -53,6 +53,8 @@ interface Particle {
   /** Per-frame scale growth (smoke) or shrink (sparks). */
   grow: number;
   baseScale: number;
+  /** Growing smoke stops here, so a cloud never covers half the screen. */
+  maxScale: number;
   stretch: boolean;
   alpha: number;
   colorFrom: number;
@@ -124,9 +126,16 @@ function lerpColor(a: number, b: number, t: number): number {
  * A single `backdrop.jpg` (sky and land in one) also works. Missing files keep
  * the drawn landscape for that layer.
  */
-const SKY = 'scenery/sky.jpg';
-const TERRAIN = 'scenery/terrain.png';
-const BACKDROP = 'scenery/backdrop.jpg';
+/**
+ * Consoles, phones and low effects load the light copies (`-lite`, about
+ * 2,400 px of sky instead of ~4,000): the full ones cost too much GPU memory
+ * there. PCs keep the full ones.
+ */
+function liteScenery(): boolean {
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return consoleBrowser() || effectsLow() || coarse;
+}
+const scenery = (name: string, ext: string, lite: boolean): string => `scenery/${name}${lite ? '-lite' : ''}.${ext}`;
 const TERRAIN_GROUND = 0.72;
 /** The sky is drawn this much wider than the screen, and sways across the extra. */
 const SKY_OVERSCAN = 0.12;
@@ -309,8 +318,9 @@ export class Battlefield {
 
   /** Swaps the drawn sky and land for the painted layers that exist. */
   private async loadBackdrop(): Promise<void> {
-    const [sky, terrain] = await Promise.all([loadArt(SKY), loadArt(TERRAIN)]);
-    const land = terrain ?? (await loadArt(BACKDROP));
+    const lite = liteScenery();
+    const [sky, terrain] = await Promise.all([loadArt(scenery('sky', 'jpg', lite)), loadArt(scenery('terrain', 'png', lite))]);
+    const land = terrain ?? (await loadArt(scenery('backdrop', 'jpg', lite)));
     if (sky) {
       this.paintedSky.texture = sky;
       this.skyTile.texture = sky;
@@ -694,6 +704,7 @@ export class Battlefield {
         spin: shape === 'spark' ? 0 : (Math.random() - 0.5) * (shape === 'rubble' ? 0.3 : 0.08),
         grow: opts.grow ?? (shape === 'smoke' ? 1.012 : shape === 'rubble' || shape === 'crystal' ? 1 : 0.992),
         baseScale: base,
+        maxScale: shape === 'smoke' ? base * (effectsLow() ? 2.2 : 3.5) : Infinity,
         stretch: shape === 'spark' || shape === 'flame',
         alpha,
         colorFrom: color,
@@ -985,7 +996,7 @@ export class Battlefield {
         p.sprite.scale.set(p.baseScale * Math.min(2.4, 0.7 + speed * 0.2), p.baseScale);
       } else {
         p.sprite.rotation += p.spin * step;
-        p.baseScale *= p.grow ** step;
+        p.baseScale = Math.min(p.maxScale, p.baseScale * p.grow ** step);
         p.sprite.scale.set(p.baseScale);
       }
     }
@@ -1071,7 +1082,9 @@ export class Battlefield {
 
   private updateWeather(dt: number): void {
     const kind = this.mood.weather;
-    if (kind === 'none' || settings.get().reducedMotion) return;
+    // Consoles skip the event weather (Terremoto dust, Ocaso embers...): their
+    // browser has little to spare, and the tab froze when it arrived.
+    if (kind === 'none' || settings.get().reducedMotion || consoleBrowser()) return;
     if (kind === 'rain') {
       // Now and then, lightning over the hills and a roll of thunder.
       this.lightningTimer -= dt;
@@ -1083,7 +1096,9 @@ export class Battlefield {
         setTimeout(() => this.onAmbient?.('thunder'), 250 + Math.random() * 600);
       }
     }
-    this.weatherTimer += dt / (effectsLow() ? 0.5 : 1);
+    // Half as much weather on low effects. After a long stall (a slow frame,
+    // a tab in the background) it does not try to catch up all at once.
+    this.weatherTimer = Math.min(this.weatherTimer + dt * (effectsLow() ? 0.5 : 1), 1000);
     const every = kind === 'rain' ? 14 : kind === 'snow' ? 60 : 120;
     while (this.weatherTimer > every) {
       this.weatherTimer -= every;
@@ -1102,6 +1117,7 @@ export class Battlefield {
           this.burst(x, -10, { count: 1, color: [0xe0a040, 0xc06a2a, 0xd8c060], speed: 1.4, angle: Math.PI / 2 + 0.4, spread: 0.6, gravity: 0.006, size: 8, life: 8000, blend: 'normal' });
           break;
         case 'dust':
+          if (effectsLow()) break;
           this.burst(x, this.groundY - Math.random() * 30, { count: 1, texture: 'smoke', color: 0xc8a070, speed: 0.8, angle: 0, spread: 0.6, gravity: -0.002, size: 50, life: 3000, alpha: 0.6, grow: 1.004 });
           break;
       }

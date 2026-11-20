@@ -1,6 +1,7 @@
 import type { BattleEventId, GameEvent, HeroId, PlayerId, School } from '@cardcraft-castles/engine';
 import { getCard } from '@cardcraft-castles/engine';
 import { animScale, settings } from '../app/settings';
+import { effectsLow } from '../app/quality';
 import type { Battlefield, ProjectileStyle } from '../scene/battlefield';
 import { heroColor, skyFor } from '../ui/theme';
 import { audio, type Cue } from './audio';
@@ -516,12 +517,14 @@ export const fx = {
     const sides = Array.from({ length: field.castleCount }, (_, i) => i);
     switch (eventId) {
       case 'terremoto':
-        for (let i = 0; i < 6; i++) setTimeout(() => field.shake(14), i * 220);
+        // Kept light: on a console (Edge on Xbox) the old dust clouds, big
+        // and growing, overloaded the GPU and blanked the screen.
+        for (let i = 0; i < 4; i++) setTimeout(() => field.shake(12), i * 260);
         for (const side of sides) {
           const base = field.anchor(side, 'base');
-          field.burst(base.x, base.y - 6, { count: 14, texture: 'smoke', color: 0xa08460, speed: 2, spread: Math.PI * 0.9, gravity: -0.01, size: 80, life: 2200, alpha: 0.6, area: { w: 160, h: 10 } });
+          if (!effectsLow()) field.burst(base.x, base.y - 6, { count: 8, texture: 'smoke', color: 0xa08460, speed: 2, spread: Math.PI * 0.9, gravity: -0.01, size: 70, life: 1800, alpha: 0.55, grow: 1.006, area: { w: 160, h: 10 } });
           const top = field.anchor(side, 'keep');
-          field.burst(top.x, top.y + 30, { count: 20, texture: 'rubble', speed: 2, gravity: 0.3, size: 8, life: 1600, area: { w: 60, h: 60 } });
+          field.burst(top.x, top.y + 30, { count: 16, texture: 'rubble', speed: 2, gravity: 0.3, size: 8, life: 1600, area: { w: 60, h: 60 } });
         }
         break;
       case 'tormenta':

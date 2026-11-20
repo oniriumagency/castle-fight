@@ -86,8 +86,27 @@ export function towerShadeTexture(): Texture {
   return Texture.from(c);
 }
 
+/**
+ * Sky gradients and glows are asked for again on every battle event; each one
+ * is painted once and reused, so a long game does not pile up GPU textures.
+ */
+const painted = new Map<string, Texture>();
+
+function once(key: string, paint: () => Texture): Texture {
+  let texture = painted.get(key);
+  if (!texture) {
+    texture = paint();
+    painted.set(key, texture);
+  }
+  return texture;
+}
+
 /** Top to bottom gradient used for skies. */
 export function gradientTexture(stops: [number, string][], height = 256): Texture {
+  return once(`gradient|${height}|${JSON.stringify(stops)}`, () => paintGradient(stops, height));
+}
+
+function paintGradient(stops: [number, string][], height: number): Texture {
   const [c, g] = canvas(4, height);
   const grad = g.createLinearGradient(0, 0, 0, height);
   for (const [at, color] of stops) grad.addColorStop(at, color);
@@ -98,6 +117,10 @@ export function gradientTexture(stops: [number, string][], height = 256): Textur
 
 /** Soft round glow (sun, magic, light pools). */
 export function glowTexture(color = '255,230,170', size = 128): Texture {
+  return once(`glow|${size}|${color}`, () => paintGlow(color, size));
+}
+
+function paintGlow(color: string, size: number): Texture {
   const [c, g] = canvas(size, size);
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   grad.addColorStop(0, `rgba(${color},1)`);

@@ -17,6 +17,9 @@ const FOLDERS = ['cards', 'heroes', 'events', 'scenery'];
 const WIDTH = 720;
 /** The painted battlefield fills the whole screen, so it keeps more pixels. */
 const WIDTHS = { scenery: 2560 };
+/** The light scenery copies: about 2,400 px of sky and 1,600 px of terrain. */
+const LITE_SKY_HEIGHT = 720;
+const LITE_WIDTH = 1600;
 
 async function mtime(path) {
   try {
@@ -87,23 +90,32 @@ for (const folder of FOLDERS) {
   for (const file of files) {
     if (!/\.(jpe?g|png)$/i.test(file)) continue;
     const input = join(source, folder, file);
-    const output = join(target, folder, file.replace(/\.(jpe?g|png)$/i, '.webp'));
-    if ((await mtime(output)) >= (await mtime(input))) {
-      skipped++;
-      continue;
+    // The painted battlefield also gets a light copy (`-lite`) for consoles,
+    // phones and low effects: the full sky alone is ~4000 px wide, too much
+    // GPU memory for a console browser and over some GPUs' texture limit.
+    const variants = folder === 'scenery' ? [false, true] : [false];
+    for (const lite of variants) {
+      const output = join(target, folder, file.replace(/\.(jpe?g|png)$/i, lite ? '-lite.webp' : '.webp'));
+      if ((await mtime(output)) >= (await mtime(input))) {
+        skipped++;
+        continue;
+      }
+      // The sky is sized by its height (it fills the screen top to horizon); a
+      // seamless panorama can be several screens wide.
+      const size =
+        folder === 'scenery' && file.startsWith('sky')
+          ? { height: lite ? LITE_SKY_HEIGHT : 1200 }
+          : { width: lite ? LITE_WIDTH : (WIDTHS[folder] ?? WIDTH) };
+      const resized = sharp(input).resize({ ...size, withoutEnlargement: true });
+      const image =
+        folder === 'scenery' && file.startsWith('terrain')
+          ? await cutOutSky(resized)
+          : folder === 'scenery' && file.startsWith('sky')
+            ? await closeSeam(resized)
+            : resized;
+      await image.webp({ quality: folder === 'scenery' ? 84 : 80, alphaQuality: 90 }).toFile(output);
+      built++;
     }
-    // The sky is sized by its height (it fills the screen top to horizon); a
-    // seamless panorama can be several screens wide.
-    const size = folder === 'scenery' && file.startsWith('sky') ? { height: 1200 } : { width: WIDTHS[folder] ?? WIDTH };
-    const resized = sharp(input).resize({ ...size, withoutEnlargement: true });
-    const image =
-      folder === 'scenery' && file.startsWith('terrain')
-        ? await cutOutSky(resized)
-        : folder === 'scenery' && file.startsWith('sky')
-          ? await closeSeam(resized)
-          : resized;
-    await image.webp({ quality: folder === 'scenery' ? 84 : 80, alphaQuality: 90 }).toFile(output);
-    built++;
   }
 }
 console.log(`art: ${built} converted, ${skipped} up to date -> ${relative(process.cwd(), target)}`);
