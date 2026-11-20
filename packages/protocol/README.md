@@ -50,6 +50,18 @@ online.inviteUrl(room.id); // https://tu-juego/?room=abcd2345
 
 Todos los emisores tienen también `once(tipo, filtro?)`, que devuelve una promesa con el siguiente evento.
 
+## Observadores
+
+Si la sala está llena (`joinRoom` acaba con `roomFull`), se puede ver la partida sin asiento:
+
+```ts
+const watch = online.spectateRoom(room.id);
+watch.on('watching', ({ room }) => renderSeats(room));
+watch.on('state', ({ view, resumed }) => (resumed ? draw(view) : animate(view))); // view.spectator === true
+```
+
+El servidor manda a los observadores una vista sin ninguna mano visible (solo las reveladas por una carta), sin las opciones de las elecciones de nadie y con `viewer: 0`. No pueden jugar, enviar emotes ni pedir revancha. Caben `MAX_SPECTATORS` (8) por sala; `room.spectators` dice cuántos hay.
+
 ## Reconexión
 
 Las conexiones se reintentan solas con espera creciente (de 0,4 s a 10 s) y comprueban cada 20 s que siguen vivas. Al volver, la sala recupera el asiento con el token que el servidor dio en `welcome`, guardado en `localStorage`. Recargar la página y llamar otra vez a `joinRoom` con el mismo id también recupera el asiento (`online.hasSeat(id)` dice si lo hay). Tras recuperar, llega un `state` con `resumed: true` y sin eventos: hay que pintar la vista directamente.

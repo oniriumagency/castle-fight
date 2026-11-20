@@ -32,6 +32,7 @@ export {
   RUST,
   costResource,
   attackBonus,
+  attackBonusParts,
   enchantmentLife,
   roundOf,
   twilightLevel,
@@ -43,6 +44,7 @@ export {
   leaderOf,
   ultimateThreshold,
 } from './core';
+export type { AttackBonusPart } from './core';
 
 export {
   CARDS,

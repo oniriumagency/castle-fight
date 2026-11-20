@@ -126,6 +126,8 @@ export function parseRoomClientMessage(text: string): RoomClientMessage | null {
     case 'leave':
     case 'sync':
       return { type: raw.type };
+    case 'watch':
+      return typeof raw.v === 'number' ? { type: 'watch', v: raw.v } : null;
     default:
       return null;
   }

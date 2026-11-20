@@ -30,7 +30,24 @@ import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilig
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
-import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize, withCopiedCard, type Boost } from '../../ui/card';
+import {
+  boardBuffs,
+  buffsKey,
+  buffsOnCard,
+  cardBack,
+  cardFace,
+  eventCard,
+  heroCard,
+  historyEntry,
+  markDiscarded,
+  parseHistoryEntry,
+  rulesInnerHtml,
+  rulesOf,
+  setTableSize,
+  withCopiedCard,
+  type Boost,
+  type CardBuffs,
+} from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
 import { heroCss, skyFor } from '../../ui/theme';
@@ -115,8 +132,15 @@ class BoardScreen implements Screen {
   private readonly banner = h('div.turn-banner', { 'aria-live': 'polite' });
   private readonly deckPile = h('div.pile.deck-pile');
   private readonly discardPile = h('div.pile.discard-pile');
+  private readonly piles = h('div.piles', null, this.deckPile, this.discardPile);
   private readonly turnLabel = h('div.turn-label');
   private readonly timer = h('div.timer', { hidden: true });
+  /** "Observer mode": a spectator, or a player whose castle fell in a free-for-all. */
+  private readonly observerTag = h('div.observer-tag', { hidden: true });
+  /** People watching the online game without a seat. */
+  private readonly spectatorChip = h('div.spectator-chip', { hidden: true });
+  /** Whether the board is in observer mode (no hand, the castles still fighting get the room). */
+  private observing = false;
   private readonly eventChip = h('button.event-chip', { type: 'button' });
   private readonly twilightChip = h('button.twilight-chip', { type: 'button', hidden: true });
   /** The view being animated towards (`view` only moves once its events have played). */
@@ -161,7 +185,7 @@ class BoardScreen implements Screen {
     const sides = Array.from({ length: this.count }, (_, side) => side);
     this.panels = sides.map((side) => new SidePanel(side));
     this.plaques = sides.map((side) => new CastlePlaque(side, keepWin));
-    this.oppHands = sides.map((side) => h('div.opp-hand', { class: `opp-hand-${side}`, 'aria-label': 'opponent hand', hidden: side === 0 }));
+    this.oppHands = sides.map((side) => h('div.opp-hand', { class: `opp-hand-${side}`, 'aria-label': 'opponent hand', hidden: side === 0 && !session.spectator }));
     this.history = sides.map(() => []);
     this.shownHistory = sides.map(() => []);
     this.logPanel = h('aside.log-panel', { hidden: true }, h('h3', null, t('log')), this.logList);
@@ -179,7 +203,7 @@ class BoardScreen implements Screen {
       },
       html(iconSvg('scroll')),
     );
-    const emoteBtn = session.emote ? this.emoteButton() : null;
+    const emoteBtn = session.emote && !session.spectator ? this.emoteButton() : null;
 
     this.deckPile.append(cardBack(), h('span.pile-count'));
     this.discardPile.append(h('div.pile-empty'), h('span.pile-count'));
@@ -203,13 +227,14 @@ class BoardScreen implements Screen {
 
     this.el = h(
       'div.board',
-      { class: `mode-${session.kind}${this.count > 2 ? ' ffa' : ''}` },
-      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer), h('div.event-box', null, this.eventChip, this.twilightChip), h('div.top-right', null, emoteBtn, muteButton(), logBtn)),
+      { class: `mode-${session.kind}${this.count > 2 ? ' ffa' : ''}${session.spectator ? ' spectator' : ''}` },
+      h('div.topbar', null, menuBtn, h('div.turn-box', null, this.turnLabel, this.timer, this.observerTag), h('div.event-box', null, this.eventChip, this.twilightChip), h('div.top-right', null, this.spectatorChip, emoteBtn, muteButton(), logBtn)),
       this.panels[0].el,
       // Free-for-all: the rivals' panels stack in one column, so either can grow without covering the other.
       this.count > 2 ? h('div.rival-column', null, ...this.panels.slice(1).map((p) => p.el)) : this.panels[1].el,
-      h('div.board-field', null, ...this.plaques.map((p) => p.el), h('div.piles', null, this.deckPile, this.discardPile)),
-      ...this.oppHands.slice(1),
+      h('div.board-field', null, ...this.plaques.map((p) => p.el), this.piles),
+      // A spectator sees every hand from behind, the left player's too.
+      ...this.oppHands.slice(session.spectator ? 0 : 1),
       this.stage,
       this.hand.el,
       this.ultMode.button,
@@ -314,6 +339,7 @@ class BoardScreen implements Screen {
   }
 
   relocalize(): void {
+    this.observerTag.replaceChildren(html(iconSvg('eye')), h('span', null, t('observerMode')));
     this.render();
     this.logPanel.querySelector('h3')!.textContent = t('log');
   }
@@ -369,6 +395,11 @@ class BoardScreen implements Screen {
     return this.view?.players[seat].hero ?? this.session.seats[seat].hero;
   }
 
+  /** What adds to the numbers on `seat`'s cards right now (hero, enchantments, Twilight Fury). */
+  private buffsOf(seat: PlayerId): CardBuffs | HeroId {
+    return this.view ? boardBuffs(this.view, seat) : this.heroOf(seat);
+  }
+
   private seatOfSide(side: number): PlayerId {
     return (this.leftSeat + side) % this.count;
   }
@@ -397,6 +428,16 @@ class BoardScreen implements Screen {
     const touch = matchMedia('(hover: none)').matches;
     // Phones get a hand made to be read: no overlap, no part below the edge.
     const phonePortrait = portrait && w < 640;
+    // Observer mode on a phone: the fallen castles leave the field to the ones
+    // still fighting, and the player's own panel goes with theirs.
+    const offField = this.observing && (phonePortrait || short || w < 760) ? this.offFieldSides() : [];
+    this.field.setOffField(offField);
+    this.el.classList.toggle('self-off', offField.includes(0));
+    this.sides().forEach((side) => {
+      const off = offField.includes(side);
+      this.plaques[side].el.hidden = off;
+      this.oppHands[side].classList.toggle('off-field', off);
+    });
     let cardW: number;
     let peek: number;
     if (phonePortrait) {
@@ -425,36 +466,53 @@ class BoardScreen implements Screen {
     this.el.classList.toggle('narrow', w < 760);
     this.el.classList.toggle('phone-portrait', phonePortrait);
     this.el.classList.toggle('touch', touch);
+    // Phones in landscape: the piles go to the top bar, beside the menu, so the
+    // castles and their plaques have the field to themselves.
+    const topbar = this.el.querySelector<HTMLElement>('.topbar')!;
+    const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
+    if (short && this.piles.parentElement !== topbar) topbar.insertBefore(this.piles, topbar.children[1] ?? null);
+    else if (!short && this.piles.parentElement !== fieldEl) fieldEl.append(this.piles);
 
-    const left = this.panels[0].el.getBoundingClientRect();
+    const leftRect = this.panels[0].el.getBoundingClientRect();
+    // A hidden panel measures 0 × 0 at the top left: the field starts at the edge.
+    const left = offField.includes(0) ? { right: 0, bottom: 0 } : leftRect;
     // Free-for-all: both rivals' panels share a column on the right.
     const right = (this.el.querySelector('.rival-column') ?? this.panels[1].el).getBoundingClientRect();
-    const top = this.el.querySelector('.topbar')!.getBoundingClientRect();
-    // Top of the resting hand, plus room for the castle plaques.
-    const handTop = hgt - 6 - cardW * 1.4 * (1 - peek) - (phonePortrait ? 6 : 0);
+    const top = topbar.getBoundingClientRect();
+    // Top of the resting hand, plus room for the castle plaques. An observer has no hand.
+    const handTop = this.observing ? hgt - 10 : hgt - 6 - cardW * 1.4 * (1 - peek) - (phonePortrait ? 6 : 0);
     const plaqueRoom = short ? 30 : 46;
     const fieldLeft = portrait ? 0 : left.right;
     const fieldRight = portrait ? w : right.left;
     const fieldTop = portrait ? Math.max(top.bottom, left.bottom, right.bottom) : top.bottom;
     const rect = { left: fieldLeft, top: fieldTop, width: Math.max(200, fieldRight - fieldLeft), height: Math.max(90, (handTop - plaqueRoom - fieldTop) / 0.94) };
     this.field.layout(rect);
-    const fieldEl = this.el.querySelector<HTMLElement>('.board-field')!;
     Object.assign(fieldEl.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
     for (const side of this.sides()) {
       const base = this.field.anchor(side, 'base');
       this.plaques[side].place(base.x - rect.left, base.y - rect.top + 4);
     }
-    // Free-for-all: each rival's hand hangs above their castle.
-    if (this.count > 2) {
-      for (const side of this.sides().slice(1)) {
-        const keep = this.field.anchor(side, 'base');
-        this.oppHands[side].style.left = `${keep.x}px`;
-      }
-    }
+    this.placeOppHands();
     const deck = this.deckPile.getBoundingClientRect();
     this.hand.deckPoint = { x: deck.left, y: deck.top };
     this.hand.layout();
     if (this.shown) this.field.setCastles(this.castleValues());
+  }
+
+  /**
+   * Free-for-all: each rival's hand hangs above their castle (a spectator's
+   * board: every hand). On a phone in landscape the piles sit at the left of
+   * the top bar: a hand above a castle on that edge moves clear of them.
+   */
+  private placeOppHands(): void {
+    if (this.count < 3 && !this.session.spectator) return;
+    const inTopbar = this.el.classList.contains('short') && this.piles.parentElement?.classList.contains('topbar');
+    const pilesRight = inTopbar ? this.piles.getBoundingClientRect().right + 8 : 0;
+    for (const side of this.sides().slice(this.session.spectator ? 0 : 1)) {
+      const keep = this.field.anchor(side, 'base');
+      const half = this.oppHands[side].getBoundingClientRect().width / 2;
+      this.oppHands[side].style.left = `${Math.max(keep.x, pilesRight + half)}px`;
+    }
   }
 
   /** Castle heights by side. */
@@ -475,6 +533,47 @@ class BoardScreen implements Screen {
     const winner = view.result?.winner;
     return !!view.players[seat].eliminated || (view.phase === 'finished' && winner !== null && winner !== undefined && winner !== seat);
   }
+
+  /**
+   * Observer mode: a spectator, or a player whose castle fell in a
+   * free-for-all while the others fight on. Their hand is hidden.
+   */
+  private isObserving(view: PlayerView | null): boolean {
+    if (this.session.spectator || view?.spectator) return true;
+    return this.count > 2 && !!view?.players[this.leftSeat]?.eliminated;
+  }
+
+  /** Sides whose castle may leave the field for an observer: the fallen ones, while two or more still fight. */
+  private offFieldSides(): number[] {
+    const view = this.view;
+    if (!view || this.count < 3) return [];
+    const fallen = this.seats().filter((seat) => view.players[seat].eliminated);
+    if (this.count - fallen.length < 2) return [];
+    return fallen.map((seat) => this.sideOf(seat));
+  }
+
+  /** Switch observer mode on or off when it changes, and lay the board out again. */
+  private syncObserver(): void {
+    const view = this.view;
+    const on = this.isObserving(view);
+    // The castles to take off the field change as players fall.
+    const offKey = on ? this.offFieldSides().join(',') : '';
+    if (on === this.observing && offKey === this.offKey) return;
+    const changed = on !== this.observing;
+    this.observing = on;
+    this.offKey = offKey;
+    this.el.classList.toggle('observer', on);
+    this.observerTag.hidden = !on;
+    this.observerTag.replaceChildren(html(iconSvg('eye')), h('span', null, t('observerMode')));
+    this.observerTag.title = this.session.spectator ? t('observerHintSpectator') : t('observerHintFallen');
+    if (changed && on) {
+      this.hand.select(null);
+      this.closeDiscard?.();
+    }
+    this.layout();
+  }
+
+  private offKey = '';
 
   /** Gravestones on the fallen castles, without animation (resume, end of an update). */
   private syncGraves(view: PlayerView): void {
@@ -518,9 +617,14 @@ class BoardScreen implements Screen {
         }
         break;
       }
-      case 'presence':
+      case 'presence': {
         this.presence = e.presence;
+        const n = e.presence.spectators ?? 0;
+        this.spectatorChip.hidden = n === 0;
+        this.spectatorChip.replaceChildren(html(iconSvg('eye')), h('span', null, String(n)));
+        this.spectatorChip.title = t('spectatorsWatching', { n });
         break;
+      }
       case 'rematch':
         break;
     }
@@ -573,6 +677,7 @@ class BoardScreen implements Screen {
     this.syncGraves(this.view);
     this.handSeat = this.view.viewer;
     this.handModel = [...this.view.players[this.view.viewer].hand];
+    this.syncObserver();
     this.render();
     this.afterSettled();
   }
@@ -588,7 +693,7 @@ class BoardScreen implements Screen {
         this.resultsShown = true;
         const winner = view.result.winner;
         const announce = !this.fallenShown;
-        if (announce) fx.gameOver(winner === null ? null : this.session.kind === 'local' ? true : this.session.isLocal(winner), winner === null ? null : this.sideOf(winner), this.fxContext());
+        if (announce) fx.gameOver(winner === null ? null : this.session.kind === 'local' || this.session.spectator ? true : this.session.isLocal(winner), winner === null ? null : this.sideOf(winner), this.fxContext());
         // After an early defeat the results are already up: only the rivals' fight ended.
         if (!this.fallenShown) this.openResults(view);
       }
@@ -688,7 +793,7 @@ class BoardScreen implements Screen {
 
     // Hand of the player looking at the screen.
     const handSeat = this.handSeat ?? view.viewer;
-    this.hand.el.classList.toggle('concealed', !this.curtain.hidden || handSeat !== view.viewer);
+    this.hand.el.classList.toggle('concealed', !this.curtain.hidden || handSeat !== view.viewer || this.observing);
     // Ultimate ready: golden aura and the hero button next to the hand.
     const mineNow = this.shown[handSeat];
     const ultReady = !!mineNow?.ultimateReady && this.curtain.hidden && handSeat === view.viewer && view.phase !== 'finished';
@@ -713,8 +818,10 @@ class BoardScreen implements Screen {
 
     // Rivals' hands: backs, or faces when revealed.
     for (const oppSeat of this.seats()) {
-      if (oppSeat !== handSeat) this.renderOppHand(oppSeat);
+      if (oppSeat !== handSeat || this.session.spectator) this.renderOppHand(oppSeat);
     }
+    // Their width changes with the cards in them.
+    this.placeOppHands();
 
     // Piles.
     const me = this.shown[handSeat];
@@ -756,23 +863,24 @@ class BoardScreen implements Screen {
   private renderOppHand(seat: PlayerId): void {
     const el = this.oppHands[this.sideOf(seat)];
     const oppCards = this.shown![seat].hand;
-    const oppHero = this.heroOf(seat);
-    if (el.childElementCount === oppCards.length && el.dataset.key === JSON.stringify(oppCards)) return;
-    el.dataset.key = JSON.stringify(oppCards);
+    const oppBuffs = this.buffsOf(seat);
+    const key = JSON.stringify(oppCards) + (typeof oppBuffs === 'string' ? oppBuffs : buffsKey(oppBuffs));
+    if (el.childElementCount === oppCards.length && el.dataset.key === key) return;
+    el.dataset.key = key;
     if (this.pilePreview && !this.discardPile.matches(':hover')) this.hidePilePreview();
     el.replaceChildren(
       ...oppCards.map((c) => {
-        const card = c.cardId ? cardFace(c.cardId, { calm: true, hero: oppHero }) : cardBack();
+        const card = c.cardId ? cardFace(c.cardId, { calm: true, ...look(oppBuffs) }) : cardBack();
         card.dataset.uid = String(c.uid);
         if (c.cardId) {
           const id = c.cardId;
           card.classList.add('revealed');
           card.addEventListener('click', () => {
             this.hidePilePreview();
-            this.inspectCard(id, oppHero);
+            this.inspectCard(id, oppBuffs);
           });
           card.addEventListener('pointerenter', (e) => {
-            if (e.pointerType === 'mouse') this.showCardPreview(id, card.getBoundingClientRect(), 'below', oppHero);
+            if (e.pointerType === 'mouse') this.showCardPreview(id, card.getBoundingClientRect(), 'below', oppBuffs);
           });
           card.addEventListener('pointerleave', () => this.hidePilePreview());
         }
@@ -911,6 +1019,7 @@ class BoardScreen implements Screen {
     this.shown = view.players.map(clonePlayer);
     this.shownActive = view.active;
     this.handSeat = view.viewer;
+    this.syncObserver();
     if (starting) {
       // Castles rise from the ground and the hand is dealt.
       for (const side of this.sides()) this.field.setFallen(side, false);
@@ -1311,7 +1420,7 @@ class BoardScreen implements Screen {
 
   /** The rect a card leaves from: its element in my hand, or the opponent's hand. */
   private takeFromHand(seat: PlayerId, uid: number): DOMRect {
-    if (seat === this.handSeat) {
+    if (seat === this.handSeat && !this.session.spectator) {
       const el = this.hand.detach(uid);
       if (el) {
         const rect = el.getBoundingClientRect();
@@ -1372,16 +1481,28 @@ class BoardScreen implements Screen {
     const pips = Array.from({ length: 9 }, (_, i) =>
       h('i.pip', { style: `left:${25 + (i % 3) * 25}%;top:${25 + Math.floor(i / 3) * 25}%` }),
     );
+    // The 1 is a red skull: the face that blows up in your hands.
+    const skull = html(
+      '<svg class="skull" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<defs><linearGradient id="dice-skull-red" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="#ff6a4a"/><stop offset=".55" stop-color="#c8301c"/><stop offset="1" stop-color="#7a1408"/>' +
+        '</linearGradient></defs>' +
+        '<path class="bone" d="M12 2.4c-5 0-8.6 3.5-8.6 8.1 0 2.6 1.1 4.6 2.9 5.8v2.6c0 .9.7 1.6 1.6 1.6h.9v-2.1h1.5v2.1h3.4v-2.1h1.5v2.1h.9c.9 0 1.6-.7 1.6-1.6v-2.6c1.8-1.2 2.9-3.2 2.9-5.8 0-4.6-3.6-8.1-8.6-8.1z"/>' +
+        '<path class="holes" d="M8.4 9.3c1.4 0 2.5 1 2.5 2.3S9.9 14 8.6 14 6 13 6 11.6s1-2.3 2.4-2.3zm7.2 0c1.4 0 2.4 1 2.4 2.3S17 14 15.4 14s-2.3-1-2.3-2.4 1.1-2.3 2.5-2.3zM12 14.3l1.3 2.4h-2.6z"/>' +
+        '<path class="shine" d="M7.2 5.6c1.2-1 2.8-1.5 4.3-1.5" />' +
+        '</svg>',
+    ).firstElementChild!;
     const face = (n: number): void => {
-      const on = PIPS[n] ?? [];
+      const on = n === 1 ? [] : (PIPS[n] ?? []);
       pips.forEach((pip, i) => pip.classList.toggle('on', on.includes(i)));
+      skull.classList.toggle('on', n === 1);
     };
     const caption = t(outcome === 'hit' ? 'diceHit' : outcome === 'backfire' ? 'diceBackfire' : 'diceMiss');
     const at = this.playedCard?.getBoundingClientRect() ?? this.stage.getBoundingClientRect();
     const box = h(
       'div.dice-roll',
       { 'aria-hidden': 'true', style: `left:${at.left + at.width / 2}px;top:${at.top + at.height * 0.42}px` },
-      h('div.die', null, ...pips),
+      h('div.die', null, ...pips, skull),
       h('strong', null, caption),
     );
     this.floaters.appendChild(box);
@@ -1493,10 +1614,10 @@ class BoardScreen implements Screen {
    * discard pile, or a revealed card of the rival). Not on touch screens,
    * where a tap opens the inspect view instead.
    */
-  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId, discarded = false, boost: Boost = null): void {
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
-    const big = markBoost(cardFace(cardId, { calm: true, hero }), cardId, boost);
+    const big = markBoost(cardFace(cardId, { calm: true, ...look(hero) }), cardId, boost);
     if (discarded) markDiscarded(big);
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
@@ -1859,7 +1980,7 @@ class BoardScreen implements Screen {
       const btn = h(
         'button.choice-option.card-option.discard-option',
         { type: 'button', 'aria-pressed': 'false' },
-        markDiscarded(cardFace(c.cardId!, { calm: true, hero: this.hand.context ? this.heroOf(this.hand.context.seat) : undefined })),
+        markDiscarded(cardFace(c.cardId!, { calm: true, buffs: this.hand.buffs() })),
       );
       btn.addEventListener('click', () => {
         const at = picked.indexOf(c.uid);
@@ -1926,7 +2047,8 @@ class BoardScreen implements Screen {
     const cardId = this.hand.cardIdOf(uid);
     if (!ctx || !cardId) return;
     const reason = blockReason(ctx, cardId);
-    const big = cardFace(cardId, { tilt: true, cost: undefined, hero: this.heroOf(ctx.seat) });
+    const buffs = this.hand.buffs();
+    const big = cardFace(cardId, { tilt: true, cost: undefined, buffs });
     const handCard = this.hand.elementOf(uid);
     big.classList.toggle('combo', !reason && handCard?.classList.contains('combo') === true);
     big.classList.toggle('boosted', !reason && handCard?.classList.contains('boosted') === true);
@@ -1946,6 +2068,8 @@ class BoardScreen implements Screen {
         if (this.refreshInspect === refresh) this.refreshInspect = null;
         this.hand.select(null);
       },
+      null,
+      buffsOnCard(cardId, buffs),
     );
     // Kept in step with the game while it stays open (for example the rival's turn ends).
     const refresh = (): void => {
@@ -1964,6 +2088,14 @@ class BoardScreen implements Screen {
       }
       const cost = handCard.querySelector('.cost');
       if (cost) big.querySelector('.cost')?.replaceWith(cost.cloneNode(true));
+      // An enchantment ran out or a new bonus started: the "+X" follow.
+      const buffsNow = this.hand.buffs();
+      if ((big.dataset.buffs ?? '') !== buffsKey(buffsNow)) {
+        const rules = big.querySelector('.rules > span');
+        if (rules) rules.innerHTML = rulesInnerHtml(cardId, buffsNow);
+        big.dataset.buffs = buffsKey(buffsNow);
+        panel.updateBuffs(buffsOnCard(cardId, buffsNow));
+      }
     };
     this.refreshInspect = refresh;
   }
@@ -1971,7 +2103,14 @@ class BoardScreen implements Screen {
   /** Updates the open hand card view after a state change. */
   private refreshInspect: (() => void) | null = null;
 
-  private openInspect(card: HTMLElement, text: string, actions?: Parameters<typeof inspectPanel>[0]['actions'], onClose?: () => void, extra?: HTMLElement | null): InspectPanel {
+  private openInspect(
+    card: HTMLElement,
+    text: string,
+    actions?: Parameters<typeof inspectPanel>[0]['actions'],
+    onClose?: () => void,
+    extra?: HTMLElement | null,
+    buffs?: Parameters<typeof inspectPanel>[0]['buffs'],
+  ): InspectPanel {
     this.closeInspect?.();
     let closed = false;
     const close = (): void => {
@@ -1982,22 +2121,22 @@ class BoardScreen implements Screen {
       if (this.closeInspect === close) this.closeInspect = null;
       onClose?.();
     };
-    const panel = inspectPanel({ card, text, actions, close, extra });
+    const panel = inspectPanel({ card, text, actions, close, extra, buffs });
     this.layer.appendChild(panel);
     requestAnimationFrame(() => panel.classList.add('in'));
     this.closeInspect = close;
     return panel;
   }
 
-  private inspectCard(cardId: string, hero?: HeroId, discarded = false, boost: Boost = null, copied: string | null = null): void {
+  private inspectCard(cardId: string, hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null, copied: string | null = null): void {
     audio.play('cardSelect');
-    const face = markBoost(cardFace(cardId, { tilt: true, hero }), cardId, boost);
+    const face = markBoost(cardFace(cardId, { tilt: true, ...look(hero) }), cardId, boost);
     if (discarded) markDiscarded(face);
     // A Mirage from the history shows, on its right, the card it copied.
     const extra = copied
-      ? h('div.inspect-copied', null, h('p.inspect-copied-label', null, t('copiedCard')), cardFace(copied, { tilt: true, hero }))
+      ? h('div.inspect-copied', null, h('p.inspect-copied-label', null, t('copiedCard')), cardFace(copied, { tilt: true, ...look(hero) }))
       : null;
-    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra);
+    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra, typeof hero === 'object' ? buffsOnCard(cardId, hero) : undefined);
   }
 
   private inspectHero(heroId: string): void {
@@ -2130,7 +2269,7 @@ class BoardScreen implements Screen {
     const confirmBtn = h('button.btn.primary', { type: 'button' }) as HTMLButtonElement;
     const options = uids.map((uid) => {
       const card = hand.find((c) => String(c.uid) === uid);
-      const face = card?.cardId ? cardFace(card.cardId, { calm: true, hero: this.heroOf(viewer) }) : cardBack();
+      const face = card?.cardId ? cardFace(card.cardId, { calm: true, ...look(this.buffsOf(viewer)) }) : cardBack();
       const btn = h('button.choice-option.card-option.discard-option', { type: 'button', 'aria-pressed': 'false' }, markDiscarded(face));
       btn.addEventListener('click', () => {
         const at = picked.indexOf(uid);
@@ -2256,7 +2395,7 @@ class BoardScreen implements Screen {
         h('button.btn.big', { type: 'button', onclick: () => close() }, t('resume')),
         h('button.btn', { type: 'button', onclick: () => (close(), openSettings()) }, html(iconSvg('gear')), t('settings')),
         h('button.btn', { type: 'button', onclick: () => (close(), openHowToPlay()) }, html(iconSvg('book')), t('howToPlay')),
-        this.view?.phase !== 'finished'
+        this.view?.phase !== 'finished' && !this.observing
           ? h(
               'button.btn.danger',
               {
@@ -2268,7 +2407,7 @@ class BoardScreen implements Screen {
               },
               t('concede'),
             )
-          : h('button.btn', { type: 'button', onclick: () => (close(), this.exit()) }, t('mainMenu')),
+          : h('button.btn', { type: 'button', onclick: () => (close(), this.exit()) }, this.session.kind === 'online' ? t('leaveRoom') : t('mainMenu')),
       ),
     );
   }
@@ -2306,6 +2445,11 @@ class BoardScreen implements Screen {
 }
 
 /** How a played card was strengthened: its Combo (only cards with a Combo bonus), or its condition. */
+/** Card options for a card seen with its holder's live bonuses, or only with its hero's (history, cards in flight). */
+function look(from: HeroId | CardBuffs | undefined): { hero?: HeroId; buffs?: CardBuffs } {
+  return from === undefined ? {} : typeof from === 'string' ? { hero: from } : { buffs: from };
+}
+
 function boostOf(e: { cardId: string; combo: boolean; boosted?: boolean }): Boost {
   if (e.combo && comboBonusText(e.cardId)) return 'combo';
   return e.combo || e.boosted ? 'boosted' : null;

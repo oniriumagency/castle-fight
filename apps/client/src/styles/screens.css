@@ -1441,3 +1441,249 @@ input.shake {
 .notify-on {
   color: var(--gold-l);
 }
+
+/* ---------- What's new (changelog) ---------- */
+
+.changelog {
+  width: min(900px, 100%);
+  gap: 0;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgb(227 182 86 / 16%), transparent 60%),
+    linear-gradient(180deg, rgb(27 23 38 / 98%), rgb(16 13 24 / 98%));
+}
+
+.cl-release {
+  display: flex;
+  flex-direction: column;
+}
+
+.cl-head {
+  text-align: center;
+  padding: 28px 56px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.cl-eyebrow {
+  font-family: var(--display);
+  font-size: 0.78rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #2a1606;
+  background: linear-gradient(180deg, #f3c766, #a86c1c);
+  padding: 4px 14px 3px 17px;
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgb(243 199 102 / 35%);
+}
+
+.changelog .cl-head h2 {
+  font-family: var(--display);
+  font-size: clamp(1.45rem, 3.4vw, 2.1rem);
+  line-height: 1.15;
+  color: var(--gold-l);
+  text-shadow: 0 2px 12px rgb(0 0 0 / 60%);
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.cl-date {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+}
+
+.cl-lead {
+  margin: 6px 0 0;
+  max-width: 600px;
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+
+.cl-section {
+  padding: 20px 28px 22px;
+  border-top: 1px solid rgb(227 182 86 / 18%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cl-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.12rem;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+
+.cl-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--gold-l);
+  background: radial-gradient(circle at 35% 30%, rgb(227 182 86 / 38%), rgb(227 182 86 / 10%));
+  border: 1px solid rgb(227 182 86 / 45%);
+}
+
+.cl-icon .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.cl-body {
+  margin: 0;
+  font-size: 1.04rem;
+  color: var(--ink);
+}
+
+.cl-body b {
+  color: var(--gold-l);
+}
+
+.cl-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px 14px;
+  padding: 6px 0 2px;
+}
+
+.cl-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.cl-card .card {
+  --w: 132px;
+  filter: drop-shadow(0 10px 16px rgb(0 0 0 / 45%));
+}
+
+.cl-cards.few .cl-card .card {
+  --w: 168px;
+}
+
+.cl-card figcaption {
+  max-width: 240px;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  color: var(--gold-l);
+  background: rgb(227 182 86 / 12%);
+  border: 1px solid rgb(227 182 86 / 40%);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+.cl-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px 18px;
+}
+
+.cl-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 1rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 3.5%);
+  border: 1px solid rgb(255 255 255 / 6%);
+}
+
+.cl-points .cl-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.cl-points .cl-icon .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.changelog > .actions {
+  position: sticky;
+  bottom: 0;
+  justify-content: center;
+  padding: 16px 20px 20px;
+  background: linear-gradient(180deg, transparent, rgb(18 13 9 / 94%) 45%);
+}
+
+/* Short screens (phones in landscape): tighter, and the cards scroll sideways in one row. */
+@media (max-height: 520px) {
+  .cl-head {
+    padding: 18px 48px 12px;
+  }
+
+  .cl-lead {
+    font-size: 0.98rem;
+  }
+
+  .cl-section {
+    padding: 14px 18px 16px;
+  }
+
+  .cl-cards {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+
+  .cl-cards.few {
+    justify-content: center;
+  }
+
+  .cl-card .card,
+  .cl-cards.few .cl-card .card {
+    --w: 112px;
+  }
+
+  /* The close X stays at hand; the button waits at the end instead of covering the cards. */
+  .changelog > .actions {
+    position: static;
+    padding: 4px 16px 16px;
+    background: none;
+  }
+
+  .changelog > .actions .btn.big {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 560px) {
+  .cl-head {
+    padding: 22px 44px 14px;
+  }
+
+  .cl-section {
+    padding: 16px 16px 18px;
+  }
+
+  .cl-card .card {
+    --w: 120px;
+  }
+
+  .cl-cards.few .cl-card .card {
+    --w: 140px;
+  }
+}

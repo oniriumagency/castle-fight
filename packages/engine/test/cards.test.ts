@@ -27,6 +27,13 @@ function pass(state: GameState): GameState {
   return discardCard(state).state;
 }
 
+/** Worker cards do not spend the turn: the same player plays (or discards) another card. */
+function expectExtraPlay(state: GameState): void {
+  expect(state.active).toBe(ME);
+  expect(state.phase).toBe('action');
+  expect(state.actionsLeft).toBe(1);
+}
+
 const CARD_TESTS: Record<string, () => void> = {
   // ----- Construcción ------------------------------------------------------
   'hilada-de-piedra': () => {
@@ -47,8 +54,10 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(play('andamio-real').state.players[ME].keep).toBe(67);
   },
   'gremio-de-canteros': () => {
-    const { state } = play('gremio-de-canteros');
+    const { state } = play('gremio-de-canteros', { keepTurn: false });
     expect(state.players[ME].workers).toEqual({ piedra: 3, acero: 2, mana: 2 });
+    expect(state.players[ME].resources.piedra).toBe(44);
+    expectExtraPlay(state);
   },
   'cantera-abierta': () => {
     const { state } = play('cantera-abierta');
@@ -74,12 +83,15 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(play('reparaciones-de-urgencia', { you: { keep: 34 } }).state.players[ME].keep).toBe(49);
   },
   'fragua-del-gremio': () => {
-    const { state } = play('fragua-del-gremio');
+    const { state } = play('fragua-del-gremio', { keepTurn: false });
     expect(state.players[ME].workers).toEqual({ piedra: 2, acero: 3, mana: 2 });
-    expect(state.players[ME].resources.piedra).toBe(42);
+    expect(state.players[ME].resources.piedra).toBe(44);
+    expectExtraPlay(state);
   },
   'aula-de-arcanistas': () => {
-    expect(play('aula-de-arcanistas').state.players[ME].workers).toEqual({ piedra: 2, acero: 2, mana: 3 });
+    const { state } = play('aula-de-arcanistas', { keepTurn: false });
+    expect(state.players[ME].workers).toEqual({ piedra: 2, acero: 2, mana: 3 });
+    expectExtraPlay(state);
   },
   'torre-vigia': () => {
     let { state } = play('torre-vigia', { keepTurn: false });
@@ -149,17 +161,20 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[ME].keep).toBe(40);
   },
   'maestro-de-obras': () => {
-    const { state } = play('maestro-de-obras');
+    const { state } = play('maestro-de-obras', { keepTurn: false });
     expect(state.players[ME].workers.piedra).toBe(3);
     expect(state.players[ME].wall).toBe(25);
+    expect(state.players[ME].resources.piedra).toBe(41);
+    expectExtraPlay(state);
   },
   'bastion-ciclopeo': () => {
     expect(play('bastion-ciclopeo').state.players[ME].wall).toBe(52);
   },
   'gremios-unidos': () => {
-    const { state } = play('gremios-unidos');
+    const { state } = play('gremios-unidos', { keepTurn: false });
     expect(state.players[ME].workers).toEqual({ piedra: 3, acero: 3, mana: 3 });
-    expect(state.players[ME].resources.piedra).toBe(38);
+    expect(state.players[ME].resources.piedra).toBe(40);
+    expectExtraPlay(state);
   },
   'aguja-celeste': () => {
     expect(play('aguja-celeste').state.players[ME].keep).toBe(83);
@@ -211,7 +226,10 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(none.keep).toBe(40);
   },
   'leva-de-herreros': () => {
-    expect(play('leva-de-herreros').state.players[ME].workers.acero).toBe(3);
+    const { state } = play('leva-de-herreros', { keepTurn: false });
+    expect(state.players[ME].workers.acero).toBe(3);
+    expect(state.players[ME].resources.acero).toBe(44);
+    expectExtraPlay(state);
   },
   'saqueo-nocturno': () => {
     // Steals from the opponent's biggest stockpile.
@@ -391,7 +409,10 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[OPP].resources.mana).toBe(53);
   },
   'circulo-de-estudio': () => {
-    expect(play('circulo-de-estudio').state.players[ME].workers.mana).toBe(3);
+    const { state } = play('circulo-de-estudio', { keepTurn: false });
+    expect(state.players[ME].workers.mana).toBe(3);
+    expect(state.players[ME].resources.mana).toBe(44);
+    expectExtraPlay(state);
   },
   transmutacion: () => {
     const { state } = play('transmutacion');

@@ -796,7 +796,10 @@ export interface PendingChoiceView {
 
 /** What one player is allowed to know. Safe to send to that player's client. */
 export interface PlayerView {
+  /** Whose view this is. In a spectator's view (`spectator: true`) it is seat 0, whose hand is hidden like the rest. */
   viewer: PlayerId;
+  /** Set in a spectator's view: no hand is visible (unless revealed) and no choice is theirs. */
+  spectator?: true;
   rules: Rules;
   seq: number;
   turn: number;
