@@ -30,7 +30,24 @@ import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilig
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
-import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize, withCopiedCard, type Boost } from '../../ui/card';
+import {
+  boardBuffs,
+  buffsKey,
+  buffsOnCard,
+  cardBack,
+  cardFace,
+  eventCard,
+  heroCard,
+  historyEntry,
+  markDiscarded,
+  parseHistoryEntry,
+  rulesInnerHtml,
+  rulesOf,
+  setTableSize,
+  withCopiedCard,
+  type Boost,
+  type CardBuffs,
+} from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
 import { heroCss, skyFor } from '../../ui/theme';
@@ -376,6 +393,11 @@ class BoardScreen implements Screen {
 
   private heroOf(seat: PlayerId): HeroId {
     return this.view?.players[seat].hero ?? this.session.seats[seat].hero;
+  }
+
+  /** What adds to the numbers on `seat`'s cards right now (hero, enchantments, Twilight Fury). */
+  private buffsOf(seat: PlayerId): CardBuffs | HeroId {
+    return this.view ? boardBuffs(this.view, seat) : this.heroOf(seat);
   }
 
   private seatOfSide(side: number): PlayerId {
@@ -841,23 +863,24 @@ class BoardScreen implements Screen {
   private renderOppHand(seat: PlayerId): void {
     const el = this.oppHands[this.sideOf(seat)];
     const oppCards = this.shown![seat].hand;
-    const oppHero = this.heroOf(seat);
-    if (el.childElementCount === oppCards.length && el.dataset.key === JSON.stringify(oppCards)) return;
-    el.dataset.key = JSON.stringify(oppCards);
+    const oppBuffs = this.buffsOf(seat);
+    const key = JSON.stringify(oppCards) + (typeof oppBuffs === 'string' ? oppBuffs : buffsKey(oppBuffs));
+    if (el.childElementCount === oppCards.length && el.dataset.key === key) return;
+    el.dataset.key = key;
     if (this.pilePreview && !this.discardPile.matches(':hover')) this.hidePilePreview();
     el.replaceChildren(
       ...oppCards.map((c) => {
-        const card = c.cardId ? cardFace(c.cardId, { calm: true, hero: oppHero }) : cardBack();
+        const card = c.cardId ? cardFace(c.cardId, { calm: true, ...look(oppBuffs) }) : cardBack();
         card.dataset.uid = String(c.uid);
         if (c.cardId) {
           const id = c.cardId;
           card.classList.add('revealed');
           card.addEventListener('click', () => {
             this.hidePilePreview();
-            this.inspectCard(id, oppHero);
+            this.inspectCard(id, oppBuffs);
           });
           card.addEventListener('pointerenter', (e) => {
-            if (e.pointerType === 'mouse') this.showCardPreview(id, card.getBoundingClientRect(), 'below', oppHero);
+            if (e.pointerType === 'mouse') this.showCardPreview(id, card.getBoundingClientRect(), 'below', oppBuffs);
           });
           card.addEventListener('pointerleave', () => this.hidePilePreview());
         }
@@ -1579,10 +1602,10 @@ class BoardScreen implements Screen {
    * discard pile, or a revealed card of the rival). Not on touch screens,
    * where a tap opens the inspect view instead.
    */
-  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId, discarded = false, boost: Boost = null): void {
+  private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
-    const big = markBoost(cardFace(cardId, { calm: true, hero }), cardId, boost);
+    const big = markBoost(cardFace(cardId, { calm: true, ...look(hero) }), cardId, boost);
     if (discarded) markDiscarded(big);
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
@@ -1945,7 +1968,7 @@ class BoardScreen implements Screen {
       const btn = h(
         'button.choice-option.card-option.discard-option',
         { type: 'button', 'aria-pressed': 'false' },
-        markDiscarded(cardFace(c.cardId!, { calm: true, hero: this.hand.context ? this.heroOf(this.hand.context.seat) : undefined })),
+        markDiscarded(cardFace(c.cardId!, { calm: true, buffs: this.hand.buffs() })),
       );
       btn.addEventListener('click', () => {
         const at = picked.indexOf(c.uid);
@@ -2012,7 +2035,8 @@ class BoardScreen implements Screen {
     const cardId = this.hand.cardIdOf(uid);
     if (!ctx || !cardId) return;
     const reason = blockReason(ctx, cardId);
-    const big = cardFace(cardId, { tilt: true, cost: undefined, hero: this.heroOf(ctx.seat) });
+    const buffs = this.hand.buffs();
+    const big = cardFace(cardId, { tilt: true, cost: undefined, buffs });
     const handCard = this.hand.elementOf(uid);
     big.classList.toggle('combo', !reason && handCard?.classList.contains('combo') === true);
     big.classList.toggle('boosted', !reason && handCard?.classList.contains('boosted') === true);
@@ -2032,6 +2056,8 @@ class BoardScreen implements Screen {
         if (this.refreshInspect === refresh) this.refreshInspect = null;
         this.hand.select(null);
       },
+      null,
+      buffsOnCard(cardId, buffs),
     );
     // Kept in step with the game while it stays open (for example the rival's turn ends).
     const refresh = (): void => {
@@ -2050,6 +2076,14 @@ class BoardScreen implements Screen {
       }
       const cost = handCard.querySelector('.cost');
       if (cost) big.querySelector('.cost')?.replaceWith(cost.cloneNode(true));
+      // An enchantment ran out or a new bonus started: the "+X" follow.
+      const buffsNow = this.hand.buffs();
+      if ((big.dataset.buffs ?? '') !== buffsKey(buffsNow)) {
+        const rules = big.querySelector('.rules > span');
+        if (rules) rules.innerHTML = rulesInnerHtml(cardId, buffsNow);
+        big.dataset.buffs = buffsKey(buffsNow);
+        panel.updateBuffs(buffsOnCard(cardId, buffsNow));
+      }
     };
     this.refreshInspect = refresh;
   }
@@ -2057,7 +2091,14 @@ class BoardScreen implements Screen {
   /** Updates the open hand card view after a state change. */
   private refreshInspect: (() => void) | null = null;
 
-  private openInspect(card: HTMLElement, text: string, actions?: Parameters<typeof inspectPanel>[0]['actions'], onClose?: () => void, extra?: HTMLElement | null): InspectPanel {
+  private openInspect(
+    card: HTMLElement,
+    text: string,
+    actions?: Parameters<typeof inspectPanel>[0]['actions'],
+    onClose?: () => void,
+    extra?: HTMLElement | null,
+    buffs?: Parameters<typeof inspectPanel>[0]['buffs'],
+  ): InspectPanel {
     this.closeInspect?.();
     let closed = false;
     const close = (): void => {
@@ -2068,22 +2109,22 @@ class BoardScreen implements Screen {
       if (this.closeInspect === close) this.closeInspect = null;
       onClose?.();
     };
-    const panel = inspectPanel({ card, text, actions, close, extra });
+    const panel = inspectPanel({ card, text, actions, close, extra, buffs });
     this.layer.appendChild(panel);
     requestAnimationFrame(() => panel.classList.add('in'));
     this.closeInspect = close;
     return panel;
   }
 
-  private inspectCard(cardId: string, hero?: HeroId, discarded = false, boost: Boost = null, copied: string | null = null): void {
+  private inspectCard(cardId: string, hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null, copied: string | null = null): void {
     audio.play('cardSelect');
-    const face = markBoost(cardFace(cardId, { tilt: true, hero }), cardId, boost);
+    const face = markBoost(cardFace(cardId, { tilt: true, ...look(hero) }), cardId, boost);
     if (discarded) markDiscarded(face);
     // A Mirage from the history shows, on its right, the card it copied.
     const extra = copied
-      ? h('div.inspect-copied', null, h('p.inspect-copied-label', null, t('copiedCard')), cardFace(copied, { tilt: true, hero }))
+      ? h('div.inspect-copied', null, h('p.inspect-copied-label', null, t('copiedCard')), cardFace(copied, { tilt: true, ...look(hero) }))
       : null;
-    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra);
+    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra, typeof hero === 'object' ? buffsOnCard(cardId, hero) : undefined);
   }
 
   private inspectHero(heroId: string): void {
@@ -2216,7 +2257,7 @@ class BoardScreen implements Screen {
     const confirmBtn = h('button.btn.primary', { type: 'button' }) as HTMLButtonElement;
     const options = uids.map((uid) => {
       const card = hand.find((c) => String(c.uid) === uid);
-      const face = card?.cardId ? cardFace(card.cardId, { calm: true, hero: this.heroOf(viewer) }) : cardBack();
+      const face = card?.cardId ? cardFace(card.cardId, { calm: true, ...look(this.buffsOf(viewer)) }) : cardBack();
       const btn = h('button.choice-option.card-option.discard-option', { type: 'button', 'aria-pressed': 'false' }, markDiscarded(face));
       btn.addEventListener('click', () => {
         const at = picked.indexOf(uid);
@@ -2392,6 +2433,11 @@ class BoardScreen implements Screen {
 }
 
 /** How a played card was strengthened: its Combo (only cards with a Combo bonus), or its condition. */
+/** Card options for a card seen with its holder's live bonuses, or only with its hero's (history, cards in flight). */
+function look(from: HeroId | CardBuffs | undefined): { hero?: HeroId; buffs?: CardBuffs } {
+  return from === undefined ? {} : typeof from === 'string' ? { hero: from } : { buffs: from };
+}
+
 function boostOf(e: { cardId: string; combo: boolean; boosted?: boolean }): Boost {
   if (e.combo && comboBonusText(e.cardId)) return 'combo';
   return e.combo || e.boosted ? 'boosted' : null;

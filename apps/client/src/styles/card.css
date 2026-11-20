@@ -453,10 +453,25 @@
   filter: drop-shadow(0 0 2cqw rgb(0 0 0 / 50%));
 }
 
-/* What the player's hero adds to a number ("13+2 damage"): the "+2" in the hero's colour. */
+/*
+ * What is added to a number ("13+2+3 damage"), one "+X" per source so each
+ * bonus reads apart: the hero's passive in purple, an enchantment in green,
+ * the Twilight Fury in ember red. The inspect view lists them by name.
+ */
+.card .buff {
+  font-weight: 700;
+}
+
 .card .hero-buff {
   color: #9b1f86;
-  font-weight: 700;
+}
+
+.card .enchantment-buff {
+  color: #19763c;
+}
+
+.card .twilight-buff {
+  color: #b5400c;
 }
 
 /* A card thrown away rather than played: red tint and an X stamp. */

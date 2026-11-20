@@ -1378,6 +1378,33 @@
   margin-bottom: 0;
 }
 
+/* One bonus on the inspected card: its "+X" (coloured like on the card) and where it comes from. */
+.glossary .buff {
+  display: inline-block;
+  min-width: 2.2em;
+  padding: 0 6px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 700;
+  color: #fff;
+}
+
+.glossary .hero-buff {
+  background: #9b1f86;
+}
+
+.glossary .enchantment-buff {
+  background: #19763c;
+}
+
+.glossary .twilight-buff {
+  background: #b5400c;
+}
+
+.glossary dd.buff-line {
+  margin-bottom: 4px;
+}
+
 .inspect-reason {
   padding: 8px 12px;
   border-radius: 8px;
