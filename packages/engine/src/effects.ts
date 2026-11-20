@@ -7,6 +7,7 @@ import {
   dealDamage,
   discardFromHand,
   saboteurSteal,
+  stealResource,
   drawCards,
   defaultTarget,
   enchantmentLife,
@@ -280,10 +281,7 @@ function applyOp(
     case 'stealResource': {
       const each = perRival(state, me, op.amount);
       for (const target of targets) {
-        const resource = highestOf(state.players[target]!.resources);
-        const taken = changeResources(state, events, target, { [resource]: -each }, reason);
-        const amount = -(taken[resource] ?? 0);
-        if (amount > 0) changeResources(state, events, me, { [resource]: amount }, reason);
+        stealResource(state, events, me, target, highestOf(state.players[target]!.resources), each, reason);
       }
       return null;
     }
@@ -305,11 +303,16 @@ function applyOp(
     case 'stealWorker': {
       // The opponent keeps at least `minWorkers`; you gain the worker either way.
       // Against several rivals each one loses a worker but you gain only one.
+      // In a duel the log reads it as one steal when the opponent really lost the worker.
       const worker = highestOf(opp.workers);
+      const lost: PlayerId[] = [];
       for (const target of targets) {
-        changeWorkers(state, events, target, { [highestOf(state.players[target]!.workers)]: -1 }, reason);
+        const link = targets.length === 1 ? { to: me } : {};
+        const real = changeWorkers(state, events, target, { [highestOf(state.players[target]!.workers)]: -1 }, reason, link);
+        if (Object.keys(real).length) lost.push(target);
       }
-      changeWorkers(state, events, me, { [worker]: 1 }, reason);
+      const from = targets.length === 1 && lost.length === 1 ? { from: lost[0]! } : {};
+      changeWorkers(state, events, me, { [worker]: 1 }, reason, from);
       return null;
     }
 
