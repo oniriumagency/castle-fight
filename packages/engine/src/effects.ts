@@ -246,10 +246,16 @@ function applyOp(
     }
 
     case 'damage': {
-      const amount = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0) + discardBonus(ctx, op);
+      const base = op.amount + (ctx.combo ? (op.comboBonus ?? 0) : 0);
+      const amount = base + discardBonus(ctx, op);
       if (amount <= 0) return null;
       const times = op.times ?? 1;
-      const each = perRival(state, me, amount);
+      // A whole per-card amount against every rival keeps the printed number exact.
+      const each =
+        op.perDiscardAll !== undefined && hitsAll(state, me)
+          ? (base > 0 ? perRival(state, me, base) : 0) + op.perDiscardAll * (ctx.discarded ?? 0)
+          : perRival(state, me, amount);
+      if (each <= 0) return null;
       for (const target of targets) {
         for (let i = 0; i < times; i++) {
           if (state.players[target]!.eliminated) break;

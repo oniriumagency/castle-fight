@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARDS, DEFAULT_RULES, applyAction, createGame, getPlayerView, legalActions, playGame, randomPolicy, eagerPolicy } from '../src/index';
+import { BATTLE_EVENTS, CARDS, DEFAULT_RULES, HEROES, applyAction, createGame, getPlayerView, legalActions, playGame, randomPolicy, eagerPolicy } from '../src/index';
 import { mustApply, setHand } from '../src/testing';
 import type { EffectOp, GameState, Rules } from '../src/types';
 
@@ -47,6 +47,21 @@ describe('three players', () => {
     expect(after.players[1]!.keep).toBe(keep - 6);
     expect(after.players[2]!.keep).toBe(keep - 6);
     expect(after.players[0]!.keep).toBe(keep);
+  });
+
+  it('"Todo o Nada" deals a whole amount per discarded card to every rival', () => {
+    const state = threeWay();
+    setHand(state, 0, ['todo-o-nada', 'escaramuza', 'parapeto', 'catapulta', 'cimientos']);
+    const op = CARDS.find((c) => c.id === 'todo-o-nada')!.effects.find((o) => o.op === 'damage');
+    const per = op?.op === 'damage' ? op.perDiscardAll! : 0;
+    expect(Number.isInteger(per) && per > 0).toBe(true);
+    const { events } = mustApply(state, { type: 'play', player: 0, uid: state.players[0]!.hand[0]!.uid });
+    for (const rival of [1, 2]) {
+      const hits = events.filter((e) => e.type === 'damage' && e.target === rival);
+      expect(hits).toHaveLength(1);
+      const hit = hits[0]!;
+      if (hit.type === 'damage') expect(hit.wallLoss + hit.keepLoss).toBe(4 * per);
+    }
   });
 
   it('in "choose" mode an attack hits only the chosen rival, and legal actions offer each target', () => {
@@ -152,3 +167,29 @@ describe('free-for-all rules text', () => {
     }
   });
 });
+
+describe('printed numbers', () => {
+  it('no card, hero or event text shows a decimal number', () => {
+    const texts: string[] = [];
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') texts.push(v);
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (typeof v === 'object' && v !== null) Object.entries(v).forEach(([k, x]) => k !== 'art' && walk(x));
+    };
+    walk([CARDS.map((c) => [c.name, c.text, c.textFfa]), HEROES, BATTLE_EVENTS]);
+    expect(texts.length).toBeGreaterThan(100);
+    for (const t of texts) expect(t).not.toMatch(/\d[.,]\d/);
+  });
+
+  it('every per-card amount against all rivals is a whole number printed on the card', () => {
+    for (const card of CARDS) {
+      for (const op of card.effects) {
+        if (op.op !== 'damage' || op.perDiscardAll === undefined) continue;
+        expect(Number.isInteger(op.perDiscardAll), card.id).toBe(true);
+        expect(card.textFfa!.es, card.id).toContain(`${op.perDiscardAll} de daño`);
+        expect(card.textFfa!.en, card.id).toContain(`${op.perDiscardAll} damage`);
+      }
+    }
+  });
+});
+

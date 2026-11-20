@@ -186,6 +186,11 @@ export type EffectOp =
       comboBonus?: number;
       /** Added to `amount` once for each card the same effect made you discard. */
       perDiscard?: number;
+      /**
+       * When the attack hits every rival, a whole per-card amount used instead
+       * of scaling the total, so the card can print a clean number.
+       */
+      perDiscardAll?: number;
     }
   | { op: 'gainResource'; resource: Resource | 'all'; amount: number }
   | { op: 'gainWorker'; worker: Resource; amount: number }

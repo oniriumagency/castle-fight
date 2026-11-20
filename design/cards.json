@@ -816,8 +816,8 @@
         "en": "Discard your whole hand. 6 damage for each card discarded."
       },
       "textFfa": {
-        "es": "Descarta toda tu mano. Por cada carta descartada, 3,6 de daño a cada rival (redondeado).",
-        "en": "Discard your whole hand. For each card discarded, 3.6 damage to each rival (rounded)."
+        "es": "Descarta toda tu mano. 4 de daño a cada rival por cada carta descartada.",
+        "en": "Discard your whole hand. 4 damage to each rival for each card discarded."
       },
       "art": "cards/todo-o-nada.jpg"
     },
