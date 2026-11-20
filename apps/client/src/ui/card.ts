@@ -251,7 +251,8 @@ export function markDiscarded(el: HTMLElement): HTMLElement {
 
 /**
  * History entries: a card id, with a prefix when the card was discarded
- * (`x:`) or played with its Combo (`c:`) or its condition met (`b:`).
+ * (`x:`) or played with its Combo (`c:`) or its condition met (`b:`), and
+ * with `>id` after it when it copied another card (Mirage).
  * Kept as plain strings so saved histories stay readable.
  */
 export type Boost = 'combo' | 'boosted' | null;
@@ -264,7 +265,19 @@ export function historyEntry(cardId: string, discarded: boolean, boost: Boost = 
   return boost ? BOOST_PREFIX[boost] + cardId : cardId;
 }
 
-export function parseHistoryEntry(entry: string): { cardId: string; discarded: boolean; boost: Boost } {
+const COPY_SEPARATOR = '>';
+
+/** The same entry, noting the card it copied. */
+export function withCopiedCard(entry: string, copiedId: string): string {
+  return entry.split(COPY_SEPARATOR)[0] + COPY_SEPARATOR + copiedId;
+}
+
+export function parseHistoryEntry(full: string): { cardId: string; discarded: boolean; boost: Boost; copied: string | null } {
+  const [entry = '', copied] = full.split(COPY_SEPARATOR);
+  return { ...parseBase(entry), copied: copied || null };
+}
+
+function parseBase(entry: string): { cardId: string; discarded: boolean; boost: Boost } {
   if (entry.startsWith(DISCARDED_PREFIX)) return { cardId: entry.slice(DISCARDED_PREFIX.length), discarded: true, boost: null };
   if (entry.startsWith(BOOST_PREFIX.combo)) return { cardId: entry.slice(2), discarded: false, boost: 'combo' };
   if (entry.startsWith(BOOST_PREFIX.boosted)) return { cardId: entry.slice(2), discarded: false, boost: 'boosted' };

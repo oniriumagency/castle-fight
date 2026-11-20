@@ -89,9 +89,9 @@ const HERO_TESTS: Record<string, () => void> = {
     // (Her hand empties, so the turn passes: count the steals instead of reading the stockpile.)
     const all = playCard(charged('saboteadora', { opponent: opp, hand: ['todo-o-nada', 'escaramuza', 'parapeto'] }), 'todo-o-nada').events;
     const steals = eventsOf(all, 'resourcesChanged').filter((e) => e.reason.kind === 'hero');
-    expect(steals.map((e) => [e.player, e.delta])).toEqual([
-      [OPP, { acero: -3 }],
-      [ME, { acero: 3 }],
+    expect(steals.map((e) => [e.player, e.delta, e.to, e.from])).toEqual([
+      [OPP, { acero: -3 }, ME, undefined],
+      [ME, { acero: 3 }, undefined, OPP],
     ]);
     // And when her card makes the opponent discard (random or chosen).
     const burn = playCard(
@@ -115,12 +115,21 @@ const HERO_TESTS: Record<string, () => void> = {
     const plain = playCard(scenario({ opponent: opp, hand: ['tierra-quemada', 'escaramuza'] }), 'tierra-quemada').state;
     expect(plain.players[OPP].resources.acero).toBe(7);
     // Ultimate: steal a worker of the type the opponent has most of, and 10 piercing damage.
-    const robbed = ultimate(charged('saboteadora', { opponent: { workers: { piedra: 2, acero: 2, mana: 5 } } })).state;
+    const robbedResult = ultimate(charged('saboteadora', { opponent: { workers: { piedra: 2, acero: 2, mana: 5 } } }));
+    const robbed = robbedResult.state;
+    // The log reads it as one steal: the loss names the thief and the gain the victim.
+    expect(eventsOf(robbedResult.events, 'workersChanged').map((e) => [e.player, e.delta, e.to, e.from])).toEqual([
+      [OPP, { mana: -1 }, ME, undefined],
+      [ME, { mana: 1 }, undefined, OPP],
+    ]);
     expect(robbed.players[OPP].workers.mana).toBe(4);
     expect(robbed.players[ME].workers.mana).toBe(3);
     expect([robbed.players[OPP].wall, robbed.players[OPP].keep]).toEqual([22, 40]);
     // The opponent never drops below 1 worker; she gains hers anyway.
-    const floor = ultimate(charged('saboteadora', { opponent: { workers: { piedra: 1, acero: 1, mana: 1 } } })).state;
+    const floorResult = ultimate(charged('saboteadora', { opponent: { workers: { piedra: 1, acero: 1, mana: 1 } } }));
+    const floor = floorResult.state;
+    // Nothing was taken from the opponent, so her worker is a plain gain.
+    expect(eventsOf(floorResult.events, 'workersChanged').map((e) => [e.player, e.from])).toEqual([[ME, undefined]]);
     expect(floor.players[OPP].workers).toEqual({ piedra: 1, acero: 1, mana: 1 });
     expect(floor.players[ME].workers.piedra).toBe(3);
   },

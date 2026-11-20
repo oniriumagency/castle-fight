@@ -1,0 +1,144 @@
+/*
+ * Combo on (cards in hand): a magic aura that is hard to miss. A big soft
+ * halo pulses behind the card, an arcane ring spins around its edge, a
+ * sweep of light crosses the face and sparks rise along its sides. Only
+ * transform and opacity animate (no box-shadow or filter animation), so
+ * the compositor does the work and phones stay smooth. The plain "condition
+ * met" halo (.boosted without .combo) is unchanged.
+ */
+
+/* The aura replaces the thinner rings of playable and boosted cards. */
+.hand-card.combo::before,
+.hand-card.combo::after { display: none; }
+
+/* Above its neighbours in the fan (still under a hovered, selected or dragged card). */
+.hand-card.combo:not(.selected) { z-index: 40 !important; }
+
+.hand-card.combo {
+  --glow: 0 0 calc(26 * var(--u)) calc(7 * var(--u)) rgb(110 235 255 / 95%), 0 0 calc(70 * var(--u)) calc(18 * var(--u)) rgb(90 120 255 / 55%);
+}
+
+/* Halo behind the card. */
+.hand-card > .combo-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(16 * var(--u));
+  pointer-events: none;
+  z-index: -1;
+  box-shadow:
+    0 0 calc(10 * var(--u)) calc(4 * var(--u)) rgb(230 255 255 / 95%),
+    0 0 calc(34 * var(--u)) calc(14 * var(--u)) rgb(110 235 255 / 90%),
+    0 0 calc(90 * var(--u)) calc(30 * var(--u)) rgb(130 90 255 / 65%);
+  animation: comboHalo 1.5s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes comboHalo {
+  0%, 100% { opacity: 0.6; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.hand-card > .combo-aura {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+}
+
+/* Spinning arcane ring: a conic gradient seen through a ring-shaped mask. */
+.combo-aura .ca-ring {
+  position: absolute;
+  inset: calc(-6 * var(--u));
+  border-radius: calc(19 * var(--u));
+  padding: calc(6 * var(--u) + 1.5px);
+  overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.combo-aura .ca-ring i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 250%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    #ffffff 0deg, #7ff0ff 25deg, #3f8cff 75deg, #b06cff 125deg, #7ff0ff 170deg,
+    #ffffff 185deg, #4fd8ff 215deg, #6a4bff 280deg, #c08aff 330deg, #ffffff 360deg
+  );
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: comboSpin 2.6s linear infinite;
+  will-change: transform;
+}
+
+@keyframes comboSpin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* A band of light sweeping over the face. */
+.combo-aura .ca-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(14 * var(--u));
+  overflow: hidden;
+}
+.combo-aura .ca-sweep i {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent 0%, rgb(160 245 255 / 0%) 20%, rgb(200 250 255 / 42%) 50%, rgb(160 245 255 / 0%) 80%, transparent 100%);
+  transform: translateX(-120%) skewX(-16deg);
+  animation: comboSweep 2.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes comboSweep {
+  0% { transform: translateX(-120%) skewX(-16deg); }
+  55%, 100% { transform: translateX(330%) skewX(-16deg); }
+}
+
+/* Sparks rising along the sides. */
+.combo-aura .ca-sparks b {
+  position: absolute;
+  /* Cards in hand rest partly below the screen edge: start where they show. */
+  bottom: 34%;
+  width: calc(16 * var(--u) + 4px);
+  aspect-ratio: 1;
+  margin-left: calc(-8 * var(--u) - 2px);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0 16%, rgb(150 245 255 / 100%) 28%, rgb(120 140 255 / 55%) 50%, transparent 70%);
+  opacity: 0;
+  animation: comboSpark 1.8s ease-out infinite;
+  animation-delay: calc(var(--i) * 1.8s / var(--n));
+  will-change: transform, opacity;
+}
+.combo-aura .ca-sparks b:nth-child(1) { left: 3%; }
+.combo-aura .ca-sparks b:nth-child(2) { left: 97%; }
+.combo-aura .ca-sparks b:nth-child(3) { left: 20%; --dx: 1; }
+.combo-aura .ca-sparks b:nth-child(4) { left: 80%; --dx: -1; }
+.combo-aura .ca-sparks b:nth-child(5) { left: 1%; --dx: -1; }
+.combo-aura .ca-sparks b:nth-child(6) { left: 99%; --dx: 1; }
+.combo-aura .ca-sparks b:nth-child(7) { left: 40%; }
+.combo-aura .ca-sparks b:nth-child(8) { left: 62%; }
+
+@keyframes comboSpark {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  15% { opacity: 1; transform: translate(calc(var(--dx, 0) * 4 * var(--u)), calc(-40 * var(--u))) scale(1.15); }
+  100% { opacity: 0; transform: translate(calc(var(--dx, 0) * 14 * var(--u)), calc(-260 * var(--u))) scale(0.4); }
+}
+
+/* Reduced motion: a still, bright aura (no spin, sweep or sparks). */
+@media (prefers-reduced-motion: reduce) {
+  .hand-card > .combo-glow,
+  .combo-aura .ca-ring i { animation: none !important; }
+  .hand-card > .combo-glow { opacity: 1; }
+  .combo-aura .ca-sweep,
+  .combo-aura .ca-sparks { display: none; }
+}
+.reduced-motion .hand-card > .combo-glow,
+.reduced-motion .combo-aura .ca-ring i { animation: none !important; }
+.reduced-motion .hand-card > .combo-glow { opacity: 1; }
+.reduced-motion .combo-aura .ca-sweep,
+.reduced-motion .combo-aura .ca-sparks { display: none; }

@@ -30,7 +30,7 @@ import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilig
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
-import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize, type Boost } from '../../ui/card';
+import { cardBack, cardFace, eventCard, heroCard, historyEntry, markDiscarded, parseHistoryEntry, rulesOf, setTableSize, withCopiedCard, type Boost } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
 import { heroCss, skyFor } from '../../ui/theme';
@@ -62,6 +62,12 @@ function clonePlayer(p: PlayerPublicState): PlayerPublicState {
 
 /** Cards shown in each player's played history. */
 const HISTORY_SIZE = 3;
+
+/** The newest entry of a history copied `copiedId` (Mirage): note it so inspecting it shows that card. */
+function noteCopy(history: string[], copiedId: string): string[] {
+  const [newest, ...rest] = history;
+  return newest === undefined ? history : [withCopiedCard(newest, copiedId), ...rest];
+}
 
 /** One state update's animations may take this long at most; then the board shows the result. */
 const MAX_ANIMATION_MS = 20_000;
@@ -226,8 +232,8 @@ class BoardScreen implements Screen {
     this.ultMode.pulse = () => fx.ultimateAura(this.fxContext(), this.ultMode.button.classList.contains('usable'));
     for (const panel of this.panels) {
       panel.onInspect = (entry) => {
-        const { cardId, discarded, boost } = parseHistoryEntry(entry);
-        this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded, boost);
+        const { cardId, discarded, boost, copied } = parseHistoryEntry(entry);
+        this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded, boost, copied);
       };
       panel.onInspectHero = (heroId) => this.inspectHero(heroId);
       panel.onPreview = (cardId, anchor) => {
@@ -815,6 +821,8 @@ class BoardScreen implements Screen {
       if (e.type === 'cardPlayed' || e.type === 'cardDiscarded') {
         const entry = e.type === 'cardDiscarded' ? historyEntry(e.cardId, true) : historyEntry(e.cardId, false, boostOf(e));
         this.history[e.player] = [entry, ...this.history[e.player]].slice(0, HISTORY_SIZE);
+      } else if (e.type === 'cardCopied') {
+        this.history[e.player] = noteCopy(this.history[e.player], e.cardId);
       }
     }
     if (events.length) this.saveStats();
@@ -1040,6 +1048,8 @@ class BoardScreen implements Screen {
         break;
       }
       case 'cardCopied':
+        this.shownHistory[e.player] = noteCopy(this.shownHistory[e.player], e.cardId);
+        this.render();
         this.showBanner(L(getCard(e.cardId).name), t('logCopied', { who: this.name(e.player), card: '' }).trim());
         await wait(500);
         break;
@@ -1903,7 +1913,7 @@ class BoardScreen implements Screen {
   /** Updates the open hand card view after a state change. */
   private refreshInspect: (() => void) | null = null;
 
-  private openInspect(card: HTMLElement, text: string, actions?: Parameters<typeof inspectPanel>[0]['actions'], onClose?: () => void): InspectPanel {
+  private openInspect(card: HTMLElement, text: string, actions?: Parameters<typeof inspectPanel>[0]['actions'], onClose?: () => void, extra?: HTMLElement | null): InspectPanel {
     this.closeInspect?.();
     let closed = false;
     const close = (): void => {
@@ -1914,18 +1924,22 @@ class BoardScreen implements Screen {
       if (this.closeInspect === close) this.closeInspect = null;
       onClose?.();
     };
-    const panel = inspectPanel({ card, text, actions, close });
+    const panel = inspectPanel({ card, text, actions, close, extra });
     this.layer.appendChild(panel);
     requestAnimationFrame(() => panel.classList.add('in'));
     this.closeInspect = close;
     return panel;
   }
 
-  private inspectCard(cardId: string, hero?: HeroId, discarded = false, boost: Boost = null): void {
+  private inspectCard(cardId: string, hero?: HeroId, discarded = false, boost: Boost = null, copied: string | null = null): void {
     audio.play('cardSelect');
     const face = markBoost(cardFace(cardId, { tilt: true, hero }), cardId, boost);
     if (discarded) markDiscarded(face);
-    this.openInspect(face, rulesOf(getCard(cardId)));
+    // A Mirage from the history shows, on its right, the card it copied.
+    const extra = copied
+      ? h('div.inspect-copied', null, h('p.inspect-copied-label', null, t('copiedCard')), cardFace(copied, { tilt: true, hero }))
+      : null;
+    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra);
   }
 
   private inspectHero(heroId: string): void {

@@ -42,7 +42,7 @@ export function scenario(options: ScenarioOptions = {}): GameState {
     heroes: options.heroes ?? ['guardian', 'guardian'],
     firstPlayer: 0,
     // Scenarios start level: no head start for the player who moves second.
-    rules: { secondPlayerWall: 0, ...options.rules },
+    rules: { secondPlayerWall: 0, multiSeatWall: 0, ...options.rules },
   });
   const amount = options.resources ?? 50;
   for (const p of state.players) {
