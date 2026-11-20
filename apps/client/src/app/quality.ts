@@ -12,8 +12,10 @@ import { settings } from './settings';
  * GPU memory for the page and close the tab when a scene asks too much: the
  * Terremoto's dust once left an Xbox with a blank screen.
  */
+const onConsole = /Xbox|PlayStation|Nintendo|SMART-TV|SmartTV|Tizen|Web0S|webOS|CrKey|AFT[A-Z]|BRAVIA/i.test(navigator.userAgent);
+
 export function consoleBrowser(): boolean {
-  return /Xbox|PlayStation|Nintendo|SMART-TV|SmartTV|Tizen|Web0S|webOS|CrKey|AFT[A-Z]|BRAVIA/i.test(navigator.userAgent);
+  return onConsole;
 }
 
 function modestDevice(): boolean {
@@ -48,6 +50,7 @@ export function reportSlowFrames(): boolean {
 
 /** Most particles alive at once. */
 export function particleBudget(): number {
+  if (consoleBrowser()) return 140;
   return effectsLow() ? 260 : 900;
 }
 

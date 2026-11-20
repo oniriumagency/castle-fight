@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
-import { density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
+import { consoleBrowser, density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle } from './castle';
@@ -862,7 +862,9 @@ export class Battlefield {
 
   private updateWeather(dt: number): void {
     const kind = this.mood.weather;
-    if (kind === 'none' || settings.get().reducedMotion) return;
+    // Consoles skip the event weather (Terremoto dust, Ocaso embers...): their
+    // browser has little to spare, and the tab froze when it arrived.
+    if (kind === 'none' || settings.get().reducedMotion || consoleBrowser()) return;
     if (kind === 'rain') {
       // Now and then, lightning over the hills and a roll of thunder.
       this.lightningTimer -= dt;
@@ -874,7 +876,9 @@ export class Battlefield {
         setTimeout(() => this.onAmbient?.('thunder'), 250 + Math.random() * 600);
       }
     }
-    this.weatherTimer += dt / (effectsLow() ? 0.5 : 1);
+    // Half as much weather on low effects. After a long stall (a slow frame,
+    // a tab in the background) it does not try to catch up all at once.
+    this.weatherTimer = Math.min(this.weatherTimer + dt * (effectsLow() ? 0.5 : 1), 1000);
     const every = kind === 'rain' ? 14 : kind === 'snow' ? 60 : 120;
     while (this.weatherTimer > every) {
       this.weatherTimer -= every;
