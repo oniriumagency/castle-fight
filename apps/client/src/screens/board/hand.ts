@@ -359,6 +359,8 @@ export class Hand {
 export function inspectPanel(opts: {
   card: HTMLElement;
   text: string;
+  /** Shown to the right of the card, e.g. the card a Mirage copied. */
+  extra?: HTMLElement | null;
   actions?: { play: () => void; discard: () => void; reason: string | null; canAct: boolean };
   close: () => void;
 }): InspectPanel {
@@ -383,13 +385,14 @@ export function inspectPanel(opts: {
       // Anywhere but the card and what is written beside it closes the view.
       onclick: (e: Event) => {
         const target = e.target as HTMLElement;
-        if (target === e.currentTarget || target.matches('.inspect-box, .inspect-card, .inspect-side')) opts.close();
+        if (target === e.currentTarget || target.matches('.inspect-box, .inspect-card, .inspect-side, .inspect-copied')) opts.close();
       },
     },
     h(
       'div.inspect-box',
       null,
       h('div.inspect-card', null, opts.card, closeX(opts.close, true)),
+      opts.extra ?? null,
       h(
         'div.inspect-side',
         null,
