@@ -29,7 +29,7 @@ import { audio } from './fx/audio';
 import { fx } from './fx/director';
 import { online, roomIdFromUrl } from './net/online';
 import { flow } from './screens/flow';
-import { joinOnline } from './screens/online';
+import { joinOnline, watchOnline } from './screens/online';
 import { initFeedback } from './ui/feedback';
 import { toggleMute } from './ui/muteButton';
 
@@ -66,7 +66,11 @@ async function boot(): Promise<void> {
       }
       const room = await online.getRoom(roomId);
       if (room) {
-        flow.heroSelect('online', roomId);
+        // A full room (or one already playing): watch it as an observer.
+        if (room.status !== 'waiting' || room.players >= (room.size ?? 2)) {
+          toast(t('watchingFullRoom'), 'info', 4000);
+          watchOnline(roomId);
+        } else flow.heroSelect('online', roomId);
         return;
       }
       toast(t('connectionLost'), 'warn', 4000);

@@ -14,6 +14,7 @@ type MessageOf<T extends RoomServerMessage['type']> = Extract<RoomServerMessage,
 
 export class FakeSocket {
   seat: PlayerId | null = null;
+  watching = false;
   open = true;
   closedWith: { code: number; reason: string } | null = null;
   readonly received: RoomServerMessage[] = [];
@@ -45,6 +46,10 @@ export class FakeHost implements RoomHost<FakeSocket> {
   seatOf = (socket: FakeSocket): PlayerId | null => socket.seat;
   setSeat = (socket: FakeSocket, seat: PlayerId | null): void => {
     socket.seat = seat;
+  };
+  isWatching = (socket: FakeSocket): boolean => socket.watching;
+  setWatching = (socket: FakeSocket, on: boolean): void => {
+    socket.watching = on;
   };
   send = (socket: FakeSocket, message: RoomServerMessage): void => {
     const text = JSON.stringify(message);

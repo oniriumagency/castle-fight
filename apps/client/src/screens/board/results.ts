@@ -61,12 +61,15 @@ function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 
 export function showResults(o: ResultsOptions): void {
   const result = o.view.result ?? { winner: null, reason: 'keepDestroyed' as const };
   const winner = o.fallen ? null : result.winner;
-  const shared = o.session.kind === 'local';
+  // A spectator sees who won, with no victory or defeat of their own.
+  const watching = !!o.session.spectator || !!o.view.spectator;
+  const shared = o.session.kind === 'local' || watching;
   const seats = o.seatsBySide;
   const multi = seats.length > 2;
   let outcome: 'victory' | 'defeat' | 'draw';
   if (o.fallen) outcome = 'defeat';
   else if (winner === null) outcome = 'draw';
+  else if (watching) outcome = 'draw';
   else if (shared) outcome = 'victory';
   else outcome = o.session.isLocal(winner) ? 'victory' : 'defeat';
 
@@ -88,7 +91,7 @@ export function showResults(o: ResultsOptions): void {
   })();
 
   // The win/loss record and head-to-head count duels only.
-  const headToHead = multi ? null : keepRecord(o, seats[1], outcome);
+  const headToHead = multi || watching ? null : keepRecord(o, seats[1], outcome);
   const row = (label: string, value: (seat: PlayerId) => number | string): HTMLElement =>
     multi
       ? h('tr', null, h('th', { scope: 'row' }, label), seats.map((seat) => h('td', null, String(value(seat)))))
@@ -170,7 +173,7 @@ export function showResults(o: ResultsOptions): void {
     h(
       'div.results-actions',
       null,
-      rematchBtn,
+      watching ? null : rematchBtn,
       h('button.btn.big', { type: 'button', onclick: () => (audio.play('uiBack'), o.onExit()) }, o.session.kind === 'online' ? t('back') : t('mainMenu')),
       hideBtn,
     ),
@@ -184,7 +187,7 @@ export function showResults(o: ResultsOptions): void {
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('in')));
 
   // Online: when the opponent asks for a rematch, say so loud and clear (even with the board in view or the tab in the background).
-  if (o.session.kind === 'online') {
+  if (o.session.kind === 'online' && !watching) {
     let announced = false;
     const timer = setInterval(() => {
       if (!wrap.isConnected) return clearInterval(timer);

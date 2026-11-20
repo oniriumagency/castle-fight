@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, HEROES } from '@cardcraft-castles/engine';
-import { CLOSE_CODES, DEFAULT_TIMINGS, PROTOCOL_VERSION } from '@cardcraft-castles/protocol';
+import { CLOSE_CODES, DEFAULT_TIMINGS, MAX_SPECTATORS, PROTOCOL_VERSION } from '@cardcraft-castles/protocol';
 import { ROOM_LIMITS } from '../src/roomCore';
 import { makeRoom } from './helpers';
 
@@ -448,5 +448,113 @@ describe('a whole game', () => {
     expect(room.record.status).toBe('finished');
     expect(room.record.ending?.forfeit).toBeNull();
     expect(a.last('state')!.view.result).toEqual(room.record.game!.result);
+  });
+});
+
+describe('spectators', () => {
+  const watch = (room: ReturnType<typeof makeRoom>, name = 'eva') => {
+    const socket = room.connect(name);
+    room.send(socket, { type: 'watch', v: PROTOCOL_VERSION });
+    return socket;
+  };
+
+  it('lets someone watch a full room, with every hand hidden, and counts them', () => {
+    const room = makeRoom();
+    const { a, b } = room.start();
+    const eva = watch(room);
+    expect(eva.closedWith).toBeNull();
+    expect(eva.last('watching')!.room.spectators).toBe(1);
+    expect(a.last('room')!.room.spectators).toBe(1);
+    const { view, resumed } = eva.last('state')!;
+    expect(view.spectator).toBe(true);
+    expect(resumed).toBe(true);
+    expect(view.pending === null || view.pending.options.length === 0).toBe(true);
+    for (const p of view.players) expect(p.hand.every((c) => c.cardId === null)).toBe(true);
+
+    // Every move reaches the spectator, still with the hands hidden.
+    eva.clear();
+    room.move(a, b);
+    const update = eva.last('state')!;
+    expect(update.resumed).toBe(false);
+    for (const p of update.view.players) expect(p.hand.every((c) => c.cardId === null)).toBe(true);
+    for (const e of update.events) {
+      if (e.type === 'cardsDrawn' && !e.visible) expect(e.cards.every((c) => c.cardId === null)).toBe(true);
+    }
+  });
+
+  it('never lets a spectator act, emote or ask for a rematch', () => {
+    const room = makeRoom();
+    room.start();
+    const eva = watch(room);
+    const seq = room.record.game!.seq;
+    room.send(eva, { type: 'action', action: { type: 'endTurn' } });
+    expect(eva.last('error')?.code).toBe('notSeated');
+    room.send(eva, { type: 'emote', emote: 'wow' });
+    expect(eva.last('error')?.code).toBe('notSeated');
+    room.send(eva, { type: 'rematch' });
+    expect(eva.last('error')?.code).toBe('notSeated');
+    expect(room.record.game!.seq).toBe(seq);
+  });
+
+  it('turns away spectators over the limit', () => {
+    const room = makeRoom();
+    room.start();
+    const watchers = Array.from({ length: MAX_SPECTATORS }, (_, i) => watch(room, `w${i}`));
+    expect(watchers.every((w) => w.closedWith === null)).toBe(true);
+    const late = watch(room, 'late');
+    expect(late.last('error')?.code).toBe('tooManySpectators');
+    expect(late.closedWith).not.toBeNull();
+  });
+
+  it('updates the count when a spectator leaves or drops', () => {
+    const room = makeRoom();
+    const { a } = room.start();
+    const eva = watch(room, 'eva');
+    const fede = watch(room, 'fede');
+    expect(a.last('room')!.room.spectators).toBe(2);
+    room.send(eva, { type: 'leave' });
+    expect(a.last('room')!.room.spectators).toBe(1);
+    room.drop(fede);
+    expect(a.last('room')!.room.spectators).toBe(0);
+    // A spectator leaving never touches the game.
+    expect(room.record.status).toBe('playing');
+  });
+
+  it('gives a spectator a snapshot on sync', () => {
+    const room = makeRoom();
+    room.start();
+    const eva = watch(room);
+    eva.clear();
+    room.send(eva, { type: 'sync' });
+    expect(eva.last('state')!.view.spectator).toBe(true);
+  });
+
+  it('lets a spectator take a seat that is free', () => {
+    const room = makeRoom();
+    const a = room.connect('ana');
+    room.join(a, 'Ana');
+    const eva = watch(room);
+    expect(eva.last('watching')).toBeDefined();
+    room.join(eva, 'Eva');
+    expect(eva.last('welcome')!.seat).toBe(1);
+    expect(eva.watching).toBe(false);
+    expect(room.record.status).toBe('playing');
+    expect(eva.last('state')!.view.spectator).toBeUndefined();
+  });
+
+  it('keeps a seat for a returning player before spectators', () => {
+    const room = makeRoom();
+    const { a } = room.start();
+    const watchers = Array.from({ length: MAX_SPECTATORS }, (_, i) => watch(room, `w${i}`));
+    room.drop(a);
+    const pages = [];
+    while (room.host.sockets().length < ROOM_LIMITS.maxSockets) pages.push(room.connect(`page${pages.length}`));
+    const back = room.connect('ana-back');
+    expect(back.closedWith).toBeNull();
+    // An invite page made room, not a spectator.
+    expect(pages[0]!.closedWith?.code).toBe(CLOSE_CODES.tooManyConnections);
+    expect(watchers.every((w) => w.open)).toBe(true);
+    room.send(back, { type: 'resume', v: PROTOCOL_VERSION, token: a.last('welcome')!.token });
+    expect(back.last('welcome')!.seat).toBe(0);
   });
 });
