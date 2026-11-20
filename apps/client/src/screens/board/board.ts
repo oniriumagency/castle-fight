@@ -17,7 +17,7 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { h, html, toast } from '../../app/dom';
-import { askNotificationPermission, callAttention } from '../../app/attention';
+import { callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import { modal, type Screen } from '../../app/router';
@@ -41,7 +41,7 @@ import { CastlePlaque, SidePanel } from './hud';
 import { showResults } from './results';
 import { UltimateMode } from './ultimateMode';
 import { muteButton } from '../../ui/muteButton';
-import { hideFeedbackHint, showFeedbackHint } from '../../ui/feedback';
+import { hideFeedbackHint } from '../../ui/feedback';
 import { setGameContext } from '../../app/reportContext';
 
 type StateUpdate = Extract<SessionEvent, { type: 'state' }>;
@@ -264,11 +264,9 @@ class BoardScreen implements Screen {
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
     window.addEventListener('keydown', this.onKey);
-    // Player reports carry the game being played; every game reminds them the button is there.
+    // Player reports carry the game being played. No bubble here: it would cover the board.
     setGameContext(() => this.reportContext());
-    showFeedbackHint();
-    // Online, the browser can call the player back when it is their turn: ask on their first click.
-    if (this.session.kind === 'online') this.el.addEventListener('pointerdown', askNotificationPermission, { once: true });
+    hideFeedbackHint();
     this.unsubscribeSettings = settings.subscribe((next, prev) => {
       if (next.locale !== prev.locale) this.relocalize();
     });

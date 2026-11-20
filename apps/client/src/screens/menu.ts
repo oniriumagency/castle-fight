@@ -15,6 +15,7 @@ import { openHowToPlay } from './howToPlay';
 import { openRecord } from './recordModal';
 import { openSettings } from './settingsModal';
 import { muteButton } from '../ui/muteButton';
+import { hideFeedbackHint, showFeedbackHint } from '../ui/feedback';
 
 /** A few showpiece cards fanned beside the menu: a legendary between two epics. */
 function showcase(): HTMLElement {
@@ -140,8 +141,11 @@ export function menuScreen(): Screen {
         if (next.locale !== prev.locale) build();
       });
       unsubscribeInstall = onInstallChange(build);
+      // First visit only: points at the reports button, here where nothing is being played.
+      showFeedbackHint();
     },
     unmount() {
+      hideFeedbackHint();
       unsubscribe();
       unsubscribeInstall();
     },

@@ -1,6 +1,7 @@
 import { DEFAULT_TIMINGS, ROOM_SIZES, TURN_SECONDS_OPTIONS, UNLIMITED_TURN, type LobbyStats, type RoomSummary } from '@cardcraft-castles/protocol';
 import type { LobbyConnection } from '@cardcraft-castles/protocol/client';
 import { DEFAULT_RULES } from '@cardcraft-castles/engine';
+import { turnNotificationOffer } from '../app/attention';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
 import type { Screen } from '../app/router';
@@ -264,6 +265,7 @@ export function lobbyScreen(): Screen {
         'aside.lobby-side.panel',
         null,
         h('label.field', null, t('nickname'), nickname),
+        turnNotificationOffer(),
         h('button.btn.primary.big', { type: 'button', onclick: () => void quickJoin() }, html(iconSvg('sword')), t('quickJoin')),
         h('div.ornament', null, t('createRoom')),
         h('label.field', null, t('roomName'), roomName),
