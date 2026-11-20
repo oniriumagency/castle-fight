@@ -470,17 +470,27 @@ class BoardScreen implements Screen {
       const base = this.field.anchor(side, 'base');
       this.plaques[side].place(base.x - rect.left, base.y - rect.top + 4);
     }
-    // Free-for-all: each rival's hand hangs above their castle (a spectator's board: every hand).
-    if (this.count > 2 || this.session.spectator) {
-      for (const side of this.sides().slice(this.session.spectator ? 0 : 1)) {
-        const keep = this.field.anchor(side, 'base');
-        this.oppHands[side].style.left = `${keep.x}px`;
-      }
-    }
+    this.placeOppHands();
     const deck = this.deckPile.getBoundingClientRect();
     this.hand.deckPoint = { x: deck.left, y: deck.top };
     this.hand.layout();
     if (this.shown) this.field.setCastles(this.castleValues());
+  }
+
+  /**
+   * Free-for-all: each rival's hand hangs above their castle (a spectator's
+   * board: every hand). On a phone in landscape the piles sit at the left of
+   * the top bar: a hand above a castle on that edge moves clear of them.
+   */
+  private placeOppHands(): void {
+    if (this.count < 3 && !this.session.spectator) return;
+    const inTopbar = this.el.classList.contains('short') && this.piles.parentElement?.classList.contains('topbar');
+    const pilesRight = inTopbar ? this.piles.getBoundingClientRect().right + 8 : 0;
+    for (const side of this.sides().slice(this.session.spectator ? 0 : 1)) {
+      const keep = this.field.anchor(side, 'base');
+      const half = this.oppHands[side].getBoundingClientRect().width / 2;
+      this.oppHands[side].style.left = `${Math.max(keep.x, pilesRight + half)}px`;
+    }
   }
 
   /** Castle heights by side. */
@@ -788,6 +798,8 @@ class BoardScreen implements Screen {
     for (const oppSeat of this.seats()) {
       if (oppSeat !== handSeat || this.session.spectator) this.renderOppHand(oppSeat);
     }
+    // Their width changes with the cards in them.
+    this.placeOppHands();
 
     // Piles.
     const me = this.shown[handSeat];
