@@ -48,3 +48,12 @@ describe('seat options (campaign)', () => {
     expect(applyAction(s, { type: 'ultimate', player: 1 }).ok).toBe(false);
   });
 });
+
+describe('first battle event (campaign terrains)', () => {
+  it('can be fixed', () => {
+    for (const seed of [1, 2, 3]) {
+      expect(createGame({ seed, heroes: ['arquitecta', 'guardian'], firstEvent: 'tregua' }).state.upcomingEvent.id).toBe('tregua');
+    }
+    expect(() => createGame({ seed: 1, heroes: ['arquitecta', 'guardian'], firstEvent: 'nope' as never })).toThrow();
+  });
+});

@@ -1,8 +1,8 @@
-import { DEFAULT_RULES, buildDeckList, isCardId, isHeroId } from './catalog';
+import { BATTLE_EVENTS, DEFAULT_RULES, buildDeckList, isCardId, isHeroId } from './catalog';
 import { drawCards, emptyResources, heroPassiveFor } from './core';
 import { hashSeed, randomInt, shuffle } from './rng';
 import { rollBattleEvent, startTurn } from './turn';
-import type { CardId, GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from './types';
+import type { BattleEventId, CardId, GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from './types';
 
 export interface GameOptions {
   /** Same seed + same actions = same game. Use an unpredictable value online. */
@@ -13,6 +13,8 @@ export interface GameOptions {
   firstPlayer?: PlayerId;
   /** Overrides for the default rules, mainly for balance simulations and tests. */
   rules?: Partial<Rules>;
+  /** The first battle event, instead of a random one (campaign terrains). */
+  firstEvent?: BattleEventId;
   /** Per-seat options, mainly for the campaign. Missing entries play as usual. */
   seats?: (SeatOptions | undefined)[];
 }
@@ -69,6 +71,9 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
   for (const hero of options.heroes) {
     if (!isHeroId(hero)) throw new Error(`Unknown hero "${hero}"`);
   }
+  if (options.firstEvent !== undefined && !BATTLE_EVENTS.some((e) => e.id === options.firstEvent)) {
+    throw new Error(`Unknown battle event "${options.firstEvent}"`);
+  }
   for (const seat of options.seats ?? []) {
     if (!seat?.deck) continue;
     if (seat.deck.length < 12) throw new Error('A custom deck needs at least 12 cards');
@@ -99,7 +104,7 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
 
   const n = options.heroes.length;
   state.players = options.heroes.map((hero, i) => createPlayer(state, hero, options.heroes.length > 2, options.seats?.[i]));
-  state.upcomingEvent.id = rollBattleEvent(state, null);
+  state.upcomingEvent.id = options.firstEvent ?? rollBattleEvent(state, null);
   const firstPlayer = options.firstPlayer ?? (randomInt(state, n) as PlayerId);
   // Moving later costs tempo; a slightly taller Wall makes up for it (more for each seat further back).
   // With 3+ players the tempo matters less, so the step is smaller (balance sims: 33/32/34% with +3/+6).
