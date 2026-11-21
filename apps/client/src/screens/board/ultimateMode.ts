@@ -2,7 +2,7 @@ import { getHero } from '@cardcraft-castles/engine';
 import { h } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { artUrl } from '../../ui/assets';
-import { ultimateHtml } from '../../ui/card';
+import { ultimateHtml, type CardBuffs } from '../../ui/card';
 
 /** Where the eyes are in each hero portrait (px in the 720×538 art). */
 const EYES: Record<string, [[number, number], [number, number]]> = {
@@ -63,8 +63,12 @@ export class UltimateMode {
   }
 
   /** `ready`: the local player's ultimate is charged; `usable`: they may fire it now. */
-  update(heroId: string, ready: boolean, usable: boolean): void {
+  update(heroId: string, ready: boolean, usable: boolean, buffs?: CardBuffs): void {
     if (heroId !== this.heroId) this.setHero(heroId);
+    // The effect follows its bonuses (enchantments, Twilight Fury) as they change.
+    const tmp = document.createElement('span');
+    tmp.innerHTML = ultimateHtml(heroId, buffs);
+    this.effect = tmp.textContent ?? '';
     const changed = ready !== this.shown;
     this.shown = ready;
     this.usable = usable;
@@ -108,9 +112,6 @@ export class UltimateMode {
   private setHero(heroId: string): void {
     this.heroId = heroId;
     this.face.src = artUrl(getHero(heroId).art);
-    const tmp = document.createElement('span');
-    tmp.innerHTML = ultimateHtml(heroId);
-    this.effect = tmp.textContent ?? '';
     const eyes = EYES[heroId] ?? [[340, 120], [380, 120]];
     const span = Math.max(20, Math.hypot(eyes[1][0] - eyes[0][0], eyes[1][1] - eyes[0][1]));
     // Image width in button widths, so the eyes sit EYE_SPAN apart.

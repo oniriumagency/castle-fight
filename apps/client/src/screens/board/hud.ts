@@ -12,7 +12,7 @@ import {
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { artUrl, emblemSvg, iconSvg, watchArt, type EmblemName } from '../../ui/assets';
-import { discardOverlay, parseHistoryEntry, rulesOf, ultimateHtml } from '../../ui/card';
+import { discardOverlay, parseHistoryEntry, rulesOf, ultimateHtml, type CardBuffs } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
 const RESOURCE_EMBLEM: Record<Resource, EmblemName> = { piedra: 'piedra', acero: 'acero', mana: 'mana' };
@@ -26,6 +26,8 @@ export interface SideInfo {
   canUltimate: boolean;
   /** This seat is played from this device. */
   mine: boolean;
+  /** What raises the numbers of this player's ultimate now (passive, enchantments, Twilight Fury). */
+  buffs?: CardBuffs;
 }
 
 /**
@@ -138,7 +140,7 @@ export class SidePanel {
     label.textContent = p.ultimateReady ? t('ultimateReady') : `${p.ultimateCharge}/${p.ultimateThreshold}`;
     const progressText = t('ultimateProgress', { charge: p.ultimateCharge, threshold: p.ultimateThreshold });
     const effect = document.createElement('span');
-    effect.innerHTML = ultimateHtml(p.hero);
+    effect.innerHTML = ultimateHtml(p.hero, info.buffs);
     this.portrait.title = `${p.ultimateReady ? t('ultimateReady') : progressText}\n${t('ultimate')}: ${effect.textContent ?? ''}`;
     this.portrait.setAttribute('aria-label', `${L(getHero(p.hero).name)}. ${this.portrait.title}`);
 

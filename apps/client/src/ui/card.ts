@@ -261,13 +261,21 @@ export function rulesInnerHtml(cardId: CardId, buffs?: CardBuffs | null): string
 
 /** The buffs that raise a number printed on this card, to explain them beside it. */
 export function buffsOnCard(cardId: CardId, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: BuffKind }[] {
-  if (!buffs) return [];
   const card = getCard(cardId);
-  const text = rulesOf(card);
+  return buffsOn(card.effects, rulesOf(card), buffs);
+}
+
+/** The same for a hero's ultimate. */
+export function buffsOnUltimate(heroId: HeroId, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: BuffKind }[] {
+  return buffsOn(heroUltimateFor(heroId, tableSize > 2), heroParts(heroId).ultimate, buffs);
+}
+
+function buffsOn(ops: readonly EffectOp[], text: string, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: BuffKind }[] {
+  if (!buffs) return [];
   const none: CardBuffs = { attack: [], build: [], status: [] };
   return (['attack', 'build', 'status'] as const).flatMap((kind) => {
     const list = buffs[kind] ?? [];
-    return list.length && buffText(card.effects, text, { ...none, [kind]: list }) !== text ? list.map((buff) => ({ buff, kind })) : [];
+    return list.length && buffText(ops, text, { ...none, [kind]: list }) !== text ? list.map((buff) => ({ buff, kind })) : [];
   });
 }
 
@@ -393,10 +401,14 @@ function parseBase(entry: string): { cardId: string; discarded: boolean; boost: 
   return { cardId: entry, discarded: false, boost: null };
 }
 
-/** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */
-export function ultimateHtml(heroId: HeroId): string {
-  const buffs = heroBuffs(heroId);
-  return buffHtml(rulesHtml(buffText(heroUltimateFor(heroId, tableSize > 2), heroParts(heroId).ultimate, buffs)), buffs);
+/**
+ * The hero's ultimate as HTML, with what raises its numbers: during a match
+ * `buffs` (passive, enchantments and Twilight Fury, as on cards), otherwise
+ * the hero's own passive (the Marshal's damage).
+ */
+export function ultimateHtml(heroId: HeroId, buffs?: CardBuffs | null): string {
+  const shown = buffs ?? heroBuffs(heroId);
+  return buffHtml(rulesHtml(buffText(heroUltimateFor(heroId, tableSize > 2), heroParts(heroId).ultimate, shown)), shown);
 }
 
 export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement {
@@ -411,7 +423,7 @@ export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement
       <div class="type">${locale() === 'es' ? 'Héroe' : 'Hero'}</div>
       <div class="rules hero-rules">
         <p><b>${labels[0]}:</b> ${rulesHtml(passive)}</p>
-        <p><b>${labels[1]}:</b> ${ultimate ? ultimateHtml(heroId) : ''}</p>
+        <p><b>${labels[1]}:</b> ${ultimate ? ultimateHtml(heroId, opts.buffs) : ''}</p>
       </div>
     </div></div>
     <div class="name"><i class="tl"></i><i class="tr"></i><b>${escapeHtml(L(hero.name))}</b></div>
