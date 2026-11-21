@@ -301,6 +301,7 @@ const STRINGS = {
   comboDamage: { es: '{n} de daño', en: '{n} damage' },
   boosted: { es: 'Potenciada', en: 'Boosted' },
   buffDamage: { es: 'Daño extra en cada ataque', en: 'Extra damage on each attack' },
+  buffBuild: { es: 'Castillo extra al construir', en: 'Extra Castle when building' },
   buffTurns: { es: 'Turnos extra de duración', en: 'Extra turns of duration' },
   buffHero: { es: 'Pasiva de {name}', en: '{name}’s passive' },
   buffAttacksLeft: { es: '{name} ({n} ataques más)', en: '{name} ({n} more attacks)' },
