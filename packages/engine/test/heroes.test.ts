@@ -27,27 +27,27 @@ const HERO_TESTS: Record<string, () => void> = {
     expect(effectiveCost(state, ME, 'escaramuza')).toBe(1);
     expect(effectiveCost(state, OPP, 'parapeto')).toBe(4);
     expect(playCard(state, 'parapeto').state.players[ME].resources.piedra).toBe(47);
-    // Ultimate: +8 Keep, +10 Wall and +1 Mason.
+    // Ultimate: +9 Keep, +10 Wall and +1 Mason.
     const after = ultimate(state).state.players[ME];
-    expect([after.keep, after.wall]).toEqual([58, 25]);
+    expect([after.keep, after.wall]).toEqual([59, 25]);
     expect(after.workers).toEqual({ piedra: 3, acero: 2, mana: 2 });
   },
   mariscal: () => {
     // Passive: +2 damage on every hit (the Warden's Wall starts at 22).
     const state = charged('mariscal', { hand: ['doble-salva'] });
     expect(playCard(state, 'doble-salva').state.players[OPP].wall).toBe(22 - 14);
-    // Ultimate: 13 damage (an attack, so the passive applies).
+    // Ultimate: 14 damage (an attack, so the passive applies).
     const target = ultimate(state).state.players[OPP];
-    expect([target.wall, target.keep]).toEqual([7, 50]);
+    expect([target.wall, target.keep]).toEqual([6, 50]);
   },
   hechicera: () => {
     // Passive: Burn and Frost she applies last 1 more turn.
     const state = charged('hechicera', { hand: ['lluvia-de-ascuas', 'prision-de-hielo'] });
     expect(playCard(state, 'lluvia-de-ascuas').state.players[OPP].burn).toBe(5);
     expect(playCard(state, 'prision-de-hielo').state.players[OPP].frost).toEqual({ piedra: 2, acero: 2, mana: 2 });
-    // Ultimate: Burn (5 turns, 6 with the passive), full Frost and 3 piercing damage.
+    // Ultimate: Burn (4 turns, 5 with the passive), full Frost and 3 piercing damage.
     const target = ultimate(state).state.players[OPP];
-    expect(target.burn).toBe(6);
+    expect(target.burn).toBe(5);
     expect(target.frost).toEqual({ piedra: 2, acero: 2, mana: 2 });
     expect([target.wall, target.keep]).toEqual([22, 47]);
   },

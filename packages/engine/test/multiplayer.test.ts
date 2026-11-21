@@ -114,6 +114,47 @@ describe('three players', () => {
     expect(end.result).toEqual({ winner: 0, reason: 'concede' });
   });
 
+  it('heroes use their own numbers with 3 players', () => {
+    const withHeroes = (heroes: string[]): GameState => {
+      const state = threeWay();
+      state.players.forEach((p, i) => {
+        p.hero = heroes[i]!;
+        p.ultimateCharge = 99;
+      });
+      return state;
+    };
+    const ultimateOf = (state: GameState): GameState => mustApply(state, { type: 'ultimate', player: 0 }).state;
+    const wall = DEFAULT_RULES.wallStart;
+
+    // The Architect: +8 Keep and +10 Wall, no Mason.
+    const architect = ultimateOf(withHeroes(['arquitecta', 'guardian', 'guardian'])).players[0]!;
+    expect([architect.keep, architect.wall, architect.workers.piedra]).toEqual([58, wall + 10, 2]);
+
+    // The Marshal: 16 scaled to 60% on each rival (10), plus his +2 passive.
+    const marshal = ultimateOf(withHeroes(['mariscal', 'guardian', 'guardian']));
+    expect(marshal.players[1]!.wall).toBe(wall - 12);
+    expect(marshal.players[2]!.wall).toBe(wall - 12);
+
+    // The Sorceress: Burn keeps its 5 turns (6 with the passive), scaled to each rival.
+    const sorceress = ultimateOf(withHeroes(['hechicera', 'guardian', 'guardian']));
+    expect(sorceress.players[1]!.burn).toBe(Math.round(6 * 0.6));
+
+    // The Saboteur: discarding robs every rival.
+    const saboteur = withHeroes(['saboteadora', 'guardian', 'guardian']);
+    saboteur.players[1]!.resources = { piedra: 1, acero: 9, mana: 2 };
+    saboteur.players[2]!.resources = { piedra: 1, acero: 2, mana: 9 };
+    const robbed = mustApply(saboteur, { type: 'discard', player: 0, uid: saboteur.players[0]!.hand[0]!.uid }).state;
+    expect(robbed.players[1]!.resources.acero).toBe(6);
+    expect(robbed.players[2]!.resources.mana).toBe(6);
+    expect(robbed.players[0]!.resources).toEqual({ piedra: 50, acero: 53, mana: 53 });
+
+    // The Alchemist: +2 of a random resource per turn instead of +3.
+    const { state, events } = createGame({ seed: 5, heroes: ['alquimista', 'guardian', 'guardian'], firstPlayer: 0 });
+    const gained = events.filter((e) => e.type === 'resourcesChanged' && e.reason.kind === 'hero');
+    expect(gained).toHaveLength(1);
+    expect(Object.values(state.players[0]!.resources).reduce((a, b) => a + b, 0)).toBe(3 * 8 + 3 * 2 + 2);
+  });
+
   it('views show every castle and hide rival hands', () => {
     const state = threeWay();
     expect(state.rules.multiTargeting).toBe('all');

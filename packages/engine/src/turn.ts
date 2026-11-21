@@ -1,4 +1,4 @@
-import { BATTLE_EVENTS, RESOURCES, getBattleEvent, getEnchantmentModifiers, getHero } from './catalog';
+import { BATTLE_EVENTS, RESOURCES, getBattleEvent, getEnchantmentModifiers } from './catalog';
 import {
   changeResources,
   changeWorkers,
@@ -8,6 +8,7 @@ import {
   emptyResources,
   alivePlayers,
   finishGame,
+  heroPassive,
   loseStructure,
   nextAlive,
   opponents,
@@ -232,7 +233,7 @@ export function startTurn(state: GameState, events: GameEvent[], player: PlayerI
   }
   events.push({ type: 'produced', player, gained, frozen });
 
-  const bonus = getHero(self.hero).passive.randomResourcePerTurn;
+  const bonus = heroPassive(state, player).randomResourcePerTurn;
   if (bonus) {
     changeResources(state, events, player, { [randomPick(state, RESOURCES)]: bonus }, {
       kind: 'hero',

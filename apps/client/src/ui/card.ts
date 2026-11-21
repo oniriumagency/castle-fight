@@ -6,6 +6,8 @@ import {
   getBattleEvent,
   getCard,
   getHero,
+  heroPassiveFor,
+  heroUltimateFor,
   type BattleEventId,
   type Board,
   type CardId,
@@ -122,13 +124,13 @@ export interface CardBuffs {
 }
 
 function heroStatusBuffs(heroId: HeroId): NumberBuff[] {
-  const n = getHero(heroId).passive.statusDurationBonus ?? 0;
+  const n = heroPassiveFor(heroId, tableSize > 2).statusDurationBonus ?? 0;
   return n ? [{ source: 'hero', amount: n, label: t('buffHero', { name: L(getHero(heroId).name) }) }] : [];
 }
 
 /** What a hero's passive adds to the numbers printed on cards (when nothing else is known). */
 export function heroBuffs(heroId: HeroId): CardBuffs {
-  const attack = getHero(heroId).passive.attackBonus ?? 0;
+  const attack = heroPassiveFor(heroId, tableSize > 2).attackBonus ?? 0;
   return {
     attack: attack ? [{ source: 'hero', amount: attack, label: t('buffHero', { name: L(getHero(heroId).name) }) }] : [],
     status: heroStatusBuffs(heroId),
@@ -377,7 +379,7 @@ function parseBase(entry: string): { cardId: string; discarded: boolean; boost: 
 /** The hero's ultimate as HTML, with the numbers its own passive improves (the Marshal's damage). */
 export function ultimateHtml(heroId: HeroId): string {
   const buffs = heroBuffs(heroId);
-  return buffHtml(rulesHtml(buffText(getHero(heroId).ultimate, heroParts(heroId).ultimate, buffs)), buffs);
+  return buffHtml(rulesHtml(buffText(heroUltimateFor(heroId, tableSize > 2), heroParts(heroId).ultimate, buffs)), buffs);
 }
 
 export function heroCard(heroId: HeroId, opts: CardOptions = {}): HTMLDivElement {

@@ -39,6 +39,75 @@ const cost = (from: number, to: number): LocalizedText => ({ es: `Coste ${from} 
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    id: '2026-11-21',
+    date: { es: '21 de noviembre de 2026', en: 'November 21, 2026' },
+    title: { es: 'Héroes en equilibrio', en: 'Heroes in balance' },
+    lead: {
+      es: 'Ajustamos cuatro héroes para que todos tengan las mismas opciones de ganar, tanto en duelo como en Todos contra todos.',
+      en: 'We tuned four heroes so that every one of them has the same chance to win, in duels and in Free-for-all.',
+    },
+    sections: [
+      {
+        icon: 'hero',
+        title: { es: 'En duelo', en: 'In duels' },
+        body: {
+          es: 'La Hechicera dominaba en las partidas más reñidas, y la Arquitecta y el Mariscal se quedaban un poco atrás.',
+          en: 'The Sorceress dominated the closest games, while the Architect and the Marshal fell a little behind.',
+        },
+        cards: [
+          { id: 'hechicera', hero: true, note: { es: 'Quemadura de su definitiva: 1 turno menos', en: 'Ultimate Burn: 1 turn shorter' } },
+          { id: 'mariscal', hero: true, note: { es: 'Definitiva: 13 → 14 de daño', en: 'Ultimate: 13 → 14 damage' } },
+          { id: 'arquitecta', hero: true, note: { es: 'Definitiva: +8 → +9 Castillo', en: 'Ultimate: +8 → +9 Castle' } },
+        ],
+      },
+      {
+        icon: 'users',
+        title: { es: 'En Todos contra todos', en: 'In Free-for-all' },
+        body: {
+          es: 'Con tres castillos algunos héroes tienen ahora sus propios números.',
+          en: 'With three castles, some heroes now have numbers of their own.',
+        },
+        points: [
+          {
+            icon: 'hero',
+            text: {
+              es: '<b>Saboteadora:</b> al descartar o hacer descartar, roba 3 recursos a cada rival, no solo a uno.',
+              en: '<b>Saboteur:</b> when you discard or make a rival discard, steal 3 resources from every rival, not just one.',
+            },
+          },
+          {
+            icon: 'sword',
+            text: {
+              es: '<b>Mariscal:</b> su definitiva hace 10 de daño a cada rival (antes 8).',
+              en: '<b>Marshal:</b> his ultimate deals 10 damage to each rival (was 8).',
+            },
+          },
+          {
+            icon: 'keep',
+            text: {
+              es: '<b>Arquitecta:</b> su definitiva da +8 Castillo y +10 Muralla, sin el Cantero extra.',
+              en: '<b>Architect:</b> her ultimate gives +8 Castle and +10 Wall, without the extra Mason.',
+            },
+          },
+          {
+            icon: 'mana',
+            text: {
+              es: '<b>Alquimista:</b> gana +2 de un recurso al azar cada turno (antes +3).',
+              en: '<b>Alchemist:</b> gains +2 of a random resource each turn (was +3).',
+            },
+          },
+          {
+            icon: 'burn',
+            text: {
+              es: '<b>Hechicera:</b> la Quemadura de su definitiva sigue como antes.',
+              en: '<b>Sorceress:</b> her ultimate’s Burn stays as it was.',
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-11-20',
     date: { es: '20 de noviembre de 2026', en: 'November 20, 2026' },
     title: { es: 'Gremios, observadores y más', en: 'Guilds, spectators and more' },

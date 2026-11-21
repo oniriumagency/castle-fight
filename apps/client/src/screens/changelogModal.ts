@@ -22,7 +22,7 @@ function section(s: ChangelogSection): HTMLElement {
       ? h(
           'ul.cl-points',
           null,
-          s.points.map((p) => h('li', null, h('span.cl-icon', null, html(iconSvg(p.icon))), h('span', null, L(p.text)))),
+          s.points.map((p) => h('li', null, h('span.cl-icon', null, html(iconSvg(p.icon))), h('span', null, html(L(p.text))))),
         )
       : null,
   );
