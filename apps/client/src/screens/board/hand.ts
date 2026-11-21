@@ -195,9 +195,11 @@ export class Hand {
       slot.el.classList.toggle('playable', myTurn && !reason);
       slot.el.classList.toggle('blocked', myTurn && !!reason);
       const combo = myTurn && !reason && isComboActive(ctx.view, ctx.seat, slot.cardId);
+      // Combo on or a condition met ("if your rival played Construction..."): same aura.
+      const boosted = combo || (myTurn && !reason && isConditionMet(ctx.view, ctx.seat, slot.cardId));
       slot.el.classList.toggle('combo', combo);
-      setComboAura(slot.el, combo);
-      slot.el.classList.toggle('boosted', combo || (myTurn && !reason && isConditionMet(ctx.view, ctx.seat, slot.cardId)));
+      slot.el.classList.toggle('boosted', boosted);
+      setComboAura(slot.el, boosted);
       const cost = effectiveCost(ctx.view, ctx.seat, slot.cardId);
       const costEl = slot.el.querySelector('.cost');
       const span = costEl?.querySelector('span');
@@ -460,7 +462,8 @@ export type InspectPanel = HTMLDivElement & {
 };
 
 /**
- * The magic aura around a card in hand whose Combo is on: a soft halo
+ * The magic aura around a card in hand that would get its stronger effect
+ * if played now (Combo on, or a condition met): a soft halo
  * behind it, a spinning arcane ring, a sweep of light over the face and
  * sparks rising along its sides. Only transform and opacity animate, so it
  * stays light on phones; reduced motion keeps a still, bright aura.
