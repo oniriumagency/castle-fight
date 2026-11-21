@@ -397,11 +397,11 @@ export function inspectPanel(opts: {
 }): InspectPanel {
   const gloss = glossaryFor(opts.text);
   const buffEntries = (buffs: NonNullable<typeof opts.buffs>): HTMLElement[] =>
-    (['attack', 'status'] as const).flatMap((kind) => {
+    (['attack', 'build', 'status'] as const).flatMap((kind) => {
       const list = buffs.filter((b) => b.kind === kind);
       if (!list.length) return [];
       return [
-        h('dt.buff-line', null, t(kind === 'attack' ? 'buffDamage' : 'buffTurns')),
+        h('dt.buff-line', null, t(kind === 'attack' ? 'buffDamage' : kind === 'build' ? 'buffBuild' : 'buffTurns')),
         ...list.map(({ buff }) => h('dd.buff-line', null, h(`b.buff.${buff.source}-buff`, null, `+${buff.amount}`), ' ', buff.label)),
       ];
     });
