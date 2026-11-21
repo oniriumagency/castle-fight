@@ -36,7 +36,19 @@ function speakerOf(line: Line): { name: string; sub: string; art: HTMLImageEleme
  * Plays a short scene over whatever is on screen: one line at a time with the
  * speaker's portrait. A tap, click, Enter or Space moves on; Skip ends it.
  */
-export function playDialogue(lines: readonly Line[]): Promise<void> {
+/** Story paintings shown behind a scene (`art/campaign/`); a missing one leaves the usual dark backdrop. */
+export const SCENE_ART = {
+  prologue: 'campaign/prologo.jpg',
+  crown: 'campaign/corona.jpg',
+  epilogue: 'campaign/epilogo.jpg',
+} as const;
+
+/** Board portrait of a hero possessed by the Twilight in the final battle; the hero's own art stands in. */
+export function possessedArt(hero: string): string {
+  return `heroes/${hero}-ocaso.jpg`;
+}
+
+export function playDialogue(lines: readonly Line[], backdrop?: string): Promise<void> {
   if (!lines.length) return Promise.resolve();
   return new Promise((resolve) => {
     const overlay = document.getElementById('overlay')!;
@@ -44,6 +56,12 @@ export function playDialogue(lines: readonly Line[]): Promise<void> {
     const box = h('div.dialogue-box.panel');
     const skip = h('button.btn.ghost.dialogue-skip', { type: 'button' }, t('dialogueSkip'));
     const layer = h('div.dialogue-layer', { role: 'dialog', 'aria-modal': 'true', 'aria-live': 'polite' }, box, skip);
+    if (backdrop) {
+      const art = h('img.dialogue-scene', { src: artUrl(backdrop), alt: '', draggable: 'false' }) as HTMLImageElement;
+      art.addEventListener('load', () => layer.classList.add('has-scene'), { once: true });
+      art.addEventListener('error', () => art.remove(), { once: true });
+      layer.prepend(art);
+    }
 
     const finish = (): void => {
       window.removeEventListener('keydown', onKey, true);

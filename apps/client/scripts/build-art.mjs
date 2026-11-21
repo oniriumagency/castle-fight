@@ -13,10 +13,10 @@ import sharp from 'sharp';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, '../../../art');
 const target = join(here, '../public/art');
-const FOLDERS = ['cards', 'heroes', 'events', 'scenery', 'captains'];
+const FOLDERS = ['cards', 'heroes', 'events', 'scenery', 'captains', 'campaign'];
 const WIDTH = 720;
 /** The painted battlefield fills the whole screen, so it keeps more pixels. */
-const WIDTHS = { scenery: 2560 };
+const WIDTHS = { scenery: 2560, campaign: 1920 };
 /** The light scenery copies: about 2,400 px of sky and 1,600 px of terrain. */
 const LITE_SKY_HEIGHT = 720;
 const LITE_WIDTH = 1600;

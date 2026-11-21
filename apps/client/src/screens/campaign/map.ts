@@ -40,7 +40,7 @@ import { audio } from '../../fx/audio';
 import { deleteCampaign, exportCode, importCode, loadCampaign, saveCampaign, seen, startCampaign } from '../../game/campaignStore';
 import { artUrl, iconSvg } from '../../ui/assets';
 import { heroCss, skyFor } from '../../ui/theme';
-import { captainArt, playDialogue } from './dialogue';
+import { SCENE_ART, captainArt, playDialogue, possessedArt } from './dialogue';
 
 const SVG = 'http://www.w3.org/2000/svg';
 type RivalKingdom = Exclude<KingdomId, 'valdepiedra'>;
@@ -177,7 +177,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
                 save = startCampaign(difficulty);
                 hero = save.hero;
                 build();
-                await playDialogue(PROLOGUE);
+                await playDialogue(PROLOGUE, SCENE_ART.prologue);
                 seen('prologue');
                 save = loadCampaign();
               },
@@ -206,6 +206,12 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       ),
     );
     root.append(defs);
+
+    // The painted valley, once it exists (`art/campaign/mapa.jpg`); the coloured lands sit on top of it.
+    const painting = svg('image', { href: artUrl('campaign/mapa.jpg'), x: 0, y: 0, width: 1000, height: 700, preserveAspectRatio: 'xMidYMid slice', class: 'cm-painting' });
+    painting.addEventListener('load', () => root.classList.add('has-painting'), { once: true });
+    painting.addEventListener('error', () => painting.remove(), { once: true });
+    root.append(painting);
 
     // Kingdom lands: a soft patch of the hero's colour with the kingdom's name.
     for (const k of KINGDOMS) {
@@ -375,7 +381,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       audio.play('uiClick');
       const territory = getTerritory(id);
       const scenes = scenesBefore(save, territory, hero);
-      await playDialogue(scenes.lines);
+      await playDialogue(scenes.lines, territory.kind === 'final' ? SCENE_ART.crown : undefined);
       for (const key of scenes.keys) seen(key);
       save = loadCampaign()!;
       const battleId = `${id}:${Date.now().toString(36)}`;
@@ -435,7 +441,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
           t('campaignPasteCode'),
         ),
         h('hr'),
-        h('button.btn.ghost', { type: 'button', onclick: () => (close(), void playDialogue(PROLOGUE)) }, t('campaignStory')),
+        h('button.btn.ghost', { type: 'button', onclick: () => (close(), void playDialogue(PROLOGUE, SCENE_ART.prologue)) }, t('campaignStory')),
         h(
           'button.btn.danger',
           {
@@ -503,7 +509,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       h('h2', null, t('campaignDone')),
       h('p', null, t('campaignDoneLead')),
       h('div.campaign-cards', null, save!.allies.map((a) => h('img.campaign-ally-art', { src: artUrl(getHero(a).art), alt: L(getHero(a).name) }))),
-      h('button.btn', { type: 'button', onclick: () => void playDialogue(EPILOGUE) }, t('campaignStory')),
+      h('button.btn', { type: 'button', onclick: () => void playDialogue(EPILOGUE, SCENE_ART.epilogue) }, t('campaignStory')),
     );
 
   return {
@@ -516,7 +522,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       void field.setMood(skyFor(null), 900);
       if (after && save) {
         const lines = scenesAfter(save, after);
-        void playDialogue(lines);
+        void playDialogue(lines, after.won && getTerritory(after.territory).kind === 'final' ? SCENE_ART.epilogue : undefined);
       }
     },
     resize() {
@@ -531,7 +537,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
 /** The AI seats of a campaign battle, as the board shows them. */
 function defenderSeats(territory: Territory): { nickname: string; hero: HeroId; isAi: true; title?: { es: string; en: string }; portrait?: string }[] {
   if (territory.kind === 'final') {
-    return FINAL_RIVALS.map((hero) => ({ nickname: PERSONAS[hero]!.name, hero, isAi: true as const, title: { es: 'Poseído por el Ocaso', en: 'Possessed by the Twilight' } }));
+    return FINAL_RIVALS.map((hero) => ({ nickname: PERSONAS[hero]!.name, hero, isAi: true as const, title: { es: 'Poseído por el Ocaso', en: 'Possessed by the Twilight' }, portrait: possessedArt(hero) }));
   }
   const kingdom = getKingdom(territory.kingdom!);
   if (territory.captain) {
