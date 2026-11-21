@@ -80,6 +80,8 @@ Las cartas que afectan a «el rival» siguen `rules.multiTargeting`:
 - `all` (por defecto): golpean a todos los rivales vivos. Daño, robos, drenajes y turnos de Quemadura se multiplican por `rules.multiAllScale` (0,6), con redondeo y un mínimo de 1. Las elecciones sobre el rival toman su opción por defecto para cada uno. Cuando solo queda un rival, todo vuelve al 100 %.
 - `choose`: cada carta apunta a un rival (`target` en `play` y `ultimate`; `legalActions` da una acción por rival).
 
+Algunos héroes tienen números propios con 3 jugadores (`ffa` en `src/data/heroEffects.ts`, con su texto en `textFfa`); `heroPassive`, `heroPassiveFor` y `heroUltimateFor` devuelven los que tocan según la mesa. La pasiva de la Saboteadora en modo `all` roba a cada rival.
+
 `rules.leaderExtraDamage` suma daño a cada ataque contra el Torreón más alto y `rules.eliminationBounty` da recursos a quien derriba un castillo. Ambos valen 0 por defecto. `pnpm --filter @cardcraft-castles/ai ffa` compara las variantes con la IA.
 
 ### Reloj de turno

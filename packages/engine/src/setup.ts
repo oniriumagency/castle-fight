@@ -1,5 +1,5 @@
-import { DEFAULT_RULES, buildDeckList, getHero, isHeroId } from './catalog';
-import { drawCards, emptyResources } from './core';
+import { DEFAULT_RULES, buildDeckList, isHeroId } from './catalog';
+import { drawCards, emptyResources, heroPassiveFor } from './core';
 import { hashSeed, randomInt, shuffle } from './rng';
 import { rollBattleEvent, startTurn } from './turn';
 import type { GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from './types';
@@ -15,12 +15,12 @@ export interface GameOptions {
   rules?: Partial<Rules>;
 }
 
-function createPlayer(state: GameState, hero: HeroId): PlayerState {
+function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean): PlayerState {
   const rules = state.rules;
   return {
     hero,
     keep: rules.keepStart,
-    wall: rules.wallStart + (getHero(hero).passive.startingWallBonus ?? 0),
+    wall: rules.wallStart + (heroPassiveFor(hero, multiplayer).startingWallBonus ?? 0),
     resources: emptyResources(rules.resourceStart),
     workers: emptyResources(rules.workerStart),
     hand: [],
@@ -76,7 +76,7 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
   } as unknown as GameState;
 
   const n = options.heroes.length;
-  state.players = options.heroes.map((hero) => createPlayer(state, hero));
+  state.players = options.heroes.map((hero) => createPlayer(state, hero, options.heroes.length > 2));
   state.upcomingEvent.id = rollBattleEvent(state, null);
   const firstPlayer = options.firstPlayer ?? (randomInt(state, n) as PlayerId);
   // Moving later costs tempo; a slightly taller Wall makes up for it (more for each seat further back).

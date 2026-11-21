@@ -77,21 +77,22 @@ Con la IA en nivel normal, 10.800 partidas (`pnpm balance --games 300 --seed 33`
 | | |
 | --- | --- |
 | Duración | Con la Furia del Ocaso (por defecto): 22,8 turnos de media entre los dos jugadores (mediana 24; el 10 % pasa de 31). Sin ella: 35 de media (mediana 30; el 10 % pasa de 64) |
-| Quien sale primero gana | 49,0 % |
+| Quien sale primero gana | 48,8 % |
 | Finales | Con la Furia: 92 % derribando el Castillo rival, 8 % construyendo hasta 100. Sin ella: 82 % y 18 % |
 
 | Héroe | Victorias |
 | --- | --- |
-| El Guardián | 51,0 % |
-| El Mariscal | 50,3 % |
-| La Hechicera | 50,0 % |
-| La Saboteadora | 49,6 % |
-| La Arquitecta | 49,6 % |
-| El Alquimista | 49,5 % |
+| El Mariscal | 51,7 % |
+| La Arquitecta | 51,3 % |
+| El Guardián | 50,4 % |
+| El Alquimista | 49,1 % |
+| La Hechicera | 48,8 % |
+| La Saboteadora | 48,8 % |
+
+En nivel difícil (2.880 partidas con las semillas 7 y 21) quedan entre el 47 % y el 52 %. En todos contra todos con 3 jugadores (4.800 partidas en nivel normal, cada trío de héroes en todos los asientos) ganan entre el 32,3 % y el 34,2 %; para eso la Arquitecta, el Mariscal, la Hechicera, la Saboteadora y el Alquimista tienen números propios con 3 jugadores (`ffa` en `heroEffects.ts`).
 
 Las cartas que dan trabajadores no gastan el turno (dan otra jugada), así que valen la pena aunque la Furia acorte la partida: se juegan unas 0,5 veces por partida cada una y quien las juega gana entre el 48 % y el 55 %. Antes, a coste 8 y sin jugada extra, se jugaban 0,1 veces y ganaba el 40 %.
 
-En nivel difícil los seis quedan entre el 48 % y el 53 %.
 
 ## Pruebas
 
