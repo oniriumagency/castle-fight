@@ -34,6 +34,7 @@ import {
   boardBuffs,
   buffsKey,
   buffsOnCard,
+  buffsOnUltimate,
   cardBack,
   cardFace,
   eventCard,
@@ -260,7 +261,7 @@ class BoardScreen implements Screen {
         const { cardId, discarded, boost, copied } = parseHistoryEntry(entry);
         this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded, boost, copied);
       };
-      panel.onInspectHero = (heroId) => this.inspectHero(heroId);
+      panel.onInspectHero = (heroId) => this.inspectHero(heroId, this.seatOfSide(panel.side));
       panel.onPreview = (cardId, anchor) => {
         if (cardId && anchor) {
           const entry = parseHistoryEntry(cardId);
@@ -781,6 +782,7 @@ class BoardScreen implements Screen {
         active: this.shownActive === seat && view.phase !== 'finished',
         canUltimate: canAct && seat === view.viewer && p.ultimateReady,
         mine: this.session.isLocal(seat),
+        buffs: boardBuffs(view, seat),
       });
       this.plaques[side].update(p.keep, p.wall);
       this.plaques[side].setName(this.name(seat), this.shownActive === seat && view.phase !== 'finished');
@@ -797,7 +799,7 @@ class BoardScreen implements Screen {
     // Ultimate ready: golden aura and the hero button next to the hand.
     const mineNow = this.shown[handSeat];
     const ultReady = !!mineNow?.ultimateReady && this.curtain.hidden && handSeat === view.viewer && view.phase !== 'finished';
-    if (mineNow) this.ultMode.update(mineNow.hero, ultReady, ultReady && canAct);
+    if (mineNow) this.ultMode.update(mineNow.hero, ultReady, ultReady && canAct, boardBuffs(view, handSeat));
     // "Ready" sits next to the hand (left of the hero button), and pulses when nothing else is left to do.
     const ready = this.canReady();
     this.readyBtn.hidden = !ready;
@@ -1733,7 +1735,7 @@ class BoardScreen implements Screen {
   }
 
   private async showUltimate(seat: PlayerId, heroId: string): Promise<void> {
-    const card = heroCard(heroId, { className: 'ultimate-reveal' });
+    const card = heroCard(heroId, { className: 'ultimate-reveal', buffs: this.view ? boardBuffs(this.view, seat) : null });
     const box = h('div.ultimate-box', { class: `from-${this.sideOf(seat)}` }, card);
     this.stage.appendChild(box);
     this.showUltimateUsedCall(seat, heroId, box.getBoundingClientRect());
@@ -2139,9 +2141,10 @@ class BoardScreen implements Screen {
     this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra, typeof hero === 'object' ? buffsOnCard(cardId, hero) : undefined);
   }
 
-  private inspectHero(heroId: string): void {
+  private inspectHero(heroId: string, seat: PlayerId): void {
     audio.play('cardSelect');
-    this.openInspect(heroCard(heroId, { tilt: true }), rulesOf(getHero(heroId)));
+    const buffs = this.view ? boardBuffs(this.view, seat) : null;
+    this.openInspect(heroCard(heroId, { tilt: true, buffs }), rulesOf(getHero(heroId)), undefined, undefined, null, buffsOnUltimate(heroId, buffs));
   }
 
   private inspectEvent(): void {
