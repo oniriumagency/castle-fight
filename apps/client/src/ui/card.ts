@@ -1,6 +1,7 @@
 import {
   DEFAULT_RULES,
   attackBonusParts,
+  twilightLevel,
   SCHOOL_NAMES,
   TERMS,
   getBattleEvent,
@@ -117,11 +118,15 @@ export interface NumberBuff {
   label: string;
 }
 
-/** What is added to the numbers printed on a card: per attack, and to Burn/Frost/Rust durations. */
+/** What is added to the numbers printed on a card: per attack, to each Castle build, and to Burn/Frost/Rust durations. */
 export interface CardBuffs {
   attack: NumberBuff[];
+  /** Added to every "+N Castle" (the Twilight Fury). Optional: hero-only buffs have none. */
+  build?: NumberBuff[];
   status: NumberBuff[];
 }
+
+export type BuffKind = 'attack' | 'build' | 'status';
 
 function heroStatusBuffs(heroId: HeroId): NumberBuff[] {
   const n = heroPassiveFor(heroId, tableSize > 2).statusDurationBonus ?? 0;
@@ -152,13 +157,16 @@ export function boardBuffs(board: Board, seat: PlayerId): CardBuffs {
       part.charges === undefined ? name : t(part.charges === 1 ? 'buffAttackLeft' : 'buffAttacksLeft', { name, n: part.charges });
     return { source: 'enchantment', amount: part.amount, label };
   });
-  return { attack, status: heroStatusBuffs(heroId) };
+  // The engine adds the Fury's level times its build bonus to every Castle build.
+  const fury = twilightLevel(board) * (board.rules.twilightBuildBonus ?? 0);
+  const build: NumberBuff[] = fury ? [{ source: 'twilight', amount: fury, label: t('twilightName') }] : [];
+  return { attack, build, status: heroStatusBuffs(heroId) };
 }
 
 /** Changes whenever the buffs shown on a card would. */
 export function buffsKey(buffs: CardBuffs | null | undefined): string {
   if (!buffs) return '';
-  return [...buffs.attack, ...buffs.status].map((b) => `${b.source}:${b.amount}:${b.label}`).join('|');
+  return [...buffs.attack, ...(buffs.build ?? []), ...buffs.status].map((b) => `${b.source}:${b.amount}:${b.label}`).join('|');
 }
 
 /** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
@@ -180,9 +188,12 @@ function tableAmount(n: number): number {
   return tableSize > 2 ? Math.max(1, Math.round(n * DEFAULT_RULES.multiAllScale)) : n;
 }
 
-function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>(), status: new Set<number>() }) {
+function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>(), build: new Set<number>(), status: new Set<number>() }) {
   for (const op of ops) {
     if (op.op === 'damage') out.damage.add(tableAmount(op.amount));
+    // Per-card builds ("+4 Castle for each") get the bonus once, not per card: they keep their printed number.
+    else if (op.op === 'keep' && !op.perDiscard) out.build.add(op.amount);
+    else if (op.op === 'enchant' && op.modifiers?.onTurnStart) effectNumbers(op.modifiers.onTurnStart, out);
     else if (op.op === 'burn') out.status.add(tableAmount(op.turns));
     else if (op.op === 'frost' || op.op === 'rust') out.status.add(op.turns);
     else if (op.op === 'if') {
@@ -207,14 +218,20 @@ const BUFF_CLOSE = '\u0002';
  * single attacks (per card discarded, Burn ticks) stay as printed.
  */
 function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): string {
-  if (!buffs.attack.length && !buffs.status.length) return text;
+  const build = buffs.build ?? [];
+  if (!buffs.attack.length && !build.length && !buffs.status.length) return text;
   const numbers = effectNumbers(ops);
-  const marks = (kind: 'a' | 's', list: NumberBuff[]): string => list.map((_, i) => `${BUFF_OPEN}${kind}${i}${BUFF_CLOSE}`).join('');
+  const marks = (kind: 'a' | 'b' | 's', list: NumberBuff[]): string => list.map((_, i) => `${BUFF_OPEN}${kind}${i}${BUFF_CLOSE}`).join('');
   const es = locale() === 'es';
   let out = text;
   if (buffs.attack.length && numbers.damage.size) {
     const damage = es ? /(?<![+\d])(\d+)(?= de daño(?! menos| por))/g : /(?<![+\d])(\d+)(?= (?:piercing )?damage(?! per| for each))/g;
     out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? `${m}${marks('a', buffs.attack)}` : m));
+  }
+  if (build.length && numbers.build.size) {
+    // "+7 Castle", and the stronger "+15 instead" of a conditional build.
+    const castle = es ? /(?<=\+)(\d+)(?= (?:Castillo(?! por)|en su lugar))/g : /(?<=\+)(\d+)(?= (?:Castle(?! for each)|instead))/g;
+    out = out.replace(castle, (m) => (numbers.build.has(Number(m)) ? `${m}${marks('b', build)}` : m));
   }
   if (buffs.status.length && numbers.status.size) {
     const turns = es ? /(?<=durante )(\d+) turnos?/g : /(?<=for )(\d+) turns?/g;
@@ -228,8 +245,8 @@ function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): str
 }
 
 function buffHtml(html: string, buffs: CardBuffs): string {
-  return html.replace(/\u0001([as])(\d+)\u0002/g, (_, kind: string, i: string) => {
-    const b = (kind === 'a' ? buffs.attack : buffs.status)[Number(i)];
+  return html.replace(/\u0001([abs])(\d+)\u0002/g, (_, kind: string, i: string) => {
+    const b = (kind === 'a' ? buffs.attack : kind === 'b' ? (buffs.build ?? []) : buffs.status)[Number(i)];
     if (!b) return '';
     const cls = b.source === 'hero' ? 'buff hero-buff' : `buff ${b.source}-buff`;
     return `<span class="${cls}" title="${escapeHtml(b.label)}">+${b.amount}</span>`;
@@ -243,15 +260,15 @@ export function rulesInnerHtml(cardId: CardId, buffs?: CardBuffs | null): string
 }
 
 /** The buffs that raise a number printed on this card, to explain them beside it. */
-export function buffsOnCard(cardId: CardId, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: 'attack' | 'status' }[] {
+export function buffsOnCard(cardId: CardId, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: BuffKind }[] {
   if (!buffs) return [];
   const card = getCard(cardId);
   const text = rulesOf(card);
-  const raises = (only: CardBuffs): boolean => buffText(card.effects, text, only) !== text;
-  return [
-    ...(buffs.attack.length && raises({ attack: buffs.attack, status: [] }) ? buffs.attack.map((buff) => ({ buff, kind: 'attack' as const })) : []),
-    ...(buffs.status.length && raises({ attack: [], status: buffs.status }) ? buffs.status.map((buff) => ({ buff, kind: 'status' as const })) : []),
-  ];
+  const none: CardBuffs = { attack: [], build: [], status: [] };
+  return (['attack', 'build', 'status'] as const).flatMap((kind) => {
+    const list = buffs[kind] ?? [];
+    return list.length && buffText(card.effects, text, { ...none, [kind]: list }) !== text ? list.map((buff) => ({ buff, kind })) : [];
+  });
 }
 
 /** Explanations for the keywords a text uses, for the inspect view. */
