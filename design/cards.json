@@ -1250,8 +1250,12 @@
         "en": "The Architect"
       },
       "text": {
-        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Castillo, +10 Muralla y +1 Cantero.",
-        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Castle, +10 Wall and +1 Mason."
+        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +9 Castillo, +10 Muralla y +1 Cantero.",
+        "en": "Passive: your Construction cards cost 1 less. Ultimate: +9 Castle, +10 Wall and +1 Mason."
+      },
+      "textFfa": {
+        "es": "Pasiva: tus cartas de Construcción cuestan 1 menos. Definitiva: +8 Castillo y +10 Muralla.",
+        "en": "Passive: your Construction cards cost 1 less. Ultimate: +8 Castle and +10 Wall."
       },
       "art": "heroes/arquitecta.jpg"
     },
@@ -1262,12 +1266,12 @@
         "en": "The Marshal"
       },
       "text": {
-        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 13 de daño.",
-        "en": "Passive: your attacks deal +2 damage. Ultimate: 13 damage."
+        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 14 de daño.",
+        "en": "Passive: your attacks deal +2 damage. Ultimate: 14 damage."
       },
       "textFfa": {
-        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 8 de daño a cada rival.",
-        "en": "Passive: your attacks deal +2 damage. Ultimate: 8 damage to each rival."
+        "es": "Pasiva: tus ataques hacen +2 de daño. Definitiva: 10 de daño a cada rival.",
+        "en": "Passive: your attacks deal +2 damage. Ultimate: 10 damage to each rival."
       },
       "art": "heroes/mariscal.jpg"
     },
@@ -1297,6 +1301,10 @@
         "es": "Pasiva: +3 de un recurso al azar cada turno. Definitiva: +7 de cada recurso y +6 Castillo.",
         "en": "Passive: +3 of a random resource each turn. Ultimate: +7 of each resource and +6 Castle."
       },
+      "textFfa": {
+        "es": "Pasiva: +2 de un recurso al azar cada turno. Definitiva: +7 de cada recurso y +6 Castillo.",
+        "en": "Passive: +2 of a random resource each turn. Ultimate: +7 of each resource and +6 Castle."
+      },
       "art": "heroes/alquimista.jpg"
     },
     {
@@ -1310,8 +1318,8 @@
         "en": "Passive: when you discard or make your opponent discard, steal 3 resources from them (once per play). Ultimate: steal 1 of your opponent's workers and deal 10 piercing damage."
       },
       "textFfa": {
-        "es": "Pasiva: al descartar o hacer descartar, roba 3 recursos al rival con el Castillo más alto (una vez por jugada). Definitiva: cada rival pierde 1 trabajador (tú ganas 1) y recibe 6 de daño perforante.",
-        "en": "Passive: when you discard or make a rival discard, steal 3 resources from the rival with the highest Castle (once per play). Ultimate: each rival loses 1 worker (you gain 1) and takes 6 piercing damage."
+        "es": "Pasiva: al descartar o hacer descartar, roba 3 recursos a cada rival (una vez por jugada). Definitiva: cada rival pierde 1 trabajador (tú ganas 1) y recibe 6 de daño perforante.",
+        "en": "Passive: when you discard or make a rival discard, steal 3 resources from each rival (once per play). Ultimate: each rival loses 1 worker (you gain 1) and takes 6 piercing damage."
       },
       "art": "heroes/saboteadora.jpg"
     },

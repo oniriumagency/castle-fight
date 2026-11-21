@@ -43,6 +43,9 @@ export {
   alivePlayers,
   leaderOf,
   ultimateThreshold,
+  heroPassive,
+  heroPassiveFor,
+  heroUltimateFor,
 } from './core';
 export type { AttackBonusPart } from './core';
 

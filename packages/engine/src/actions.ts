@@ -1,4 +1,4 @@
-import { getCard, getHero, hasCombo } from './catalog';
+import { getCard, hasCombo } from './catalog';
 import {
   cloneState,
   costResource,
@@ -8,6 +8,7 @@ import {
   effectiveCost,
   eliminate,
   finishGame,
+  heroUltimateFor,
   isMultiplayer,
   isSchoolBanned,
   opponents,
@@ -208,7 +209,7 @@ function useUltimate(state: GameState, events: GameEvent[], player: PlayerId, ta
     state,
     events,
     { player, source: { kind: 'ultimate', id: self.hero }, combo: false, ...targetOf(state, player, target) },
-    getHero(self.hero).ultimate,
+    heroUltimateFor(self.hero, isMultiplayer(state)),
   );
 }
 
@@ -327,7 +328,7 @@ export function legalActions(state: Board): Action[] {
 
   const actions: Action[] = [];
   if (isUltimateReady(state, player)) {
-    add(actions, { type: 'ultimate', player }, () => getHero(state.players[player]!.hero).ultimate);
+    add(actions, { type: 'ultimate', player }, () => heroUltimateFor(state.players[player]!.hero, isMultiplayer(state)));
   }
   if (canEndTurn(state)) actions.push({ type: 'endTurn', player });
   // A view from before `actionsLeft` was sent counts as having the play.

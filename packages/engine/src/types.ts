@@ -306,6 +306,8 @@ export interface HeroDef {
   art: string;
   passive: HeroPassive;
   ultimate: EffectOp[];
+  /** Passive or ultimate for 3+ players, where they differ from the duel. */
+  ffa?: { passive?: HeroPassive; ultimate?: EffectOp[] };
 }
 
 /** Effects of a global battle event; they hit both players alike. */

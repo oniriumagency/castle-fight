@@ -5,10 +5,13 @@ import type {
   CardId,
   ChangeReason,
   DamageKind,
+  EffectOp,
   Enchantment,
   GameEvent,
   GameOverReason,
   GameState,
+  HeroId,
+  HeroPassive,
   PlayerId,
   PlayerState,
   Resource,
@@ -60,6 +63,23 @@ export function nextAlive(state: Seats, player: PlayerId): PlayerId {
 /** True when the game has 3+ seats (free-for-all rules apply). */
 export function isMultiplayer(state: Seats): boolean {
   return state.players.length > 2;
+}
+
+/** A hero's passive at a table of this size (some heroes have their own numbers for 3+ players). */
+export function heroPassiveFor(heroId: HeroId, multiplayer: boolean): HeroPassive {
+  const hero = getHero(heroId);
+  return (multiplayer && hero.ffa?.passive) || hero.passive;
+}
+
+/** A hero's ultimate at a table of this size. */
+export function heroUltimateFor(heroId: HeroId, multiplayer: boolean): EffectOp[] {
+  const hero = getHero(heroId);
+  return (multiplayer && hero.ffa?.ultimate) || hero.ultimate;
+}
+
+/** The passive of the hero `player` plays, for this table. */
+export function heroPassive(state: Seats, player: PlayerId): HeroPassive {
+  return heroPassiveFor(state.players[player]!.hero, isMultiplayer(state));
 }
 
 /** The living player with the strictly highest Keep, or null on a tie. */
@@ -150,7 +170,7 @@ export interface AttackBonusPart {
 export function attackBonusParts(state: Board, player: PlayerId): AttackBonusPart[] {
   const p = state.players[player];
   const parts: AttackBonusPart[] = [];
-  const hero = getHero(p.hero).passive.attackBonus ?? 0;
+  const hero = heroPassive(state, player).attackBonus ?? 0;
   if (hero) parts.push({ source: 'hero', amount: hero });
   for (const e of p.enchantments) {
     const amount = getEnchantmentModifiers(e.cardId)?.attackBonus ?? 0;
@@ -224,7 +244,7 @@ export function ultimateThreshold(state: Board, player: PlayerId): number {
 
 /** Extra turns added to the Burn and Frost that `player` applies. */
 export function statusDurationBonus(state: Board, player: PlayerId): number {
-  return getHero(state.players[player].hero).passive.statusDurationBonus ?? 0;
+  return heroPassive(state, player).statusDurationBonus ?? 0;
 }
 
 /** True if a running battle event forbids playing this card. */
@@ -245,7 +265,7 @@ export function effectiveCost(state: Board, player: PlayerId, cardId: CardId): n
   const card = getCard(cardId);
   let cost = card.cost;
 
-  const reduction = getHero(state.players[player].hero).passive.costReduction;
+  const reduction = heroPassive(state, player).costReduction;
   if (reduction && reduction.school === card.school) cost -= reduction.amount;
 
   // Enchantments of every living rival (no array allocated: this is on the AI's hot path).
@@ -512,16 +532,24 @@ export function drawCards(state: GameState, events: GameEvent[], player: PlayerI
 
 /**
  * The Saboteur's passive: steal `stealOnDiscard` of the opponent's biggest
- * stockpile (with 3+ players, from the default target). Returns false if the
+ * stockpile (with 3+ players, from every rival in `all` mode, or from the
+ * default target in `choose` mode). Returns false if the
  * hero has no such passive. Callers fire it at most once per action or card.
  */
 export function saboteurSteal(state: GameState, events: GameEvent[], player: PlayerId): boolean {
   const self = state.players[player];
-  const steal = getHero(self.hero).passive.stealOnDiscard;
+  const steal = heroPassive(state, player).stealOnDiscard;
   if (!steal) return false;
-  const opponent = isMultiplayer(state) ? defaultTarget(state, player) : other(player);
-  const resource = highestOf(state.players[opponent].resources);
-  stealResource(state, events, player, opponent, resource, steal, { kind: 'hero', id: self.hero });
+  // When every card hits all rivals, so does the passive: she robs each of them.
+  const victims = !isMultiplayer(state)
+    ? [other(player)]
+    : state.rules.multiTargeting === 'all'
+      ? opponents(state, player)
+      : [defaultTarget(state, player)];
+  for (const victim of victims) {
+    const resource = highestOf(state.players[victim].resources);
+    stealResource(state, events, player, victim, resource, steal, { kind: 'hero', id: self.hero });
+  }
   return true;
 }
 
