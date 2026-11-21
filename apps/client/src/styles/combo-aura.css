@@ -1,20 +1,19 @@
 /*
- * Combo on (cards in hand): a magic aura that is hard to miss. A big soft
+ * Combo on or condition met (cards in hand, .boosted): a magic aura that is hard to miss. A big soft
  * halo pulses behind the card, an arcane ring spins around its edge, a
  * sweep of light crosses the face and sparks rise along its sides. Only
  * transform and opacity animate (no box-shadow or filter animation), so
- * the compositor does the work and phones stay smooth. The plain "condition
- * met" halo (.boosted without .combo) is unchanged.
+ * the compositor does the work and phones stay smooth.
  */
 
 /* The aura replaces the thinner rings of playable and boosted cards. */
-.hand-card.combo::before,
-.hand-card.combo::after { display: none; }
+.hand-card.boosted::before,
+.hand-card.boosted::after { display: none; }
 
 /* Above its neighbours in the fan (still under a hovered, selected or dragged card). */
-.hand-card.combo:not(.selected) { z-index: 40 !important; }
+.hand-card.boosted:not(.selected) { z-index: 40 !important; }
 
-.hand-card.combo {
+.hand-card.boosted {
   --glow: 0 0 calc(26 * var(--u)) calc(7 * var(--u)) rgb(110 235 255 / 95%), 0 0 calc(70 * var(--u)) calc(18 * var(--u)) rgb(90 120 255 / 55%);
 }
 
