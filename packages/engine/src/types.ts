@@ -373,6 +373,12 @@ export interface Enchantment {
 
 export interface PlayerState {
   hero: HeroId;
+  /** Campaign captains: plays with the hero's castle and colours but without its passive. */
+  noPassive?: boolean;
+  /** Campaign: the ultimate is not available (it neither charges nor can be used). */
+  ultimateLocked?: boolean;
+  /** Campaign: the card list this player's deck was built from, when it is not the common deck (public). */
+  deckList?: CardId[];
   keep: number;
   wall: number;
   resources: ResourceMap;
@@ -534,6 +540,8 @@ export interface ApplyOptions {
 
 export interface BoardPlayer {
   hero: HeroId;
+  noPassive?: boolean;
+  ultimateLocked?: boolean;
   keep: number;
   resources: ResourceMap;
   enchantments: Enchantment[];
@@ -755,6 +763,12 @@ export type GameEvent =
 
 export interface PlayerPublicState {
   hero: HeroId;
+  /** Campaign captains: no hero passive. */
+  noPassive?: boolean;
+  /** Campaign: the ultimate cannot charge or be used. */
+  ultimateLocked?: boolean;
+  /** Campaign: the cards this player's deck is built from (sorted; public knowledge). Missing = the common deck. */
+  deckList?: CardId[];
   keep: number;
   wall: number;
   resources: ResourceMap;

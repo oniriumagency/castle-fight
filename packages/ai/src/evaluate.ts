@@ -354,7 +354,7 @@ function sideValue(
   }
 
   const threshold = ultimateThreshold(state, player);
-  value += w.ultimate * ultimateNominal(tables, p.hero, w) * Math.min(1, p.ultimateCharge / threshold);
+  if (!p.ultimateLocked) value += w.ultimate * ultimateNominal(tables, p.hero, w) * Math.min(1, p.ultimateCharge / threshold);
   value += w.tempo * p.extraTurns;
 
   // Cards drawn during the look-ahead are guesses, so only the hand as it was counts.

@@ -42,7 +42,7 @@ function guessPlayer(
 
   // Every card the player owns that is not known to be in hand: unknown hand
   // cards, the deck and the discard pile all come out of this pool.
-  const pool = buildDeckList(view.rules);
+  const pool = pub.deckList ? pub.deckList.slice() : buildDeckList(view.rules);
   removeKnown(pool, [...seen.values()]);
   shuffle(rng, pool);
 
@@ -54,6 +54,9 @@ function guessPlayer(
 
   return {
     hero: pub.hero,
+    ...(pub.noPassive ? { noPassive: true } : {}),
+    ...(pub.ultimateLocked ? { ultimateLocked: true } : {}),
+    ...(pub.deckList ? { deckList: pub.deckList.slice() } : {}),
     keep: pub.keep,
     wall: pub.wall,
     resources: { ...pub.resources },

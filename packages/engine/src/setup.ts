@@ -1,8 +1,8 @@
-import { DEFAULT_RULES, buildDeckList, isHeroId } from './catalog';
+import { DEFAULT_RULES, buildDeckList, isCardId, isHeroId } from './catalog';
 import { drawCards, emptyResources, heroPassiveFor } from './core';
 import { hashSeed, randomInt, shuffle } from './rng';
 import { rollBattleEvent, startTurn } from './turn';
-import type { GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from './types';
+import type { CardId, GameEvent, GameState, HeroId, PlayerId, PlayerState, Rules } from './types';
 
 export interface GameOptions {
   /** Same seed + same actions = same game. Use an unpredictable value online. */
@@ -13,18 +13,35 @@ export interface GameOptions {
   firstPlayer?: PlayerId;
   /** Overrides for the default rules, mainly for balance simulations and tests. */
   rules?: Partial<Rules>;
+  /** Per-seat options, mainly for the campaign. Missing entries play as usual. */
+  seats?: (SeatOptions | undefined)[];
 }
 
-function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean): PlayerState {
+/** How one seat differs from a normal game (campaign battles). */
+export interface SeatOptions {
+  /** The cards this seat's deck is built from, copies included. Default: the common deck. */
+  deck?: readonly CardId[];
+  /** Play without the hero's passive (campaign captains). */
+  noPassive?: boolean;
+  /** No ultimate this game: it neither charges nor can be used. */
+  ultimateLocked?: boolean;
+}
+
+function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean, seat: SeatOptions = {}): PlayerState {
   const rules = state.rules;
+  const passive = seat.noPassive ? {} : heroPassiveFor(hero, multiplayer);
+  const deckList = seat.deck ? seat.deck.slice().sort() : null;
   return {
     hero,
+    ...(seat.noPassive ? { noPassive: true } : {}),
+    ...(seat.ultimateLocked ? { ultimateLocked: true } : {}),
+    ...(deckList ? { deckList } : {}),
     keep: rules.keepStart,
-    wall: rules.wallStart + (heroPassiveFor(hero, multiplayer).startingWallBonus ?? 0),
+    wall: rules.wallStart + (passive.startingWallBonus ?? 0),
     resources: emptyResources(rules.resourceStart),
     workers: emptyResources(rules.workerStart),
     hand: [],
-    deck: shuffle(state, buildDeckList(rules)),
+    deck: shuffle(state, deckList ? deckList.slice() : buildDeckList(rules)),
     discard: [],
     enchantments: [],
     burn: 0,
@@ -52,6 +69,11 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
   for (const hero of options.heroes) {
     if (!isHeroId(hero)) throw new Error(`Unknown hero "${hero}"`);
   }
+  for (const seat of options.seats ?? []) {
+    if (!seat?.deck) continue;
+    if (seat.deck.length < 12) throw new Error('A custom deck needs at least 12 cards');
+    for (const cardId of seat.deck) if (!isCardId(cardId)) throw new Error(`Unknown card "${cardId}"`);
+  }
   const rules: Rules = {
     ...DEFAULT_RULES,
     ...options.rules,
@@ -76,7 +98,7 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
   } as unknown as GameState;
 
   const n = options.heroes.length;
-  state.players = options.heroes.map((hero) => createPlayer(state, hero, options.heroes.length > 2));
+  state.players = options.heroes.map((hero, i) => createPlayer(state, hero, options.heroes.length > 2, options.seats?.[i]));
   state.upcomingEvent.id = rollBattleEvent(state, null);
   const firstPlayer = options.firstPlayer ?? (randomInt(state, n) as PlayerId);
   // Moving later costs tempo; a slightly taller Wall makes up for it (more for each seat further back).

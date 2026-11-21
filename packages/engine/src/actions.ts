@@ -46,7 +46,8 @@ export function currentPlayer(state: Board): PlayerId | null {
 
 /** True if `player` has taken enough damage to use the hero ultimate. */
 export function isUltimateReady(state: Board, player: PlayerId): boolean {
-  return state.players[player].ultimateCharge >= ultimateThreshold(state, player);
+  const p = state.players[player];
+  return !p.ultimateLocked && p.ultimateCharge >= ultimateThreshold(state, player);
 }
 
 /**
