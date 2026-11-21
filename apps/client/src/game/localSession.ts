@@ -12,7 +12,9 @@ import {
 } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 import { settings } from '../app/settings';
+import type { BattleOutcome, BattleSetup } from '@cardcraft-castles/campaign';
 import { chooseAiAction, type Difficulty } from './ai';
+import { settleCampaignBattle } from './campaignStore';
 import { BaseSession, type MatchSession, type Seat, type SessionKind } from './session';
 
 export interface LocalOptions {
@@ -21,6 +23,14 @@ export interface LocalOptions {
   seats: Seat[];
   /** For `ai`: every seat but 0 is an AI. */
   difficulty?: Difficulty;
+  /** A campaign battle: how it is set up and which pending battle it settles. */
+  campaign?: CampaignBattle;
+}
+
+export interface CampaignBattle {
+  /** The id `startBattle` stored, so the result is applied once. */
+  id: string;
+  setup: BattleSetup;
 }
 
 /** The game in progress on this device, kept so it survives a locked phone or a reload. */
@@ -29,6 +39,7 @@ interface SavedGame {
   kind: 'ai' | 'local';
   seats: Seat[];
   difficulty: Difficulty;
+  campaign?: CampaignBattle;
   state: GameState;
   viewer: PlayerId;
   savedAt: number;
@@ -78,6 +89,9 @@ export class LocalSession extends BaseSession implements MatchSession {
   readonly kind: 'ai' | 'local';
   readonly seats: Seat[];
   readonly difficulty: Difficulty;
+  readonly campaign: CampaignBattle | null;
+  /** Set once a campaign battle is over and its result applied. */
+  campaignOutcome: BattleOutcome | null = null;
   private state!: GameState;
   private viewer: PlayerId = 0;
   private deadline: number | null = null;
@@ -91,6 +105,7 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.kind = options.kind;
     this.seats = options.seats;
     this.difficulty = options.difficulty ?? 'normal';
+    this.campaign = options.campaign ?? null;
     if (saved) {
       this.state = saved.state;
       this.viewer = saved.viewer;
@@ -102,7 +117,7 @@ export class LocalSession extends BaseSession implements MatchSession {
   static resume(): LocalSession | null {
     const save = readSave();
     if (!save) return null;
-    return new LocalSession({ kind: save.kind, seats: save.seats, difficulty: save.difficulty }, save);
+    return new LocalSession({ kind: save.kind, seats: save.seats, difficulty: save.difficulty, ...(save.campaign ? { campaign: save.campaign } : {}) }, save);
   }
 
   statsKey(): string {
@@ -119,6 +134,7 @@ export class LocalSession extends BaseSession implements MatchSession {
       kind: this.kind,
       seats: this.seats,
       difficulty: this.difficulty,
+      ...(this.campaign ? { campaign: this.campaign } : {}),
       state: this.state,
       viewer: this.viewer,
       savedAt: Date.now(),
@@ -130,6 +146,16 @@ export class LocalSession extends BaseSession implements MatchSession {
     }
   }
 
+  /** Campaign: applies the result once the player has won, lost, or fallen in the final battle. */
+  private settleCampaign(): void {
+    if (!this.campaign || this.campaignOutcome) return;
+    const me = this.state.players[0]!;
+    const over = this.state.phase === 'finished' || !!me.eliminated;
+    if (!over) return;
+    const won = this.state.phase === 'finished' && this.state.result?.winner === 0;
+    this.campaignOutcome = settleCampaignBattle(this.campaign.id, won);
+  }
+
   isLocal(seat: PlayerId): boolean {
     return this.kind === 'local' || seat === 0;
   }
@@ -138,11 +164,14 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.stopTimers();
     this.deadline = null;
     this.clockTurn = -1;
+    const setup = this.campaign?.setup;
     const { state, events } = createGame({
       seed: randomSeed(),
       heroes: this.seats.map((s) => s.hero),
       // The turn ends on "Ready", so the ultimate can still follow the card.
-      rules: { manualEndTurn: true },
+      rules: { ...setup?.rules, manualEndTurn: true },
+      ...(setup ? { seats: setup.seats } : {}),
+      ...(setup?.firstEvent ? { firstEvent: setup.firstEvent } : {}),
     });
     this.state = state;
     this.publish(events);
@@ -157,6 +186,7 @@ export class LocalSession extends BaseSession implements MatchSession {
 
   private publish(events: GameEvent[], resumed = false): void {
     this.viewer = this.currentViewer();
+    this.settleCampaign();
     this.save();
     this.emit({
       type: 'state',
@@ -205,7 +235,7 @@ export class LocalSession extends BaseSession implements MatchSession {
       this.aiTimer = setTimeout(() => {
         this.aiTimer = null;
         if (this.closed || this.state.phase === 'finished') return;
-        this.apply(chooseAiAction(this.state, this.difficulty));
+        this.apply(chooseAiAction(this.state, this.difficulty, this.campaign?.setup.tier));
       }, think * scale);
       return;
     }
@@ -245,6 +275,8 @@ export class LocalSession extends BaseSession implements MatchSession {
   }
 
   rematch(heroes?: Partial<Record<PlayerId, HeroId>>): void {
+    // A campaign battle is fought again from the map, not with a rematch.
+    if (this.campaign) return;
     // A new hero for the seats played on this device; the AI keeps its own.
     this.seats.forEach((seat, i) => {
       const hero = heroes?.[i];

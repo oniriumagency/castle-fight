@@ -13,7 +13,7 @@ import sharp from 'sharp';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, '../../../art');
 const target = join(here, '../public/art');
-const FOLDERS = ['cards', 'heroes', 'events', 'scenery'];
+const FOLDERS = ['cards', 'heroes', 'events', 'scenery', 'captains'];
 const WIDTH = 720;
 /** The painted battlefield fills the whole screen, so it keeps more pixels. */
 const WIDTHS = { scenery: 2560 };

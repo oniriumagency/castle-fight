@@ -20,6 +20,7 @@ import { h, html, toast } from '../../app/dom';
 import { callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
+import type { BattleOutcome } from '@cardcraft-castles/campaign';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
 import { battlefield } from '../../app/stage';
@@ -783,6 +784,8 @@ class BoardScreen implements Screen {
         canUltimate: canAct && seat === view.viewer && p.ultimateReady,
         mine: this.session.isLocal(seat),
         buffs: boardBuffs(view, seat),
+        ...(this.session.seats[seat]?.title ? { title: L(this.session.seats[seat]!.title!) } : {}),
+        ...(this.session.seats[seat]?.portrait ? { portrait: this.session.seats[seat]!.portrait! } : {}),
       });
       this.plaques[side].update(p.keep, p.wall);
       this.plaques[side].setName(this.name(seat), this.shownActive === seat && view.phase !== 'finished');
@@ -2142,6 +2145,11 @@ class BoardScreen implements Screen {
   }
 
   private inspectHero(heroId: string, seat: PlayerId): void {
+    // Campaign captains fight with their kingdom's colours but none of its hero's powers.
+    if (this.view?.players[seat]?.noPassive) {
+      toast(t('captainNoPowers'), 'info', 3200);
+      return;
+    }
     audio.play('cardSelect');
     const buffs = this.view ? boardBuffs(this.view, seat) : null;
     this.openInspect(heroCard(heroId, { tilt: true, buffs }), rulesOf(getHero(heroId)), undefined, undefined, null, buffsOnUltimate(heroId, buffs));
@@ -2443,7 +2451,12 @@ class BoardScreen implements Screen {
   }
 
   private exit(): void {
-    void import('../flow').then(({ flow }) => (this.session.kind === 'online' ? flow.lobby() : flow.menu()));
+    const campaign = (this.session as { campaign?: unknown }).campaign;
+    void import('../flow').then(({ flow }) => {
+      if (campaign) flow.campaign((this.session as { campaignOutcome?: BattleOutcome | null }).campaignOutcome ?? null);
+      else if (this.session.kind === 'online') flow.lobby();
+      else flow.menu();
+    });
   }
 }
 

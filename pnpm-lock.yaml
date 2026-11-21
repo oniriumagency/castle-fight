@@ -13,6 +13,9 @@ importers:
       '@cardcraft-castles/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@cardcraft-castles/campaign':
+        specifier: workspace:*
+        version: link:../../packages/campaign
       '@cardcraft-castles/engine':
         specifier: workspace:*
         version: link:../../packages/engine

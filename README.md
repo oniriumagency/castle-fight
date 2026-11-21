@@ -11,6 +11,7 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`), con el nombre de archivo indicado en cada prompt. |
 | `packages/engine` | Motor de reglas puro y determinista, sin dependencias. Lo usan el servidor, el cliente, la IA y las simulaciones. [Documentación](packages/engine/README.md). |
 | `packages/ai` | IA rival con tres dificultades, que corre en el navegador sin servidor, y simulaciones de equilibrio IA contra IA. [Documentación](packages/ai/README.md). |
+| `packages/campaign` | Modo Campaña: mapa de reinos y territorios, progreso guardado, mazos rivales, dificultad y diálogos. [Documentación](packages/campaign/README.md). |
 | `packages/protocol` | Mensajes entre cliente y servidor y el SDK de cliente tipado (`@cardcraft-castles/protocol/client`) con lobby, salas, reconexión y reloj. [Documentación](packages/protocol/README.md). |
 | `apps/client` | Cliente web (Vite + PixiJS): menú, lobby online, selección de héroe, tablero animado y resultados, en escritorio y móvil, en español e inglés. Se juega contra la IA, a dos jugadores en el mismo dispositivo o en línea. [Documentación](apps/client/README.md). |
 | `apps/library` | Portada de games.onirium.agency: la biblioteca de juegos de Onirium. Se genera desde `games.json` y junta la biblioteca y el juego en una sola carpeta para publicar. [Documentación](apps/library/README.md). |

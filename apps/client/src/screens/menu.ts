@@ -52,6 +52,14 @@ function modeButton(icon: IconName, label: string, hint: string, onClick: () => 
   );
 }
 
+/** The campaign, flagged as beta while it is being tested. */
+function campaignButton(): HTMLElement {
+  const btn = modeButton('keep', t('playCampaign'), t('playCampaignHint'), () => flow.campaign());
+  btn.classList.add('campaign-mode');
+  btn.querySelector('strong')!.append(h('span.beta-tag', null, t('betaTag')));
+  return btn;
+}
+
 export function menuScreen(): Screen {
   const el = h('div.menu-screen');
 
@@ -77,6 +85,7 @@ export function menuScreen(): Screen {
           'nav.modes',
           null,
           hasSavedGame() ? modeButton('keep', t('continueGame'), t('continueGameHint'), () => flow.resumeLocal() || build()) : null,
+          campaignButton(),
           modeButton('sword', t('playAi'), t('playAiHint'), () => flow.heroSelect('ai')),
           modeButton('globe', t('playOnline'), t('playOnlineHint'), () => flow.lobby()),
           modeButton('users', t('playLocal'), t('playLocalHint'), () => flow.heroSelect('local')),

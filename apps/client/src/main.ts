@@ -18,6 +18,7 @@ import './styles/card.css';
 import './styles/screens.css';
 import './styles/board.css';
 import './styles/materials.css';
+import './styles/campaign.css';
 
 import { toast } from './app/dom';
 import { t } from './app/i18n';

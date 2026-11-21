@@ -6,8 +6,10 @@ import { setScreenName } from '../app/reportContext';
 import { show } from '../app/router';
 import { settings } from '../app/settings';
 import type { Difficulty } from '../game/ai';
-import { LocalSession } from '../game/localSession';
-import type { MatchSession } from '../game/session';
+import { LocalSession, type CampaignBattle } from '../game/localSession';
+import type { MatchSession, Seat } from '../game/session';
+import type { BattleOutcome } from '@cardcraft-castles/campaign';
+import { campaignScreen } from './campaign/map';
 import { boardScreen } from './board/board';
 import { heroSelectScreen, type HeroSelectMode } from './heroSelect';
 import { lobbyScreen } from './lobby';
@@ -111,6 +113,24 @@ export const flow = {
     flow.board(session);
     toast(t('gameRestored'), 'info', 2600);
     return true;
+  },
+
+  /** The campaign map (or its start screen), with the scenes that follow `outcome` when coming back from a battle. */
+  campaign(outcome: BattleOutcome | null = null): void {
+    setRoomInUrl(null);
+    setScreenName('campaign');
+    show(campaignScreen(outcome));
+  },
+
+  startCampaignBattle(battle: CampaignBattle, rivals: Seat[]): void {
+    setRoomInUrl(null);
+    const session = new LocalSession({
+      kind: 'ai',
+      difficulty: 'normal',
+      campaign: battle,
+      seats: [{ nickname: nickname(t('you')), hero: battle.setup.heroes[0]! }, ...rivals],
+    });
+    flow.board(session);
   },
 
   board(session: MatchSession): void {

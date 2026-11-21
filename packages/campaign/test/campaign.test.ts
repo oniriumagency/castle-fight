@@ -143,8 +143,10 @@ describe('battles', () => {
 
   it('gets harder with every hero beaten and with the chosen difficulty', () => {
     const save = newCampaign();
-    expect(rivalTier(save, 'bastion-a')).toBeLessThan(rivalTier(save, 'bastion-castillo'));
+    // The first castle gets a softer AI on purpose: its deck already makes it the hardest fight so far.
+    expect(rivalTier(save, 'bastion-castillo')).toBeLessThan(rivalTier(save, 'bastion-a'));
     const later = win(win(win(save, 'bastion-a'), 'bastion-c'), 'bastion-castillo');
+    expect(rivalTier(later, 'alambiques-a')).toBeLessThan(rivalTier(later, 'alambiques-castillo'));
     expect(rivalTier(later, 'alambiques-a')).toBeGreaterThan(rivalTier(save, 'alambiques-a'));
     expect(rivalTier(newCampaign('historia'), 'bastion-a')).toBeLessThan(rivalTier(save, 'bastion-a'));
     expect(rivalTier(newCampaign('dificil'), 'bastion-a')).toBeGreaterThan(rivalTier(save, 'bastion-a'));

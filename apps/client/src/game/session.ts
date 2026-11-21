@@ -1,4 +1,4 @@
-import type { GameEvent, HeroId, PlayerId, PlayerView } from '@cardcraft-castles/engine';
+import type { GameEvent, HeroId, LocalizedText, PlayerId, PlayerView } from '@cardcraft-castles/engine';
 import type { PlayerAction } from '@cardcraft-castles/protocol';
 
 /**
@@ -14,6 +14,10 @@ export interface Seat {
   isAi?: boolean;
   /** Online: the player's public browser id, for the head-to-head record. */
   pid?: string | null;
+  /** Campaign captains: shown instead of the hero's name (e.g. "Captain · Azure Bastion"). */
+  title?: LocalizedText;
+  /** Campaign captains: their portrait (catalog art path); the hero's when it is not painted yet. */
+  portrait?: string;
 }
 
 export type SessionKind = 'ai' | 'local' | 'online';

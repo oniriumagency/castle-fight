@@ -96,7 +96,7 @@ export const KINGDOMS: readonly Kingdom[] = [
   { id: 'alambiques', hero: 'alquimista', name: { es: 'Valle de los Alambiques', en: 'Alembic Vale' }, theme: { es: 'Recursos y trabajadores', en: 'Resources and workers' }, x: 750, y: 540 },
   { id: 'ceniza', hero: 'saboteadora', name: { es: 'Hondonada de Ceniza', en: 'Ashen Hollow' }, theme: { es: 'Descarte y robo', en: 'Discard and theft' }, x: 230, y: 240 },
   { id: 'escarcha', hero: 'hechicera', name: { es: 'Cumbres de Escarcha', en: 'Frostpeaks' }, theme: { es: 'Magia y estados', en: 'Magic and statuses' }, x: 770, y: 240 },
-  { id: 'carmesi', hero: 'mariscal', name: { es: 'Marca Carmesí', en: 'Crimson March' }, theme: { es: 'Asalto puro', en: 'Pure assault' }, x: 500, y: 110 },
+  { id: 'carmesi', hero: 'mariscal', name: { es: 'Marca Carmesí', en: 'Crimson March' }, theme: { es: 'Asalto puro', en: 'Pure assault' }, x: 500, y: 115 },
 ];
 
 export const TERRAINS: readonly Terrain[] = [
@@ -157,7 +157,7 @@ export const TERRITORIES: readonly Territory[] = [
   // Ashen Hollow (the Saboteur): discard and theft.
   T('ceniza-a', 'ceniza', 'territory', 'Ciénaga de Hollín', 'Soot Mire', 190, 330, 'pantano', ['escombros-utiles', 'tierra-quemada'],
     cap('Gilly Ratón', '¿Has perdido algo? No. Todavía no.', 'Lost something? No. Not yet.')),
-  T('ceniza-b', 'ceniza', 'territory', 'Mercado Negro', 'Black Market', 350, 160, 'mercado', ['ofrenda-arcana', 'ojo-del-augur'],
+  T('ceniza-b', 'ceniza', 'territory', 'Mercado Negro', 'Black Market', 320, 185, 'mercado', ['ofrenda-arcana', 'ojo-del-augur'],
     cap('Wick Tallow', 'Aquí todo tiene precio. El tuyo acaba de subir.', 'Everything has a price here. Yours just went up.')),
   T('ceniza-c', 'ceniza', 'territory', 'Túneles del Contrabando', 'Smugglers’ Tunnels', 300, 270, 'terremoto', ['planos-revisados', 'relevo-de-tropas', 'sillares-reciclados'],
     cap('Corwin Manolenta', 'Estos túneles tienen mil salidas. Tú no encontrarás ninguna.', 'These tunnels have a thousand ways out. You will find none.')),
@@ -168,7 +168,7 @@ export const TERRITORIES: readonly Territory[] = [
   // Frostpeaks (the Sorceress): magic and statuses.
   T('escarcha-a', 'escarcha', 'territory', 'Lago Cristalino', 'Crystal Lake', 810, 330, 'tregua', ['aliento-de-escarcha', 'disipar'],
     cap('Aprendiz Liora', 'La maestra dice que no te tenga miedo. Lo estoy intentando.', 'My mistress says I should not fear you. I am trying.')),
-  T('escarcha-b', 'escarcha', 'territory', 'Sendero de Escarcha', 'Frost Trail', 650, 160, 'eclipse', ['maldicion-de-oxido', 'espejismo'],
+  T('escarcha-b', 'escarcha', 'territory', 'Sendero de Escarcha', 'Frost Trail', 680, 185, 'eclipse', ['maldicion-de-oxido', 'espejismo'],
     cap('Hermano Vane', 'El frío no tiene prisa. Nosotros tampoco.', 'The cold is in no hurry. Neither are we.')),
   T('escarcha-c', 'escarcha', 'territory', 'Ruinas del Augur', 'Augur’s Ruins', 700, 270, 'tormenta', ['rayo-bifurcado', 'trueque-de-destinos'],
     cap('Maga Seren', 'Estas piedras vieron caer a reyes. Tú no eres reina.', 'These stones saw kings fall. You are no queen.')),
@@ -177,15 +177,15 @@ export const TERRITORIES: readonly Territory[] = [
   T('escarcha-castillo', 'escarcha', 'castle', 'Torre de la Llama Helada', 'Tower of the Frozen Flame', 910, 250, null, ['tormenta-de-ceniza', 'cometa-del-ocaso']),
 
   // Crimson March (the Marshal): pure assault.
-  T('carmesi-a', 'carmesi', 'territory', 'Campo de Lanzas', 'Field of Spears', 400, 140, 'llanura', ['hostigamiento', 'ariete-de-hierro'],
+  T('carmesi-a', 'carmesi', 'territory', 'Campo de Lanzas', 'Field of Spears', 415, 118, 'llanura', ['hostigamiento', 'ariete-de-hierro'],
     cap('Sargento Bruck', '¡Formad filas! Que la Arquitecta vea cómo se pelea en la Marca.', 'Form ranks! Let the Architect see how the March fights.')),
-  T('carmesi-b', 'carmesi', 'territory', 'Forja Roja', 'Red Forge', 600, 140, 'murallas', ['estandarte-de-guerra', 'emboscada'],
+  T('carmesi-b', 'carmesi', 'territory', 'Forja Roja', 'Red Forge', 585, 118, 'murallas', ['estandarte-de-guerra', 'emboscada'],
     cap('Capitán Holt', 'Cada espada de esta forja lleva el nombre de un muro que derribó.', 'Every sword from this forge bears the name of a wall it brought down.')),
   T('carmesi-c', 'carmesi', 'territory', 'Llanura de Batalla', 'Battle Plain', 500, 190, 'llanura', ['catapulta', 'balista-de-asedio'],
     cap('Coronel Varga', 'En esta llanura no hay donde esconderse. Ni para ti ni para mí.', 'There is nowhere to hide on this plain. Not for you, not for me.')),
-  T('carmesi-d', 'carmesi', 'territory', 'Cuarteles del Norte', 'Northern Barracks', 560, 60, 'tormenta', ['sabotaje', 'barril-de-polvora'],
+  T('carmesi-d', 'carmesi', 'territory', 'Cuarteles del Norte', 'Northern Barracks', 590, 52, 'tormenta', ['sabotaje', 'barril-de-polvora'],
     cap('Comandante Dresk', 'El Mariscal no se equivoca. Si te dejó llegar aquí, es para terminar contigo él mismo.', 'The Marshal makes no mistakes. If he let you get this far, it is to finish you himself.')),
-  T('carmesi-castillo', 'carmesi', 'castle', 'Fortaleza Carmesí', 'Crimson Fortress', 460, 55, null, ['trabuquete-colosal', 'torre-de-asedio', 'hueste-imparable']),
+  T('carmesi-castillo', 'carmesi', 'castle', 'Fortaleza Carmesí', 'Crimson Fortress', 430, 48, null, ['trabuquete-colosal', 'torre-de-asedio', 'hueste-imparable']),
 
   // The Crown: the final battle, once the five castles have fallen.
   T('corona', null, 'final', 'La Corona', 'The Crown', 500, 380, 'ocaso', []),
