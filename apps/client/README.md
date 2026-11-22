@@ -60,6 +60,14 @@ Los efectos de sonido y visuales son originales y se generan en el navegador: no
 
 Ajustes: volumen general, música y efectos, silenciar todo (también con la tecla M), calidad de efectos, sacudida de pantalla y movimiento reducido. El botón del altavoz (menú y partida) abre ahí mismo un panel con los tres volúmenes y Silenciar todo (`ui/muteButton.ts`).
 
+## Jugar sin conexión
+
+En las compilaciones (no en `pnpm dev`) un service worker guarda el juego en el dispositivo, así que la campaña, la IA y dos jugadores funcionan sin internet. `sw/plugin.ts` escribe `dist/sw.js` a partir de `sw/sw.js` con la lista de archivos y un hash del contenido de cada uno; `src/app/offline.ts` lo registra.
+
+- Antes de activarse guarda la página, el código, los estilos, las fuentes (woff2), los iconos y todas las ilustraciones, incluido el cómic (unos 9 MB). La música (unos 15 MB) se guarda justo después, en segundo plano, y si se corta sigue en la siguiente visita. Las peticiones por rangos de `<audio>` se responden desde el archivo guardado.
+- Cada despliegue es una versión nueva de la caché: solo se descargan los archivos cuyo hash cambió, el resto se copia de la versión anterior, que después se borra. La página se pide primero a la red (con 4 s de margen), así que con conexión siempre llega la última versión; sin conexión sale la guardada. El juego instalado busca una versión nueva al volver al frente, como mucho una vez por hora.
+- La API en línea (`api/`) nunca pasa por la caché.
+
 ## Controles
 
 Tocar o hacer clic en una carta la muestra en grande con Jugar y Descartar. En ordenador también se puede arrastrar hacia arriba para jugar o al montón de descartes, hacer doble clic, o usar teclas: 1 a 6 eligen carta, Intro juega, Supr descarta, U usa la definitiva y Esc cierra.

@@ -25,6 +25,7 @@ import { toast } from './app/dom';
 import { t } from './app/i18n';
 import { initErrorReporting } from './app/errorReport';
 import { initInstall } from './app/install';
+import { initOffline } from './app/offline';
 import { initLandscapeOnly } from './app/orientation';
 import { settings } from './app/settings';
 import { battlefield, initStage } from './app/stage';
@@ -48,6 +49,7 @@ async function boot(): Promise<void> {
   settings.subscribe(applyDocumentSettings);
   initErrorReporting();
   initInstall();
+  initOffline();
   initLandscapeOnly();
   await initStage();
   initFeedback();
