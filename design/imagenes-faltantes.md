@@ -4,7 +4,7 @@ Revisé todo el juego (main y la beta). Faltan **22 imágenes**: 11 cartas del j
 
 Cada prompt lleva su archivo y su carpeta dentro de `art/`. Al subir la imagen en esa ruta, el juego la toma sola. Mientras falte, la carta sale sin ilustración y la campaña usa lo de ahora (el retrato del héroe o el fondo oscuro).
 
-Formatos: cartas 4:3 horizontal, retratos 3:4 vertical, escenas 16:9 y el mapa 10:7 (o 3:2). JPG.
+Formatos: cartas 4:3 horizontal, retratos 3:4 vertical, escenas 16:9 y el mapa 4:3. JPG.
 
 # Parte 1: las 11 cartas sin ilustración (`art/cards/`, 4:3)
 
