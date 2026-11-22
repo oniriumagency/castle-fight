@@ -1,0 +1,228 @@
+/* The tutorial guide: dark around one element, a ring, a hand or cursor and Mary's bubble. */
+
+.coach-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.coach-layer.in {
+  opacity: 1;
+}
+
+.coach-shade {
+  position: fixed;
+  background: rgb(4 3 2 / 72%);
+  pointer-events: auto;
+  transition: all 0.25s ease;
+}
+
+.coach-layer.pass .coach-shade {
+  pointer-events: none;
+}
+
+.coach-ring {
+  position: fixed;
+  border: 2px solid #ffd36a;
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px rgb(255 211 106 / 25%), 0 0 24px rgb(255 190 80 / 60%);
+  animation: coachRing 1.4s ease-in-out infinite;
+  transition: all 0.25s ease;
+}
+
+@keyframes coachRing {
+  50% { box-shadow: 0 0 0 7px rgb(255 211 106 / 12%), 0 0 34px rgb(255 190 80 / 80%); }
+}
+
+.coach-hand {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 4px 6px rgb(0 0 0 / 60%));
+  animation: coachTap 1.6s ease-in-out infinite;
+}
+
+.coach-hand.cursor {
+  width: 30px;
+  height: 30px;
+}
+
+.coach-hand svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* The fingertip (or the cursor's tip) sits on the point. */
+@keyframes coachTap {
+  0%, 100% { transform: translate(calc(var(--x0) - 14px), calc(var(--y0) + 18px)) scale(1); }
+  45% { transform: translate(calc(var(--x0) - 14px), calc(var(--y0) - 2px)) scale(1); }
+  55% { transform: translate(calc(var(--x0) - 14px), calc(var(--y0) - 2px)) scale(0.88); }
+}
+
+.coach-hand.cursor {
+  animation-name: coachClick;
+}
+
+@keyframes coachClick {
+  0%, 100% { transform: translate(calc(var(--x0) + 18px), calc(var(--y0) + 18px)) scale(1); }
+  45% { transform: translate(calc(var(--x0) - 3px), calc(var(--y0) - 3px)) scale(1); }
+  55% { transform: translate(calc(var(--x0) - 3px), calc(var(--y0) - 3px)) scale(0.85); }
+}
+
+.coach-hand[data-gesture='drag'] {
+  animation: coachDrag 2.2s ease-in-out infinite;
+}
+
+@keyframes coachDrag {
+  0% { opacity: 0; transform: translate(calc(var(--x0) - 14px), calc(var(--y0) + 4px)); }
+  12% { opacity: 1; transform: translate(calc(var(--x0) - 14px), calc(var(--y0) + 4px)) scale(0.9); }
+  70% { opacity: 1; transform: translate(calc(var(--x1) - 14px), calc(var(--y1) + 4px)) scale(0.9); }
+  85%, 100% { opacity: 0; transform: translate(calc(var(--x1) - 14px), calc(var(--y1) + 4px)) scale(1); }
+}
+
+.coach-bubble {
+  position: fixed;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: min(420px, calc(100vw - 16px));
+  padding: 12px 14px;
+  pointer-events: auto;
+  border-color: var(--gold-d);
+  transition: left 0.25s ease, top 0.25s ease;
+}
+
+.coach-bubble.pop {
+  animation: coachPop 0.28s ease-out;
+}
+
+@keyframes coachPop {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+}
+
+.coach-face img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  object-fit: cover;
+}
+
+.coach-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.coach-text {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.coach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.coach-skip {
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.coach-next {
+  min-height: 34px;
+  padding: 4px 16px;
+}
+
+@media (max-height: 560px) {
+  .coach-bubble {
+    width: min(360px, calc(100vw - 16px));
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .coach-face img {
+    width: 38px;
+    height: 38px;
+  }
+
+  .coach-text {
+    font-size: 15px;
+  }
+
+  .coach-actions {
+    margin-top: 4px;
+  }
+}
+
+.reduced-motion .coach-hand,
+.reduced-motion .coach-ring {
+  animation-duration: 3s;
+}
+
+/* The opening comic: each panel's painting fades in behind the caption with a slow push-in. */
+
+.dialogue-layer.comic {
+  background: #070504;
+}
+
+.dialogue-layer.comic .dialogue-scene {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  transform-origin: 50% 40%;
+}
+
+.dialogue-layer.comic .dialogue-scene.on {
+  opacity: 1;
+  animation: comicPush 10s ease-out forwards;
+}
+
+@keyframes comicPush {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.12); }
+}
+
+.reduced-motion .dialogue-layer.comic .dialogue-scene.on {
+  animation: none;
+}
+
+.dialogue-progress {
+  position: fixed;
+  top: max(18px, var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.dialogue-progress i {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 240 210 / 25%);
+  transition: background 0.3s;
+}
+
+.dialogue-progress i.on {
+  background: var(--gold);
+}
+
+/* Settings: the Tutorial row. */
+.settings .setting-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.settings .setting-actions .btn { padding: 6px 12px; font-size: 0.85rem; min-height: 0; }
+.coach-layer.covered { visibility: hidden; }

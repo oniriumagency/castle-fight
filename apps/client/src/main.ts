@@ -18,6 +18,8 @@ import './styles/card.css';
 import './styles/screens.css';
 import './styles/board.css';
 import './styles/materials.css';
+import './styles/campaign.css';
+import './styles/tutorial.css';
 
 import { toast } from './app/dom';
 import { t } from './app/i18n';
@@ -30,6 +32,7 @@ import { audio } from './fx/audio';
 import { fx } from './fx/director';
 import { online, roomIdFromUrl } from './net/online';
 import { flow } from './screens/flow';
+import { tutorial } from './game/tutorial';
 import { joinOnline, watchOnline } from './screens/online';
 import { initFeedback } from './ui/feedback';
 import { toggleMute } from './ui/muteButton';
@@ -59,6 +62,9 @@ async function boot(): Promise<void> {
   // Invite link: open the room straight away.
   const roomId = roomIdFromUrl(location.href);
   if (roomId) {
+    // Someone who came through an invite came to play online: the menu is theirs from the start.
+    tutorial.isFirstRun();
+    tutorial.mark('menu');
     try {
       if (online.hasSeat(roomId)) {
         // This browser already plays in that room (reload): take the seat back.
@@ -80,7 +86,11 @@ async function boot(): Promise<void> {
     }
   }
   // An unfinished game on this device (phone locked, tab reloaded hours later): straight back into it.
-  if (!flow.resumeLocal()) flow.menu();
+  if (flow.resumeLocal()) return;
+  // The very first start: straight into the story and the guided campaign.
+  // Until the first enemy hero falls, the game is the campaign.
+  if (tutorial.isFirstRun() || !tutorial.menuOpen()) flow.firstRun();
+  else flow.menu();
 }
 
 void boot();

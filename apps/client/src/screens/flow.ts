@@ -1,3 +1,4 @@
+import { tutorial } from '../game/tutorial';
 import { HEROES, type HeroId } from '@cardcraft-castles/engine';
 import { INVITE_PARAM } from '@cardcraft-castles/protocol';
 import { toast } from '../app/dom';
@@ -6,8 +7,11 @@ import { setScreenName } from '../app/reportContext';
 import { show } from '../app/router';
 import { settings } from '../app/settings';
 import type { Difficulty } from '../game/ai';
-import { LocalSession } from '../game/localSession';
-import type { MatchSession } from '../game/session';
+import { loadCampaign, startCampaign } from '../game/campaignStore';
+import { LocalSession, type CampaignBattle } from '../game/localSession';
+import type { MatchSession, Seat } from '../game/session';
+import type { BattleOutcome } from '@cardcraft-castles/campaign';
+import { campaignScreen } from './campaign/map';
 import { boardScreen } from './board/board';
 import { heroSelectScreen, type HeroSelectMode } from './heroSelect';
 import { lobbyScreen } from './lobby';
@@ -37,6 +41,8 @@ export function setRoomInUrl(roomId: string | null): void {
 /** Navigation between screens. Screens call these instead of importing each other. */
 export const flow = {
   menu(): void {
+    // The menu opens once the first enemy hero falls in the campaign.
+    if (!tutorial.menuOpen()) return flow.firstRun();
     setRoomInUrl(null);
     setScreenName('menu');
     show(menuScreen());
@@ -111,6 +117,30 @@ export const flow = {
     flow.board(session);
     toast(t('gameRestored'), 'info', 2600);
     return true;
+  },
+
+  /** The campaign map (or its start screen), with the scenes that follow `outcome` when coming back from a battle. */
+  campaign(outcome: BattleOutcome | null = null): void {
+    setRoomInUrl(null);
+    setScreenName('campaign');
+    show(campaignScreen(outcome));
+  },
+
+  /** First start of the game: a new campaign (normal difficulty), its opening comic and the guide. */
+  firstRun(): void {
+    if (!loadCampaign()) startCampaign('normal');
+    flow.campaign();
+  },
+
+  startCampaignBattle(battle: CampaignBattle, rivals: Seat[]): void {
+    setRoomInUrl(null);
+    const session = new LocalSession({
+      kind: 'ai',
+      difficulty: 'normal',
+      campaign: battle,
+      seats: [{ nickname: nickname(t('you')), hero: battle.setup.heroes[0]! }, ...rivals],
+    });
+    flow.board(session);
   },
 
   board(session: MatchSession): void {

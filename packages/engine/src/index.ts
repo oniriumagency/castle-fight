@@ -11,7 +11,7 @@
 
 export type * from './types';
 
-export { createGame, type GameOptions } from './setup';
+export { createGame, type GameOptions, type SeatOptions } from './setup';
 export {
   applyAction,
   legalActions,

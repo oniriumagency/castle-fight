@@ -5,6 +5,30 @@ export function artUrl(path: string): string {
   return `${import.meta.env.BASE_URL}art/${path.replace(/\.(jpe?g|png)$/i, '.webp')}`;
 }
 
+/** URL of a portrait's round close-up of the face (`heroes/x.jpg` → `heroes/x-face.webp`, made by `scripts/build-art.mjs`). */
+export function faceUrl(path: string): string {
+  return artUrl(path.replace(/\.(jpe?g|png)$/i, '-face.jpg'));
+}
+
+/**
+ * A round portrait: the sharp close-up of the face, then the whole painting,
+ * then `fallback` (a captain whose portrait is not painted yet shows their hero).
+ */
+export function faceImg(path: string, fallback = path, attrs: Record<string, string> = {}): HTMLImageElement {
+  const img = document.createElement('img');
+  for (const [k, v] of Object.entries(attrs)) img.setAttribute(k, v);
+  if (!img.hasAttribute('alt')) img.alt = '';
+  img.draggable = false;
+  const chain = [faceUrl(path), artUrl(path), faceUrl(fallback), artUrl(fallback)].filter((u, i, all) => all.indexOf(u) === i);
+  let step = 0;
+  img.src = chain[0]!;
+  img.addEventListener('error', () => {
+    step++;
+    if (step < chain.length) img.src = chain[step]!;
+  });
+  return img;
+}
+
 const preloaded = new Set<string>();
 
 /** Starts downloading illustrations so cards never pop in empty. */

@@ -19,6 +19,7 @@ export {
   DIFFICULTY_NAMES,
   DIFFICULTY_DESCRIPTIONS,
   PROFILES,
+  profileForTier,
   type Difficulty,
   type Profile,
 } from './difficulty';

@@ -607,7 +607,31 @@
 }
 
 .emote-bubble.show {
-  animation: bubble 2.6s ease forwards;
+  animation: bubble var(--bubble-time, 2.6s) ease forwards;
+}
+
+/* A hero's line about the match: wraps, and points at the portrait. */
+.emote-bubble.reaction {
+  top: calc(100% + 12px);
+  width: max-content;
+  max-width: min(260px, 70vw);
+  white-space: normal;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.emote-bubble.reaction::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 26px;
+  border: 7px solid transparent;
+  border-bottom-color: var(--parch);
+}
+
+.side-1 .emote-bubble.reaction::before {
+  left: auto;
+  right: 26px;
 }
 
 @keyframes bubble {

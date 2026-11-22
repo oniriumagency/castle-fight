@@ -1687,3 +1687,13 @@ input.shake {
     --w: 140px;
   }
 }
+
+/* ---------- Credits ---------- */
+.credits { max-width: 520px; max-height: 86vh; overflow-y: auto; }
+.credits .credits-lead { opacity: 0.8; margin: 0 0 12px; }
+.credits h3 { margin: 14px 0 6px; }
+.credits-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.credits-list li { line-height: 1.35; }
+.credits-list small { opacity: 0.75; }
+.credits-list a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.settings .setting-row > .btn.small { padding: 6px 12px; font-size: 0.85rem; min-height: 0; }

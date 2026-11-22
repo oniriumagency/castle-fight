@@ -29,6 +29,10 @@ export interface SideInfo {
   mine: boolean;
   /** What raises the numbers of this player's ultimate now (passive, enchantments, Twilight Fury). */
   buffs?: CardBuffs;
+  /** Campaign captains: shown instead of the hero's name. */
+  title?: string;
+  /** Campaign captains: their portrait (catalog art path). */
+  portrait?: string;
 }
 
 /**
@@ -55,6 +59,7 @@ export class SidePanel {
   private lastKey = '';
   onInspect: (cardId: string) => void = () => {};
   onInspectHero: (heroId: string) => void = () => {};
+  private portraitArt = '';
   /** The mouse is on a card of the history: show it large next to `anchor` (null: hide). */
   onPreview: (cardId: string | null, anchor?: DOMRect) => void = () => {};
 
@@ -121,13 +126,19 @@ export class SidePanel {
   }
 
   update(p: PlayerPublicState, info: SideInfo): void {
-    if (p.hero !== this.heroId) {
+    const portrait = info.portrait ?? getHero(p.hero).art;
+    if (p.hero !== this.heroId || portrait !== this.portraitArt) {
       this.heroId = p.hero;
-      this.heroImg.src = artUrl(getHero(p.hero).art);
+      this.portraitArt = portrait;
+      const fallback = getHero(p.hero).art;
+      if (portrait !== fallback) watchArt(this.heroImg, () => (this.heroImg.src = artUrl(fallback)));
+      this.heroImg.src = artUrl(portrait);
       this.el.style.setProperty('--hero', heroCss(p.hero));
     }
     this.name.textContent = info.nickname;
-    this.heroName.textContent = L(getHero(p.hero).name);
+    this.heroName.textContent = info.title ?? L(getHero(p.hero).name);
+    // Campaign: captains have no ultimate, and the player's sleeps until the first hero falls.
+    this.portrait.classList.toggle('ult-locked', !!p.ultimateLocked);
     this.el.classList.toggle('active', info.active);
     // Free-for-all: a fallen castle stays on the board, greyed out.
     this.el.classList.toggle('eliminated', !!p.eliminated);
@@ -142,7 +153,10 @@ export class SidePanel {
     const progressText = t('ultimateProgress', { charge: p.ultimateCharge, threshold: p.ultimateThreshold });
     const effect = document.createElement('span');
     effect.innerHTML = ultimateHtml(p.hero, info.buffs);
-    this.portrait.title = `${p.ultimateReady ? t('ultimateReady') : progressText}\n${t('ultimate')}: ${effect.textContent ?? ''}`;
+    this.portrait.title = p.ultimateLocked
+      ? t(p.noPassive ? 'captainNoPowers' : 'ultimateAsleep')
+      : `${p.ultimateReady ? t('ultimateReady') : progressText}\n${t('ultimate')}: ${effect.textContent ?? ''}`;
+    if (p.ultimateLocked) label.textContent = '';
     this.portrait.setAttribute('aria-label', `${L(getHero(p.hero).name)}. ${this.portrait.title}`);
 
     for (const res of RESOURCES) {
@@ -238,7 +252,20 @@ export class SidePanel {
     this.presence.classList.toggle('show', !!text);
   }
 
+  /** A hero's line about the match: a speech bubble that stays longer the more it says. */
+  showReaction(text: string): void {
+    const seconds = Math.min(7, Math.max(3.4, 2.4 + text.length * 0.055));
+    this.bubble.style.setProperty('--bubble-time', `${seconds}s`);
+    this.bubble.classList.add('reaction');
+    this.bubble.textContent = text;
+    this.bubble.classList.remove('show');
+    void this.bubble.offsetWidth;
+    this.bubble.classList.add('show');
+  }
+
   showEmote(text: string): void {
+    this.bubble.classList.remove('reaction');
+    this.bubble.style.removeProperty('--bubble-time');
     this.bubble.textContent = text;
     this.bubble.classList.remove('show');
     void this.bubble.offsetWidth;

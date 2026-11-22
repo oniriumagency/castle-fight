@@ -20,15 +20,19 @@ import { h, html, toast } from '../../app/dom';
 import { callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
+import { getTerritory, isTerritoryId, type BattleOutcome } from '@cardcraft-castles/campaign';
+import { tutorial } from '../../game/tutorial';
+import { startBattleGuide } from './battleTutorial';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
 import { battlefield } from '../../app/stage';
-import { audio } from '../../fx/audio';
+import { audio, voiceOf } from '../../fx/audio';
 import { fx, type FxContext } from '../../fx/director';
 import { describeEvent } from '../../game/describe';
 import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
+import { ReactionDirector, type Reaction, type Voice } from '../../game/reactions';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import {
   boardBuffs,
@@ -171,8 +175,11 @@ class BoardScreen implements Screen {
   private lastTick = -1;
   private curtainFor: PlayerId | null = null;
   private stats = new MatchStats();
+  /** Heroes' speech bubbles reacting to the match. */
+  private readonly reactions = new ReactionDirector();
   private unsubscribe: () => void = () => {};
   private unsubscribeSettings: () => void = () => {};
+  private stopGuide: () => void = () => {};
   private raf = 0;
   private backgroundTimer = 0;
   private playedCard: HTMLElement | null = null;
@@ -287,8 +294,20 @@ class BoardScreen implements Screen {
   // Screen lifecycle
   // ---------------------------------------------------------------------------
 
+  /**
+   * The campaign's big battles (a kingdom's castle and the final battle) have
+   * their own music, which plays the whole battle, the Twilight Fury included.
+   */
+  private bossBattle(): boolean {
+    const battle = (this.session as { campaign?: { id: string } | null }).campaign;
+    const territory = battle?.id.split(':')[0];
+    if (!territory || !isTerritoryId(territory)) return false;
+    const kind = getTerritory(territory).kind;
+    return kind === 'castle' || kind === 'final';
+  }
+
   mount(): void {
-    audio.music('battle');
+    audio.music(this.bossBattle() ? 'boss' : 'battle');
     // Heroes first, then every card in the game (about 3 MB in all), so a card
     // drawn later already has its illustration instead of a dark panel while it downloads.
     void preloadArt(this.session.seats.map((s) => getHero(s.hero).art)).then(() => preloadArt(CARDS.map((c) => c.art)));
@@ -297,6 +316,10 @@ class BoardScreen implements Screen {
     this.field.setHeroes(this.sides().map((side) => this.session.seats[this.seatOfSide(side)].hero));
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
+    // Campaign: the guided first battle, then one-off tips the first time something happens.
+    if ((this.session as { campaign?: unknown }).campaign) {
+      this.stopGuide = startBattleGuide(this.session, this.el, { firstBattle: !tutorial.done('battle') });
+    }
     window.addEventListener('keydown', this.onKey);
     // Player reports carry the game being played. No bubble here: it would cover the board.
     setGameContext(() => this.reportContext());
@@ -324,6 +347,7 @@ class BoardScreen implements Screen {
     setGameContext(null);
     hideFeedbackHint();
     this.unsubscribe();
+    this.stopGuide();
     this.unsubscribeSettings();
     cancelAnimationFrame(this.raf);
     window.clearInterval(this.backgroundTimer);
@@ -829,6 +853,8 @@ class BoardScreen implements Screen {
         canUltimate: canAct && seat === view.viewer && p.ultimateReady,
         mine: this.session.isLocal(seat),
         buffs: boardBuffs(view, seat),
+        ...(this.session.seats[seat]?.title ? { title: L(this.session.seats[seat]!.title!) } : {}),
+        ...(this.session.seats[seat]?.portrait ? { portrait: this.session.seats[seat]!.portrait! } : {}),
       });
       this.plaques[side].update(p.keep, p.wall);
       this.plaques[side].setName(this.name(seat), this.shownActive === seat && view.phase !== 'finished');
@@ -896,7 +922,7 @@ class BoardScreen implements Screen {
     this.twilightChip.hidden = !status;
     this.el.classList.toggle('twilight', !!status && status.level > 0);
     // Twilight Fury has its own music: it crossfades in when the Fury falls.
-    if (view.phase !== 'finished') audio.music(status && status.level > 0 ? 'twilight' : 'battle');
+    if (view.phase !== 'finished') audio.music(this.bossBattle() ? 'boss' : status && status.level > 0 ? 'twilight' : 'battle');
     if (!status) return;
     this.twilightChip.classList.toggle('active', status.level > 0);
     this.twilightChip.classList.toggle('last', status.level === 0 && status.next <= 1);
@@ -990,8 +1016,15 @@ class BoardScreen implements Screen {
 
     if (!this.shown || update.resumed || starting || events.length === 0) {
       await this.snapTo(update.view, starting);
+      if (starting) {
+        this.reactions.reset();
+        const hello = this.pickReactions(events, update.view.players, update.view);
+        if (hello.length) this.later(() => this.say(hello), 500);
+      }
       return;
     }
+
+    const reactions = this.pickReactions(events, this.shown, update.view);
 
     // On a shared device the next player's cards must not show while animating.
     if (this.session.kind === 'local' && update.view.viewer !== this.handSeat) {
@@ -999,12 +1032,50 @@ class BoardScreen implements Screen {
     }
 
     const gen = this.animGen;
-    for (const e of events) {
+    for (const [i, e] of events.entries()) {
       if (this.destroyed || gen !== this.animGen) return;
       await this.play(e, update.view);
+      const now = reactions.filter((r) => r.at === i);
+      if (now.length) this.say(now);
     }
     await wait(120);
     this.clearPlayed();
+  }
+
+  /** Who may speak from a seat: AI rivals freely, heroes played here now and then, nobody online. */
+  private voiceOf(seat: PlayerId): Voice {
+    if (this.session.kind === 'online' || this.session.spectator || !settings.get().heroReactions) return null;
+    if (this.session.seats[seat]?.isAi) return 'rival';
+    return this.session.isLocal(seat) ? 'own' : null;
+  }
+
+  private pickReactions(events: GameEvent[], before: readonly PlayerPublicState[], view: PlayerView): Reaction[] {
+    try {
+      return this.reactions.pick(events, before, view.players, view.rules.keepWin, (seat) => this.voiceOf(seat), performance.now());
+    } catch (error) {
+      console.error('Hero reactions failed', error);
+      return [];
+    }
+  }
+
+  /** Shows the bubbles; a second one (an answer) comes a moment later. */
+  private say(reactions: Reaction[]): void {
+    reactions.forEach((r, i) => {
+      const show = (): void => {
+        if (this.destroyed || this.resultsShown) return;
+        const side = this.sideOf(r.seat);
+        this.panels[side]?.showReaction(L(r.text));
+        audio.play(voiceOf(this.session.seats[r.seat]?.hero ?? null), 0.5, { pan: [-0.5, 0.5, 0.1][side] ?? 0, gain: 0.7 });
+      };
+      if (i === 0) show();
+      else this.later(show, 1700 * i);
+    });
+  }
+
+  private later(fn: () => void, ms: number): void {
+    window.setTimeout(() => {
+      if (!this.destroyed) fn();
+    }, ms);
   }
 
   private saveStats(): void {
@@ -2196,6 +2267,11 @@ class BoardScreen implements Screen {
   }
 
   private inspectHero(heroId: string, seat: PlayerId): void {
+    // Campaign captains fight with their kingdom's colours but none of its hero's powers.
+    if (this.view?.players[seat]?.noPassive) {
+      toast(t('captainNoPowers'), 'info', 3200);
+      return;
+    }
     audio.play('cardSelect');
     const buffs = this.view ? boardBuffs(this.view, seat) : null;
     this.openInspect(heroCard(heroId, { tilt: true, buffs }), rulesOf(getHero(heroId)), undefined, undefined, null, buffsOnUltimate(heroId, buffs));
@@ -2499,7 +2575,12 @@ class BoardScreen implements Screen {
   }
 
   private exit(): void {
-    void import('../flow').then(({ flow }) => (this.session.kind === 'online' ? flow.lobby() : flow.menu()));
+    const campaign = (this.session as { campaign?: unknown }).campaign;
+    void import('../flow').then(({ flow }) => {
+      if (campaign) flow.campaign((this.session as { campaignOutcome?: BattleOutcome | null }).campaignOutcome ?? null);
+      else if (this.session.kind === 'online') flow.lobby();
+      else flow.menu();
+    });
   }
 }
 

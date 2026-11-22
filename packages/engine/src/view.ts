@@ -23,6 +23,9 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: Viewer): Playe
   const visible = player === viewer || p.handRevealed;
   return {
     hero: p.hero,
+    ...(p.noPassive ? { noPassive: true } : {}),
+    ...(p.ultimateLocked ? { ultimateLocked: true } : {}),
+    ...(p.deckList ? { deckList: p.deckList.slice() } : {}),
     keep: p.keep,
     wall: p.wall,
     resources: { ...p.resources },

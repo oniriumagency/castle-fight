@@ -79,6 +79,7 @@ export function heroUltimateFor(heroId: HeroId, multiplayer: boolean): EffectOp[
 
 /** The passive of the hero `player` plays, for this table. */
 export function heroPassive(state: Seats, player: PlayerId): HeroPassive {
+  if (state.players[player]!.noPassive) return {};
   return heroPassiveFor(state.players[player]!.hero, isMultiplayer(state));
 }
 
@@ -493,7 +494,7 @@ export function dealDamage(
 
   const taken = wallLoss + keepLoss;
   const max = ultimateThreshold(state, target);
-  if (taken > 0 && t.ultimateCharge < max) {
+  if (taken > 0 && !t.ultimateLocked && t.ultimateCharge < max) {
     t.ultimateCharge = Math.min(max, t.ultimateCharge + taken);
     events.push({
       type: 'ultimateCharged',

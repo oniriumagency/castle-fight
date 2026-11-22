@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@cardcraft-castles/ai": "workspace:*",
+    "@cardcraft-castles/campaign": "workspace:*",
     "@cardcraft-castles/engine": "workspace:*",
     "@cardcraft-castles/protocol": "workspace:*",
     "@fontsource/cinzel": "^5.3.0",

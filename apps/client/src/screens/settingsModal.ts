@@ -1,9 +1,13 @@
 import { LOCALES, type Locale } from '@cardcraft-castles/engine';
-import { h } from '../app/dom';
+import { PROLOGUE } from '@cardcraft-castles/campaign';
+import { h, toast } from '../app/dom';
 import { t } from '../app/i18n';
 import { modal } from '../app/router';
 import { settings, type Settings } from '../app/settings';
 import { audio } from '../fx/audio';
+import { tutorial } from '../game/tutorial';
+import { playDialogue, SCENE_ART } from './campaign/dialogue';
+import { openCredits } from './credits';
 
 const LOCALE_LABEL: Record<Locale, string> = { es: 'Español', en: 'English' };
 
@@ -39,7 +43,7 @@ function slider(key: 'masterVolume' | 'musicVolume' | 'sfxVolume', label: string
   return h('label.field', null, label, input);
 }
 
-function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted', label: string): HTMLElement {
+function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted' | 'heroReactions', label: string): HTMLElement {
   return h(
     'div.setting-row',
     null,
@@ -50,7 +54,7 @@ function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted', l
 
 /** Settings dialog, available from the menu and during a game. */
 export function openSettings(): void {
-  modal(() => {
+  modal((close) => {
     const box = h('div.modal.panel.settings');
     const build = (): void => {
       box.replaceChildren(
@@ -94,7 +98,58 @@ export function openSettings(): void {
         ),
         toggle('screenShake', t('screenShake')),
         toggle('reducedMotion', t('reducedMotion')),
+        toggle('heroReactions', t('heroReactions')),
         toggle('localTimer', t('localTimer')),
+        h(
+          'div.setting-row',
+          null,
+          h('span', null, t('credits')),
+          h(
+            'button.btn.small',
+            {
+              type: 'button',
+              onclick: () => {
+                audio.play('uiClick');
+                close();
+                openCredits();
+              },
+            },
+            t('creditsOpen'),
+          ),
+        ),
+        h(
+          'div.setting-row',
+          null,
+          h('span', null, t('tutorialSection')),
+          h(
+            'div.setting-actions',
+            null,
+            h(
+              'button.btn.small',
+              {
+                type: 'button',
+                onclick: () => {
+                  audio.play('uiClick');
+                  tutorial.reset();
+                  toast(t('tutorialReplayed'));
+                },
+              },
+              t('tutorialReplay'),
+            ),
+            h(
+              'button.btn.small',
+              {
+                type: 'button',
+                onclick: () => {
+                  audio.play('uiClick');
+                  close();
+                  void playDialogue(PROLOGUE, SCENE_ART.prologue);
+                },
+              },
+              t('tutorialStory'),
+            ),
+          ),
+        ),
       );
     };
     build();

@@ -6,9 +6,13 @@ import { audio } from '../../fx/audio';
 import type { MatchSession, Presence } from '../../game/session';
 import { gamesOf, loadRecord, nemesisOf, recordAi, recordOnline, type Outcome } from '../../game/record';
 import type { MatchStats } from '../../game/stats';
-import { artUrl, iconSvg } from '../../ui/assets';
+import { faceImg, iconSvg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
 import { heroSelectScreen, type HeroSelectMode } from '../heroSelect';
+import { getTerritory, type BattleOutcome } from '@cardcraft-castles/campaign';
+import type { LocalSession } from '../../game/localSession';
+import { cardFace } from '../../ui/card';
+import { attachCardZoom } from '../../ui/cardZoom';
 
 export interface ResultsOptions {
   host: HTMLElement;
@@ -57,6 +61,31 @@ function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 
   );
 }
 
+/** Campaign: what the battle won or cost (cards, an ally, the ultimate waking up). */
+function campaignSummary(outcome: BattleOutcome): HTMLElement {
+  const name = L(getTerritory(outcome.territory).name);
+  const cards = (ids: readonly string[]): HTMLElement =>
+    h(
+      'div.campaign-cards',
+      null,
+      ids.map((id) => {
+        const face = cardFace(id);
+        attachCardZoom(face, id);
+        return face;
+      }),
+    );
+  return h(
+    'div.campaign-summary',
+    null,
+    outcome.won ? h('h2', null, t('campaignConqueredTitle', { name })) : null,
+    outcome.ally ? h('p.campaign-ally', null, t('campaignRewardHero', { hero: L(getHero(outcome.ally).name) })) : null,
+    outcome.awakened ? h('p.campaign-awake', null, t('campaignUltimateAwake')) : null,
+    outcome.rewards.length ? [h('h3', null, t('campaignNewCards')), cards(outcome.rewards), h('small.campaign-zoom-hint', null, t('campaignZoomHint'))] : null,
+    outcome.recovered.length ? [h('h3', null, t('campaignRecovered')), cards(outcome.recovered)] : null,
+    outcome.lost ? [h('p.campaign-lost', null, t('campaignLost', { name })), cards([outcome.lost])] : null,
+  );
+}
+
 /** End of game: victory or defeat banner, why it ended, match statistics and what next. */
 export function showResults(o: ResultsOptions): void {
   const result = o.view.result ?? { winner: null, reason: 'keepDestroyed' as const };
@@ -90,8 +119,11 @@ export function showResults(o: ResultsOptions): void {
     }
   })();
 
+  // Campaign battles keep their own progress: they never count for the record.
+  const campaign = (o.session as Partial<LocalSession>).campaign ?? null;
+  const campaignOutcome = campaign ? ((o.session as LocalSession).campaignOutcome ?? null) : null;
   // The win/loss record and head-to-head count duels only.
-  const headToHead = multi || watching ? null : keepRecord(o, seats[1], outcome);
+  const headToHead = multi || watching || campaign ? null : keepRecord(o, seats[1], outcome);
   const row = (label: string, value: (seat: PlayerId) => number | string): HTMLElement =>
     multi
       ? h('tr', null, h('th', { scope: 'row' }, label), seats.map((seat) => h('td', null, String(value(seat)))))
@@ -139,7 +171,7 @@ export function showResults(o: ResultsOptions): void {
   const hideBtn = h('button.btn.ghost', { type: 'button' }, t('viewBoard'));
   const box = h(
     'div.results-box.panel',
-    { class: `${outcome}${multi ? ' multi' : ''}` },
+    { class: `${outcome}${multi ? ' multi' : ''}${campaignOutcome ? ' campaign' : ''}` },
     h('div.results-crest', null, h('h1', null, title), h('p', null, reason)),
     h(
       'div.results-heroes',
@@ -148,13 +180,14 @@ export function showResults(o: ResultsOptions): void {
         h(
           'div.results-hero',
           { class: seat === winner ? 'winner' : o.view.players[seat].eliminated ? 'fallen' : '', style: `--hero:${heroCss(o.view.players[seat].hero)}` },
-          h('img', { src: artUrl(getHero(o.view.players[seat].hero).art), alt: '' }),
+          faceImg(o.session.seats[seat]?.portrait ?? getHero(o.view.players[seat].hero).art, getHero(o.view.players[seat].hero).art),
           h('strong', null, o.name(seat)),
-          h('small', null, L(getHero(o.view.players[seat].hero).name)),
+          h('small', null, o.session.seats[seat]?.title ? L(o.session.seats[seat]!.title!) : L(getHero(o.view.players[seat].hero).name)),
         ),
       ),
     ),
     headToHead,
+    campaignOutcome ? campaignSummary(campaignOutcome) : null,
     h(
       'table.results-stats',
       null,
@@ -173,8 +206,12 @@ export function showResults(o: ResultsOptions): void {
     h(
       'div.results-actions',
       null,
-      watching ? null : rematchBtn,
-      h('button.btn.big', { type: 'button', onclick: () => (audio.play('uiBack'), o.onExit()) }, o.session.kind === 'online' ? t('back') : t('mainMenu')),
+      watching || campaign ? null : rematchBtn,
+      h(
+        'button.btn.big',
+        { class: campaign ? 'primary' : '', type: 'button', onclick: () => (audio.play('uiBack'), o.onExit()) },
+        campaign ? t('campaignBackToMap') : o.session.kind === 'online' ? t('back') : t('mainMenu'),
+      ),
       hideBtn,
     ),
   );

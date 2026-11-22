@@ -1,25 +1,63 @@
-export type MusicTrack = 'menu' | 'battle' | 'twilight' | 'victory' | 'defeat' | null;
+export type MusicTrack = 'menu' | 'battle' | 'twilight' | 'boss' | 'victory' | 'defeat' | null;
 
-interface TrackInfo {
+interface Piece {
   /** File in `public/music/`. */
   file: string;
-  /** Mix level, so the three pieces sit at a similar loudness under the effects. */
+  /** Mix level, so every piece sits at a similar loudness under the effects. */
   gain: number;
+}
+
+interface TrackInfo {
+  /**
+   * One or more pieces. With two or more they play one after the other, and
+   * each time the moment comes back it starts on the next one, so the two
+   * pieces take turns.
+   */
+  pieces: Piece[];
   /** Fade-in in seconds. */
   fadeIn: number;
   /** Fade-out of the previous track when this one starts (default FADE_OUT). */
   crossfade?: number;
 }
 
+// Levels: measured loudness (LUFS) brought to the old mix. The menu sits at
+// about -21 LUFS and the battle at about -19, under the effects.
 const TRACKS: Record<Exclude<MusicTrack, null>, TrackInfo> = {
-  menu: { file: 'celtic-morning.mp3', gain: 1, fadeIn: 2 },
-  battle: { file: 'diversity.mp3', gain: 0.8, fadeIn: 1.5 },
+  // Menu and campaign map.
+  menu: {
+    pieces: [
+      { file: 'village-consort.mp3', gain: 0.25 },
+      { file: 'folk-round.mp3', gain: 0.8 },
+    ],
+    fadeIn: 2,
+  },
+  battle: {
+    pieces: [
+      { file: 'lord-of-the-land.mp3', gain: 1.9 },
+      { file: 'pippin-the-hunchback.mp3', gain: 0.8 },
+    ],
+    fadeIn: 1.5,
+  },
   // Twilight Fury: replaces the battle music when it falls, with a slow crossfade.
-  // The file is mastered much louder (-11 LUFS against -17): hence the low gain.
-  twilight: { file: 'to-the-balustrade.mp3', gain: 0.42, fadeIn: 3, crossfade: 3 },
-  victory: { file: 'celtic-morning.mp3', gain: 1, fadeIn: 1 },
-  defeat: { file: 'to-the-fallen.mp3', gain: 0.7, fadeIn: 1 },
+  twilight: {
+    pieces: [
+      { file: 'heavy-interlude.mp3', gain: 0.29 },
+      { file: 'epic-boss-battle.mp3', gain: 0.26 },
+    ],
+    fadeIn: 3,
+    crossfade: 3,
+  },
+  // The campaign's big battles: each kingdom's castle and the final battle.
+  boss: {
+    pieces: [{ file: 'burnt-spirit.mp3', gain: 0.37 }],
+    fadeIn: 2,
+  },
+  victory: { pieces: [{ file: 'celtic-morning.mp3', gain: 1 }], fadeIn: 1 },
+  defeat: { pieces: [{ file: 'to-the-fallen.mp3', gain: 0.7 }], fadeIn: 1 },
 };
+
+/** Tracks that swell a little as the end of the game gets close. */
+const TENSE: ReadonlySet<MusicTrack> = new Set(['battle', 'twilight', 'boss']);
 
 const FADE_OUT = 1.4;
 /** At full tension the battle music is this much louder. */
@@ -58,12 +96,16 @@ interface Deck {
   token: number;
 }
 
+/** Every piece of music the game uses, for the credits. */
+export const MUSIC_FILES: readonly string[] = [...new Set(Object.values(TRACKS).flatMap((t) => t.pieces.map((p) => p.file)))];
+
 /**
  * Plays the soundtrack: one MP3 per moment of the game, streamed by two
  * `<audio>` elements (nothing big is decoded into memory, which matters on
  * phones) and routed into the music bus so the volume settings and ducking
- * apply. Changing track crossfades between the two; the menu and victory
- * share a piece, so going from one to the other keeps it playing.
+ * apply. Changing track crossfades between the two. A moment with two pieces
+ * plays them in turn: when one ends the next starts, and the next time the
+ * moment comes back it starts on the other one.
  */
 export class MusicPlayer {
   private readonly decks: Deck[];
@@ -71,6 +113,8 @@ export class MusicPlayer {
   private wanted: MusicTrack = null;
   private tension = 0;
   private unlocked = false;
+  /** Which piece of each track plays now. */
+  private piece = new Map<Exclude<MusicTrack, null>, number>();
 
   constructor(
     private readonly ctx: AudioContext,
@@ -88,7 +132,12 @@ export class MusicPlayer {
         // Very old browsers: the element plays on its own, without the mix.
       }
       out.connect(bus);
-      return { el, out, file: null, token: 0 };
+      const deck: Deck = { el, out, file: null, token: 0 };
+      // A playlist moves on to its next piece.
+      el.addEventListener('ended', () => {
+        if (deck === this.current) this.next();
+      });
+      return deck;
     });
   }
 
@@ -121,31 +170,67 @@ export class MusicPlayer {
     if (track === this.wanted) return;
     this.wanted = track;
     const info = track ? TRACKS[track] : null;
-    const now = this.ctx.currentTime;
     const cur = this.current;
-    if (info && cur && cur.file === info.file) {
-      this.ramp(cur, this.level(), 0.8);
-      return;
+    // The same piece already playing: keep it.
+    if (track && info && cur && cur.file) {
+      const at = info.pieces.findIndex((p) => p.file === cur.file);
+      if (at >= 0) {
+        this.piece.set(track, at);
+        this.setLoop(cur, info);
+        this.ramp(cur, this.level(), 0.8);
+        return;
+      }
     }
     if (cur) this.fadeOut(cur, info?.crossfade ?? FADE_OUT);
     this.current = null;
-    if (!info) return;
+    if (!track || !info) return;
+    // Each time the moment comes back it starts on its next piece.
+    const prev = this.piece.get(track);
+    this.piece.set(track, prev === undefined ? 0 : (prev + 1) % info.pieces.length);
     const deck = this.decks.find((d) => d !== cur) ?? this.decks[0];
+    this.start(deck, info, info.fadeIn);
+  }
+
+  /** The current piece ended: the next one of the same track starts. */
+  private next(): void {
+    const track = this.wanted;
+    const deck = this.current;
+    if (!track || !deck) return;
+    const info = TRACKS[track];
+    this.piece.set(track, ((this.piece.get(track) ?? 0) + 1) % info.pieces.length);
+    this.start(deck, info, 0.6);
+  }
+
+  private start(deck: Deck, info: TrackInfo, fadeIn: number): void {
+    const now = this.ctx.currentTime;
+    const file = this.currentPiece()!.file;
     deck.token++;
-    deck.file = info.file;
+    deck.file = file;
     deck.el.pause();
-    deck.el.src = url(info.file);
+    this.setLoop(deck, info);
+    deck.el.src = url(file);
     deck.out.gain.cancelScheduledValues(now);
     deck.out.gain.setValueAtTime(0, now);
-    deck.out.gain.linearRampToValueAtTime(this.level(), now + info.fadeIn);
+    deck.out.gain.linearRampToValueAtTime(this.level(), now + fadeIn);
     this.current = deck;
     void deck.el.play().catch(() => undefined);
+  }
+
+  /** A single piece loops; a playlist moves on when a piece ends. */
+  private setLoop(deck: Deck, info: TrackInfo): void {
+    deck.el.loop = info.pieces.length < 2;
+  }
+
+  private currentPiece(): Piece | null {
+    if (!this.wanted) return null;
+    const pieces = TRACKS[this.wanted].pieces;
+    return pieces[(this.piece.get(this.wanted) ?? 0) % pieces.length]!;
   }
 
   /** 0..1: the battle music swells a little as the end gets close. */
   setTension(value: number): void {
     this.tension = value;
-    if (this.current && (this.wanted === 'battle' || this.wanted === 'twilight')) this.ramp(this.current, this.level(), 1.2);
+    if (this.current && TENSE.has(this.wanted)) this.ramp(this.current, this.level(), 1.2);
   }
 
   /** Starts the current track again if the browser paused it (refused autoplay, phone in the background). */
@@ -155,9 +240,9 @@ export class MusicPlayer {
   }
 
   private level(): number {
-    if (!this.wanted) return 0;
-    const base = TRACKS[this.wanted].gain;
-    return this.wanted === 'battle' || this.wanted === 'twilight' ? base * (1 + this.tension ** 1.3 * TENSION_BOOST) : base;
+    const piece = this.currentPiece();
+    if (!piece) return 0;
+    return TENSE.has(this.wanted) ? piece.gain * (1 + this.tension ** 1.3 * TENSION_BOOST) : piece.gain;
   }
 
   private ramp(deck: Deck, value: number, seconds: number): void {

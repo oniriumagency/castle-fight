@@ -45,3 +45,33 @@ export const PROFILES: Readonly<Record<Difficulty, Profile>> = Object.freeze({
   normal: { worlds: 2, replies: 0, candidates: 0, noise: 7, impulse: 0 },
   hard: { worlds: 6, replies: 1, candidates: 5, noise: 0, impulse: 0 },
 });
+
+/**
+ * A level between the named ones, for a smooth difficulty curve (the
+ * campaign): 0 plays like Easy, 1 like Normal, 2 like Hard, and anything in
+ * between blends the two neighbours. Values outside 0..2 are clamped.
+ */
+export function profileForTier(tier: number): Profile {
+  const t = Math.min(2, Math.max(0, tier));
+  const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
+  if (t <= 1) {
+    const { easy, normal } = PROFILES;
+    return {
+      worlds: Math.round(lerp(easy.worlds, normal.worlds, t)),
+      replies: 0,
+      candidates: 0,
+      noise: lerp(easy.noise, normal.noise, t),
+      impulse: lerp(easy.impulse, normal.impulse, t),
+    };
+  }
+  const f = t - 1;
+  const { normal, hard } = PROFILES;
+  const looksAhead = f >= 0.5;
+  return {
+    worlds: Math.round(lerp(normal.worlds, hard.worlds, f)),
+    replies: looksAhead ? hard.replies : 0,
+    candidates: looksAhead ? Math.round(lerp(3, hard.candidates, (f - 0.5) * 2)) : 0,
+    noise: lerp(normal.noise, hard.noise, f),
+    impulse: 0,
+  };
+}
