@@ -47,7 +47,7 @@ const TRACKS: Record<Exclude<MusicTrack, null>, TrackInfo> = {
     fadeIn: 3,
     crossfade: 3,
   },
-  // The campaign's big battles: each kingdom's castle and the final battle.
+  // The campaign's final battle, against the possessed heroes.
   boss: {
     pieces: [{ file: 'burnt-spirit.mp3', gain: 0.37 }],
     fadeIn: 2,
