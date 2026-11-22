@@ -20,7 +20,7 @@ import { h, html, toast } from '../../app/dom';
 import { callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
-import type { BattleOutcome } from '@cardcraft-castles/campaign';
+import { getTerritory, isTerritoryId, type BattleOutcome } from '@cardcraft-castles/campaign';
 import { tutorial } from '../../game/tutorial';
 import { startBattleGuide } from './battleTutorial';
 import { modal, type Screen } from '../../app/router';
@@ -294,8 +294,20 @@ class BoardScreen implements Screen {
   // Screen lifecycle
   // ---------------------------------------------------------------------------
 
+  /**
+   * The campaign's big battles (a kingdom's castle and the final battle) have
+   * their own music, which plays the whole battle, the Twilight Fury included.
+   */
+  private bossBattle(): boolean {
+    const battle = (this.session as { campaign?: { id: string } | null }).campaign;
+    const territory = battle?.id.split(':')[0];
+    if (!territory || !isTerritoryId(territory)) return false;
+    const kind = getTerritory(territory).kind;
+    return kind === 'castle' || kind === 'final';
+  }
+
   mount(): void {
-    audio.music('battle');
+    audio.music(this.bossBattle() ? 'boss' : 'battle');
     // Heroes first, then every card in the game (about 3 MB in all), so a card
     // drawn later already has its illustration instead of a dark panel while it downloads.
     void preloadArt(this.session.seats.map((s) => getHero(s.hero).art)).then(() => preloadArt(CARDS.map((c) => c.art)));
@@ -910,7 +922,7 @@ class BoardScreen implements Screen {
     this.twilightChip.hidden = !status;
     this.el.classList.toggle('twilight', !!status && status.level > 0);
     // Twilight Fury has its own music: it crossfades in when the Fury falls.
-    if (view.phase !== 'finished') audio.music(status && status.level > 0 ? 'twilight' : 'battle');
+    if (view.phase !== 'finished') audio.music(this.bossBattle() ? 'boss' : status && status.level > 0 ? 'twilight' : 'battle');
     if (!status) return;
     this.twilightChip.classList.toggle('active', status.level > 0);
     this.twilightChip.classList.toggle('last', status.level === 0 && status.next <= 1);

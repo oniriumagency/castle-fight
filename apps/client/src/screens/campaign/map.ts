@@ -1,4 +1,5 @@
 import { getCard, getHero, type HeroId } from '@cardcraft-castles/engine';
+import { openCredits } from '../credits';
 import {
   BORDERS,
   CAMPAIGN_DIFFICULTIES,
@@ -509,6 +510,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
         ),
         h('hr'),
         h('button.btn.ghost', { type: 'button', onclick: () => (close(), void playDialogue(PROLOGUE, SCENE_ART.prologue)) }, t('campaignStory')),
+        h('button.btn.ghost', { type: 'button', onclick: () => (close(), openCredits()) }, t('credits')),
         h(
           'button.btn.danger',
           {

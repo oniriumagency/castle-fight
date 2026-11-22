@@ -7,6 +7,7 @@ import { settings, type Settings } from '../app/settings';
 import { audio } from '../fx/audio';
 import { tutorial } from '../game/tutorial';
 import { playDialogue, SCENE_ART } from './campaign/dialogue';
+import { openCredits } from './credits';
 
 const LOCALE_LABEL: Record<Locale, string> = { es: 'Español', en: 'English' };
 
@@ -99,6 +100,23 @@ export function openSettings(): void {
         toggle('reducedMotion', t('reducedMotion')),
         toggle('heroReactions', t('heroReactions')),
         toggle('localTimer', t('localTimer')),
+        h(
+          'div.setting-row',
+          null,
+          h('span', null, t('credits')),
+          h(
+            'button.btn.small',
+            {
+              type: 'button',
+              onclick: () => {
+                audio.play('uiClick');
+                close();
+                openCredits();
+              },
+            },
+            t('creditsOpen'),
+          ),
+        ),
         h(
           'div.setting-row',
           null,
