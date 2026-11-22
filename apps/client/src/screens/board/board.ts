@@ -26,7 +26,7 @@ import { startBattleGuide } from './battleTutorial';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
 import { battlefield } from '../../app/stage';
-import { audio } from '../../fx/audio';
+import { audio, voiceOf } from '../../fx/audio';
 import { fx, type FxContext } from '../../fx/director';
 import { describeEvent } from '../../game/describe';
 import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
@@ -1063,7 +1063,9 @@ class BoardScreen implements Screen {
     reactions.forEach((r, i) => {
       const show = (): void => {
         if (this.destroyed || this.resultsShown) return;
-        this.panels[this.sideOf(r.seat)]?.showReaction(L(r.text));
+        const side = this.sideOf(r.seat);
+        this.panels[side]?.showReaction(L(r.text));
+        audio.play(voiceOf(this.session.seats[r.seat]?.hero ?? null), 0.5, { pan: [-0.5, 0.5, 0.1][side] ?? 0, gain: 0.7 });
       };
       if (i === 0) show();
       else this.later(show, 1700 * i);

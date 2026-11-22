@@ -2,7 +2,7 @@ import { getHero } from '@cardcraft-castles/engine';
 import { PERSONAS, getKingdom, type Line } from '@cardcraft-castles/campaign';
 import { append, h } from '../../app/dom';
 import { L, t } from '../../app/i18n';
-import { audio } from '../../fx/audio';
+import { audio, voiceOf } from '../../fx/audio';
 import { artUrl, faceImg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
 
@@ -102,8 +102,13 @@ export function playDialogue(lines: readonly Line[], backdrop?: string): Promise
     const next = (): void => {
       index++;
       if (index >= lines.length) return finish();
-      audio.play('uiClick');
       const line = lines[index]!;
+      // A new painting turns the page; otherwise the speaker's voice, or a soft blip for the narrator.
+      const sp = line.speaker;
+      if (line.scene && line.scene.art !== shown) audio.play('pageTurn');
+      else if ('hero' in sp) audio.play(voiceOf(sp.hero), 0.5, { gain: 0.8 });
+      else if ('captain' in sp) audio.play(voiceOf(null), 0.5, { gain: 0.8 });
+      else audio.play('dialogueBlip');
       if (line.scene) showScene(line.scene);
       const who = speakerOf(line);
       box.className = `dialogue-box panel${who.art ? '' : ' narrator'}`;

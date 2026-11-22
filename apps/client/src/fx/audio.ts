@@ -5,6 +5,7 @@ import { RECIPES, WARM_ORDER, type Cue } from './sound/sfx';
 import { impulseResponse, Synth } from './sound/synth';
 
 export type { Cue } from './sound/sfx';
+export { voiceOf } from './sound/sfx';
 export type { MusicTrack } from './sound/music';
 
 /**

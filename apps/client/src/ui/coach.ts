@@ -165,6 +165,7 @@ export function createCoach(onSkip?: () => void): Coach {
         loop();
       }
       text.textContent = step.text;
+      audio.play('coachTip');
       next.style.display = step.until ? 'none' : '';
       bubble.classList.remove('pop');
       void bubble.offsetWidth;

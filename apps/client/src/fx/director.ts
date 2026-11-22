@@ -559,8 +559,8 @@ export const fx = {
   /** The Twilight Fury begins or rises: the sky bleeds and the ground shakes. */
   async twilightRose(level: number, ctx: FxContext): Promise<void> {
     const field = ctx.field;
-    audio.play('event');
-    audio.duck(0.45, 1800);
+    audio.play('twilightFall', 0.5, { gain: level > 1 ? 0.8 : 1 });
+    audio.duck(0.4, 2200);
     void field.setMood(skyFor(null, level), ms(1800));
     field.shake(6 + level * 2);
     await wait(900);

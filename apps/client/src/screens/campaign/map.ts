@@ -290,7 +290,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       }
       g.append(svg('text', { y: r + 16, class: 'cm-name' }, L(territory.name)));
       const pick = (): void => {
-        audio.play('uiClick');
+        audio.play('mapSelect');
         selected = territory.id;
         build();
       };
@@ -590,6 +590,8 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       field.layout();
       void field.setMood(skyFor(null), 900);
       if (after && save) {
+        // A victory sounds over the map: a castle (its hero joins) or the Crown gets the bigger fanfare.
+        if (after.won) audio.play(after.ally || getTerritory(after.territory).kind === 'final' ? 'conquestBig' : 'conquest', 0.5, { delay: 350 });
         const lines = scenesAfter(save, after);
         void playDialogue(lines, after.won && getTerritory(after.territory).kind === 'final' ? SCENE_ART.epilogue : undefined).then(async () => {
           await menuTip();

@@ -29,7 +29,13 @@ export type Cue =
   // Battle events
   | 'event' | 'eventTormenta' | 'eventTerremoto' | 'eventEclipse' | 'eventMercado' | 'eventCosecha' | 'eventTregua' | 'thunder'
   // Turn and game
-  | 'yourTurn' | 'theirTurn' | 'tick' | 'tickUrgent' | 'timeUp' | 'victory' | 'defeat';
+  | 'yourTurn' | 'theirTurn' | 'tick' | 'tickUrgent' | 'timeUp' | 'victory' | 'defeat'
+  // Twilight Fury
+  | 'twilightFall'
+  // Campaign: map, scenes and the guide
+  | 'mapSelect' | 'conquest' | 'conquestBig' | 'pageTurn' | 'dialogueBlip' | 'coachTip'
+  // Heroes' voices (speech bubbles and scenes)
+  | 'voiceArquitecta' | 'voiceMariscal' | 'voiceHechicera' | 'voiceAlquimista' | 'voiceSaboteadora' | 'voiceGuardian' | 'voiceCaptain';
 
 export interface Recipe {
   len: number;
@@ -137,6 +143,64 @@ function sparkle(s: Synth, from: number, span: number, n: number, gain: number, 
 function boom(s: Synth, freq: number, ms: number, gain: number, delay = 0): void {
   s.tone(freq, ms, { gain, to: freq * 0.5, delay, attack: 3 });
   s.noise(ms * 0.8, { color: 'brown', gain: gain * 0.9, delay, filter: { freq: 380, to: 60 } });
+}
+
+/**
+ * Gibberish speech: a few vowel-like syllables (a buzzy tone through a
+ * sweeping band-pass, the way a mouth moves between vowels). Each hero has
+ * their own pitch, pace and timbre, so a bubble is recognisable by ear.
+ */
+interface VoiceSpec {
+  midi: number;
+  type: OscillatorType;
+  /** Formant centre in Hz and how far it moves between vowels. */
+  formant: number;
+  /** Syllable length in ms. */
+  syl: number;
+  /** Pitch steps of each syllable (semitones from `midi`). */
+  melody: number[];
+  gain: number;
+}
+
+function voice(s: Synth, v: VoiceSpec, delay = 0): void {
+  const vowels = [1, 1.55, 0.8, 1.3, 0.95];
+  let at = delay;
+  v.melody.forEach((step, i) => {
+    const f = mtof(v.midi + step);
+    const len = v.syl * (i === v.melody.length - 1 ? 1.5 : 1);
+    const from = v.formant * vowels[i % vowels.length]!;
+    const to = v.formant * vowels[(i + 2) % vowels.length]!;
+    s.tone(f, len, {
+      type: v.type,
+      gain: v.gain,
+      delay: at,
+      attack: 12,
+      shape: 'hold',
+      release: len * 0.35,
+      to: f * (i === v.melody.length - 1 ? 0.92 : 1.03),
+      vibrato: { depth: 14, rate: 7 },
+      filter: { type: 'bandpass', freq: from, to, q: 3.2 },
+    });
+    // The low body of the voice.
+    s.tone(f, len, { type: 'triangle', gain: v.gain * 0.35, delay: at, attack: 10, shape: 'hold', release: len * 0.35 });
+    at += len * 1.12;
+  });
+}
+
+const VOICES = {
+  arquitecta: { midi: 62, type: 'sawtooth', formant: 1150, syl: 85, melody: [0, 4, 2, 7], gain: 0.16 },
+  mariscal: { midi: 45, type: 'sawtooth', formant: 650, syl: 95, melody: [0, 0, 5, 0], gain: 0.2 },
+  hechicera: { midi: 69, type: 'triangle', formant: 1600, syl: 110, melody: [0, 3, 7, 10], gain: 0.2 },
+  alquimista: { midi: 58, type: 'square', formant: 1000, syl: 65, melody: [0, 5, 2, 9, 4], gain: 0.12 },
+  saboteadora: { midi: 65, type: 'square', formant: 1350, syl: 55, melody: [0, -2, 3, -1, 5], gain: 0.1 },
+  guardian: { midi: 40, type: 'sawtooth', formant: 520, syl: 130, melody: [0, 3, 0], gain: 0.22 },
+  captain: { midi: 52, type: 'sawtooth', formant: 820, syl: 85, melody: [0, 2, -2, 0], gain: 0.17 },
+} satisfies Record<string, VoiceSpec>;
+
+/** A short paper rustle: a page or a map being handled. */
+function paper(s: Synth, delay: number, gain: number): void {
+  s.noise(160, { color: 'white', gain, delay, shape: 'swell', filter: { type: 'bandpass', freq: 2600, to: 4800, q: 0.9 } });
+  crackle(s, delay + 20, 140, 6, gain * 0.5);
 }
 
 // ---------------------------------------------------------------------------
@@ -849,7 +913,151 @@ export const RECIPES: Record<Cue, Recipe> = {
       s.fm(73, 2800, { ratio: 1.414, index: 3, indexTo: 0.1, gain: 0.14, delay: 300 });
     },
   },
+
+  // --- Twilight Fury ---------------------------------------------------------
+  // The Fury falls or rises: a deep bell, a dark choir swell and the ground groaning.
+  twilightFall: {
+    len: 3.2,
+    level: 0.6,
+    verb: 0.6,
+    fn: (s) => {
+      boom(s, 55, 1400, 0.4);
+      s.fm(mtof(38), 3000, { ratio: 1.41, index: 4, indexTo: 0.2, gain: 0.16 });
+      s.fm(mtof(50), 2600, { ratio: 2.76, index: 2.5, indexTo: 0.1, gain: 0.06, delay: 20 });
+      strings(s, [50, 53, 57, 60], 2400, 0.05, 250, 0.7);
+      s.noise(2200, { color: 'brown', gain: 0.18, delay: 300, shape: 'swell', filter: { freq: 300, to: 90 } });
+      debris(s, 500, 1400, 10, 0.035);
+    },
+  },
+
+  // --- Campaign ----------------------------------------------------------------
+  // A territory picked on the map: a pin pressed into parchment.
+  mapSelect: {
+    len: 0.35,
+    level: 0.22,
+    verb: 0.15,
+    vary: 0.03,
+    fn: (s) => {
+      paper(s, 0, 0.03);
+      s.thump(260, 70, { gain: 0.12, drop: 0.5, delay: 25 });
+      s.fm(mtof(79), 220, { ratio: 2.01, index: 0.9, gain: 0.035, delay: 40 });
+    },
+  },
+  // A territory taken: a drum roll and a short horn call.
+  conquest: {
+    len: 2,
+    level: 0.45,
+    verb: 0.4,
+    fn: (s) => {
+      for (let i = 0; i < 6; i++) s.thump(150, 90, { gain: 0.08 + i * 0.02, drop: 0.6, delay: i * 55 });
+      horn(s, 62, 220, 0.09, 340);
+      horn(s, 67, 220, 0.09, 560);
+      horn(s, 74, 700, 0.1, 780);
+      s.thump(110, 260, { gain: 0.25, delay: 780 });
+      crash(s, 700, 0.04, 780);
+    },
+  },
+  // A castle falls and its hero joins, or the Crown is won: a fuller fanfare.
+  conquestBig: {
+    len: 3.2,
+    level: 0.55,
+    verb: 0.5,
+    fn: (s) => {
+      for (let i = 0; i < 8; i++) s.thump(140, 90, { gain: 0.08 + i * 0.02, drop: 0.6, delay: i * 50 });
+      horn(s, 62, 200, 0.09, 420);
+      horn(s, 66, 200, 0.09, 620);
+      horn(s, 69, 200, 0.09, 820);
+      for (const n of [62, 66, 69, 74]) horn(s, n, 1500, 0.06, 1020);
+      strings(s, [50, 57, 62], 1800, 0.05, 1020, 1.2);
+      boom(s, 70, 600, 0.25, 1020);
+      crash(s, 1200, 0.05, 1020);
+      sparkle(s, 1200, 1200, 8, 0.02, 86, 101);
+    },
+  },
+  // A comic page or a scene's painting changes.
+  pageTurn: {
+    len: 0.45,
+    level: 0.2,
+    verb: 0.15,
+    vary: 0.05,
+    fn: (s) => {
+      whoosh(s, 260, 900, 3400, 0.05);
+      paper(s, 60, 0.04);
+      s.thump(300, 40, { gain: 0.04, drop: 0.6, delay: 220 });
+    },
+  },
+  // The narrator's next line.
+  dialogueBlip: {
+    len: 0.25,
+    level: 0.14,
+    verb: 0.2,
+    vary: 0.03,
+    fn: (s) => {
+      s.fm(mtof(76), 200, { ratio: 2, index: 0.7, gain: 0.04 });
+      s.noise(30, { gain: 0.015, filter: { type: 'bandpass', freq: 3000, q: 2 } });
+    },
+  },
+  // The guide points at something new.
+  coachTip: {
+    len: 0.6,
+    level: 0.2,
+    verb: 0.3,
+    fn: (s) => {
+      bell(s, 84, 320, 0.03, 0, 2);
+      bell(s, 88, 420, 0.03, 110, 2);
+    },
+  },
+
+  // --- Voices ------------------------------------------------------------------
+  voiceArquitecta: { len: 0.8, level: 0.2, verb: 0.15, vary: 0.04, fn: (s) => voice(s, VOICES.arquitecta) },
+  voiceMariscal: { len: 0.8, level: 0.22, verb: 0.15, vary: 0.04, fn: (s) => voice(s, VOICES.mariscal) },
+  voiceHechicera: {
+    len: 1,
+    level: 0.2,
+    verb: 0.35,
+    vary: 0.04,
+    fn: (s) => {
+      voice(s, VOICES.hechicera);
+      sparkle(s, 60, 400, 4, 0.012, 88, 100);
+    },
+  },
+  voiceAlquimista: {
+    len: 0.8,
+    level: 0.2,
+    verb: 0.15,
+    vary: 0.04,
+    fn: (s) => {
+      voice(s, VOICES.alquimista);
+      // A bubble pops at the end.
+      s.tone(600, 60, { type: 'sine', gain: 0.04, to: 1400, delay: 400 });
+    },
+  },
+  voiceSaboteadora: { len: 0.7, level: 0.18, verb: 0.1, vary: 0.04, fn: (s) => voice(s, VOICES.saboteadora) },
+  voiceGuardian: {
+    len: 1,
+    level: 0.22,
+    verb: 0.3,
+    vary: 0.03,
+    fn: (s) => {
+      voice(s, VOICES.guardian);
+      // Armour: a soft metallic ring under the voice.
+      s.fm(mtof(64), 700, { ratio: 3.3, index: 1.5, indexTo: 0.1, gain: 0.015, delay: 30 });
+    },
+  },
+  voiceCaptain: { len: 0.8, level: 0.2, verb: 0.15, vary: 0.05, fn: (s) => voice(s, VOICES.captain) },
 };
+
+const VOICE_CUES: Record<string, Cue> = {
+  arquitecta: 'voiceArquitecta',
+  mariscal: 'voiceMariscal',
+  hechicera: 'voiceHechicera',
+  alquimista: 'voiceAlquimista',
+  saboteadora: 'voiceSaboteadora',
+  guardian: 'voiceGuardian',
+};
+
+/** A hero's gibberish voice; captains and unknown heroes share one. */
+export const voiceOf = (hero: string | null): Cue => (hero && VOICE_CUES[hero]) || 'voiceCaptain';
 
 /** Cues worth rendering ahead of time, most urgent first. */
 export const WARM_ORDER: Cue[] = [
@@ -857,4 +1065,5 @@ export const WARM_ORDER: Cue[] = [
   'yourTurn', 'theirTurn', 'resource', 'build', 'launch', 'hit', 'playConstruccion', 'playAsalto', 'playArcano',
   'tick', 'tickUrgent', 'worker', 'enchant', 'burn', 'frost', 'shield', 'blocked', 'pierce', 'launchArcane',
   'hitBig', 'rarityRara', 'rarityEpica', 'rarityLegendaria', 'combo', 'ultimateReady', 'error', 'uiOpen',
+  'mapSelect', 'dialogueBlip', 'pageTurn', 'coachTip', ...Object.values(VOICE_CUES), 'voiceCaptain',
 ];
