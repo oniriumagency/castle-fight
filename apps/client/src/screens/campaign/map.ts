@@ -17,6 +17,7 @@ import {
   TERRITORY_WON_ALLY,
   TIPS,
   attackable,
+  castleOpen,
   awakeningLines,
   battleSetup,
   fallLines,
@@ -387,7 +388,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
             ),
           ]
         : !owned && territory.kind !== 'final' && territory.kind !== 'home'
-          ? h('p.campaign-locked', null, t('campaignUnreachable'))
+          ? h('p.campaign-locked', null, territory.kind === 'castle' && !castleOpen(s, territory.kingdom!) ? t('campaignCastleLocked') : t('campaignUnreachable'))
           : null,
     );
   };

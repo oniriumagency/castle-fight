@@ -132,9 +132,16 @@ export function attackable(save: CampaignSave): string[] {
       if (heroesDefeated(save) === RIVAL_KINGDOMS.length) out.push(t.id);
       continue;
     }
+    // The hero waits in the castle until all of their captains have fallen.
+    if (t.kind === 'castle' && !castleOpen(save, t.kingdom!)) continue;
     if (neighboursOf(t.id).some((n) => isConquered(save, n))) out.push(t.id);
   }
   return out;
+}
+
+/** A kingdom's castle can be challenged only once its four territories are conquered. */
+export function castleOpen(save: CampaignSave, kingdom: KingdomId): boolean {
+  return TERRITORIES.filter((t) => t.kingdom === kingdom && t.kind === 'territory').every((t) => isConquered(save, t.id));
 }
 
 /** Territories conquered in a kingdom (0 to 5). */

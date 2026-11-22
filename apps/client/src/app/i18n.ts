@@ -44,6 +44,7 @@ const STRINGS = {
   campaignHeld: { es: 'Retiene {n} de tus cartas: las recuperas al conquistarlo.', en: 'Holds {n} of your cards: win them back by conquering it.' },
   campaignChooseHero: { es: 'Tu héroe', en: 'Your hero' },
   campaignConquered: { es: 'Conquistado', en: 'Conquered' },
+  campaignCastleLocked: { es: 'El héroe espera en su castillo. Conquista antes los cuatro territorios de este reino.', en: 'The hero waits in their castle. Conquer the four territories of this kingdom first.' },
   campaignUnreachable: { es: 'Conquista un territorio vecino para poder atacar aquí.', en: 'Conquer a neighbouring territory to attack here.' },
   campaignCrownLocked: { es: 'Se abre cuando caigan los cinco castillos.', en: 'Opens once the five castles have fallen.' },
   campaignHome: { es: 'Tu castillo. Desde aquí empieza todo.', en: 'Your castle. This is where it all begins.' },
