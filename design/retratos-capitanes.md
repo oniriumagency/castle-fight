@@ -1,6 +1,6 @@
 # Retratos de los capitanes de la campaña
 
-Cada capitán tiene ahora su propio retrato. Ya están pintados: Sir Brannoc, Tilda Fennick, Corwin Manolenta, Aprendiz Liora y Sargento Bruck (los cinco retratos que ya teníamos). Faltan estos 15. Mientras tanto, el juego muestra una silueta encapuchada con el color del reino, para que no aparezca nunca un retrato que no corresponde.
+Cada capitán tiene ahora su propio retrato. Ya están pintados: Sir Brannoc, Tilda Fennick, Corwin Manolenta, Aprendiz Liora y Sargento Bruck (los cinco retratos que ya teníamos). Los 15 de abajo ya están pintados también (22 de noviembre).
 
 Formato: 3:4, vertical. Guarda cada imagen con el nombre indicado en `art/captains/` (o pásamelas en una carpeta y yo las coloco).
 
