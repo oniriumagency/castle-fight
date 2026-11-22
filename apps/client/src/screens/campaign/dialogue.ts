@@ -54,7 +54,39 @@ export function playDialogue(lines: readonly Line[], backdrop?: string): Promise
     const box = h('div.dialogue-box.panel');
     const skip = h('button.btn.ghost.dialogue-skip', { type: 'button' }, t('dialogueSkip'));
     const layer = h('div.dialogue-layer', { role: 'dialog', 'aria-modal': 'true', 'aria-live': 'polite' }, box, skip);
-    if (backdrop) {
+    // A comic: its lines carry their own paintings, which fade from one to the next.
+    const panels = lines.filter((l) => l.scene).length;
+    let shown = '';
+    let panelIndex = -1;
+    const dots = panels > 1 ? h('div.dialogue-progress', null, ...lines.filter((l) => l.scene).map(() => h('i'))) : null;
+    if (panels) {
+      layer.classList.add('comic', 'has-scene');
+      if (dots) layer.append(dots);
+    }
+    const showScene = (scene: NonNullable<Line['scene']>): void => {
+      if (scene.art === shown) return;
+      shown = scene.art;
+      panelIndex++;
+      dots?.querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i <= panelIndex));
+      const img = h('img.dialogue-scene', { alt: '', draggable: 'false' }) as HTMLImageElement;
+      const chain = [scene.art, scene.fallback].filter((x): x is string => !!x);
+      let step = 0;
+      img.addEventListener('error', () => {
+        step++;
+        if (step < chain.length) img.src = artUrl(chain[step]!);
+        else img.remove();
+      });
+      img.addEventListener('load', () => {
+        layer.querySelectorAll('.dialogue-scene.on').forEach((old) => {
+          old.classList.remove('on');
+          setTimeout(() => old.remove(), 900);
+        });
+        requestAnimationFrame(() => img.classList.add('on'));
+      });
+      img.src = artUrl(chain[0]!);
+      layer.prepend(img);
+    };
+    if (backdrop && !panels) {
       const art = h('img.dialogue-scene', { src: artUrl(backdrop), alt: '', draggable: 'false' }) as HTMLImageElement;
       art.addEventListener('load', () => layer.classList.add('has-scene'), { once: true });
       art.addEventListener('error', () => art.remove(), { once: true });
@@ -72,6 +104,7 @@ export function playDialogue(lines: readonly Line[], backdrop?: string): Promise
       if (index >= lines.length) return finish();
       audio.play('uiClick');
       const line = lines[index]!;
+      if (line.scene) showScene(line.scene);
       const who = speakerOf(line);
       box.className = `dialogue-box panel${who.art ? '' : ' narrator'}`;
       box.style.setProperty('--hero', who.color);

@@ -27,6 +27,7 @@ import {
   isConquered,
   playerDeck,
   startBattle,
+  heroesDefeated,
   type BattleOutcome,
   type CampaignDifficulty,
   type CampaignSave,
@@ -43,6 +44,8 @@ import { deleteCampaign, exportCode, importCode, loadCampaign, saveCampaign, see
 import { artUrl, faceImg, iconSvg } from '../../ui/assets';
 import { heroCss, skyFor } from '../../ui/theme';
 import { attachCardZoom } from '../../ui/cardZoom';
+import { clickOn, createCoach, type CoachStep } from '../../ui/coach';
+import { tutorial } from '../../game/tutorial';
 import { cardFace } from '../../ui/card';
 import { SCENE_ART, captainArt, playDialogue, possessedArt } from './dialogue';
 
@@ -139,6 +142,8 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
     audio.play('uiBack');
     void import('../flow').then(({ flow }) => flow.menu());
   };
+  /** Back to the menu, once it is open (the first enemy hero has fallen). */
+  const backButton = (): HTMLElement | null => (tutorial.menuOpen() ? h('button.btn', { type: 'button', onclick: back }, t('back')) : null);
 
   // ---------------------------------------------------------------------------
   // No campaign yet: choose a difficulty and watch the prologue.
@@ -181,7 +186,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
         h(
           'div.actions',
           null,
-          h('button.btn', { type: 'button', onclick: back }, t('back')),
+          backButton(),
           h(
             'button.btn.primary.big',
             {
@@ -193,7 +198,9 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
                 build();
                 await playDialogue(PROLOGUE, SCENE_ART.prologue);
                 seen('prologue');
+                tutorial.mark('intro');
                 save = loadCampaign();
+                await mapTutorial();
               },
             },
             t('campaignStart'),
@@ -264,6 +271,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
         tabindex: 0,
         role: 'button',
         'aria-label': L(territory.name),
+        'data-territory': territory.id,
         style: `--c:${color}`,
       });
       if (canAttack) g.append(svg('circle', { r: r + 16, fill: 'url(#cm-glow)', class: 'cm-pulse' }));
@@ -393,6 +401,44 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
     );
   };
 
+  /** The guide on the map: home, the first territory, its panel and the challenge button. */
+  const mapTutorial = async (): Promise<void> => {
+    if (!save || tutorial.done('map') || save.wins + save.losses > 0) return;
+    const coach = createCoach(() => tutorial.skipAll());
+    const node = (id: string) => (): Element | null => el.querySelector(`[data-territory="${id}"] .cm-dot`);
+    const first = 'bastion-a';
+    const steps: CoachStep[] = [
+      { target: node('valdepiedra'), text: t('tutMapHome'), pad: 14 },
+      { target: node(first), text: t('tutMapPick'), gesture: 'tap', pad: 14, until: clickOn(() => el.querySelector(`[data-territory="${first}"]`)) },
+      { target: () => el.querySelector('.campaign-rewards'), text: t('tutMapPanel'), passThrough: true },
+      { target: () => el.querySelector('.campaign-attack'), text: t('tutMapAttack'), gesture: 'tap', until: clickOn(() => el.querySelector('.campaign-attack')) },
+    ];
+    for (const step of steps) {
+      if (!(await coach.show(step))) return;
+    }
+    coach.close();
+    tutorial.mark('map');
+  };
+
+  /** Once, after the first ally joins: the hero picker. */
+  const alliesTip = async (): Promise<void> => {
+    if (!save || save.allies.length < 2 || tutorial.tipSeen('allies')) return;
+    const coach = createCoach(() => tutorial.skipAll());
+    const ok = await coach.show({ target: () => el.querySelector('.campaign-heroes'), text: t('tutTipAllies') });
+    if (ok) tutorial.markTip('allies');
+    coach.close();
+  };
+
+  /** The first enemy hero has fallen: the main menu opens, and Mary points at the way there. */
+  const menuTip = async (): Promise<void> => {
+    if (!save || heroesDefeated(save) < 1 || tutorial.menuOpen()) return;
+    tutorial.mark('menu');
+    build();
+    const coach = createCoach();
+    await coach.show({ target: () => el.querySelector('.campaign-bar > .btn'), text: t('tutMenuOpen'), gesture: 'tap' });
+    coach.close();
+  };
+
   const attack = async (id: string): Promise<void> => {
     if (busy || !save) return;
     busy = true;
@@ -404,7 +450,9 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       for (const key of scenes.keys) seen(key);
       save = loadCampaign()!;
       const battleId = `${id}:${Date.now().toString(36)}`;
-      const setup = battleSetup(save, id, hero);
+      const base = battleSetup(save, id, hero);
+      // The guided first battle: the captain plays as softly as the AI can.
+      const setup = tutorial.done('battle') ? base : { ...base, tier: 0 };
       save = startBattle(save, id, hero, battleId);
       saveCampaign(save);
       const { flow } = await import('../flow');
@@ -494,7 +542,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
     const header = h(
       'header.campaign-bar',
       null,
-      h('button.btn', { type: 'button', onclick: back }, t('back')),
+      backButton(),
       h('div.campaign-title', null, h('h1', null, t('playCampaign')), h('span.beta-tag', null, t('betaTag'))),
       h(
         'div.campaign-stats',
@@ -541,8 +589,21 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       void field.setMood(skyFor(null), 900);
       if (after && save) {
         const lines = scenesAfter(save, after);
-        void playDialogue(lines, after.won && getTerritory(after.territory).kind === 'final' ? SCENE_ART.epilogue : undefined);
-      }
+        void playDialogue(lines, after.won && getTerritory(after.territory).kind === 'final' ? SCENE_ART.epilogue : undefined).then(async () => {
+          await menuTip();
+          await alliesTip();
+        });
+      } else if (save && !save.seen.includes('prologue')) {
+        // The first start of the game: the comic, then the guide on the map.
+        void (async () => {
+          await playDialogue(PROLOGUE, SCENE_ART.prologue);
+          seen('prologue');
+          tutorial.mark('intro');
+          save = loadCampaign();
+          await mapTutorial();
+        })();
+      } else if (save && !tutorial.done('map')) void mapTutorial();
+      else void menuTip();
     },
     resize() {
       requestAnimationFrame(() => battlefield().layout());

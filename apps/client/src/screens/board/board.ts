@@ -21,6 +21,8 @@ import { callAttention } from '../../app/attention';
 import { boostTag, comboBonusText } from '../../game/combo';
 import { L, t } from '../../app/i18n';
 import type { BattleOutcome } from '@cardcraft-castles/campaign';
+import { tutorial } from '../../game/tutorial';
+import { startBattleGuide } from './battleTutorial';
 import { modal, type Screen } from '../../app/router';
 import { animScale, settings } from '../../app/settings';
 import { battlefield } from '../../app/stage';
@@ -177,6 +179,7 @@ class BoardScreen implements Screen {
   private readonly reactions = new ReactionDirector();
   private unsubscribe: () => void = () => {};
   private unsubscribeSettings: () => void = () => {};
+  private stopGuide: () => void = () => {};
   private raf = 0;
   private backgroundTimer = 0;
   private playedCard: HTMLElement | null = null;
@@ -301,6 +304,10 @@ class BoardScreen implements Screen {
     this.field.setHeroes(this.sides().map((side) => this.session.seats[this.seatOfSide(side)].hero));
     this.layout();
     this.unsubscribe = this.session.subscribe((e) => this.onSession(e));
+    // Campaign: the guided first battle, then one-off tips the first time something happens.
+    if ((this.session as { campaign?: unknown }).campaign) {
+      this.stopGuide = startBattleGuide(this.session, this.el, { firstBattle: !tutorial.done('battle') });
+    }
     window.addEventListener('keydown', this.onKey);
     // Player reports carry the game being played. No bubble here: it would cover the board.
     setGameContext(() => this.reportContext());
@@ -328,6 +335,7 @@ class BoardScreen implements Screen {
     setGameContext(null);
     hideFeedbackHint();
     this.unsubscribe();
+    this.stopGuide();
     this.unsubscribeSettings();
     cancelAnimationFrame(this.raf);
     window.clearInterval(this.backgroundTimer);

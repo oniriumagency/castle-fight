@@ -12,6 +12,8 @@ export type Speaker = { hero: HeroId } | { captain: string; kingdom: KingdomId }
 export interface Line {
   speaker: Speaker;
   text: LocalizedText;
+  /** A comic panel: the painting shown behind this line (and the next ones until another), with a stand-in until it is painted. */
+  scene?: { art: string; fallback?: string };
 }
 
 export interface Persona {
@@ -33,16 +35,79 @@ const say = (hero: HeroId, es: string, en: string): Line => ({ speaker: { hero }
 const narrate = (es: string, en: string): Line => ({ speaker: { narrator: true }, text: { es, en } });
 const MARY = 'arquitecta';
 
+const panel = (line: Line, art: string, fallback?: string): Line => ({ ...line, scene: { art: `campaign/${art}.jpg`, ...(fallback ? { fallback: `campaign/${fallback}.jpg` } : {}) } });
+
+/**
+ * The opening comic, shown the first time the game starts: eight panels that
+ * bring the player into the valley and explain how a battle is won (the Pact).
+ */
 export const PROLOGUE: Line[] = [
-  narrate(
-    'Hace veinte años murió el rey Aurelio y su corona se rompió en seis brasas. Seis señores las recibieron, y con ellas, el valle.',
-    'Twenty years ago King Aurelio died and his crown shattered into six embers. Six lords received them, and with them, the valley.',
+  panel(
+    narrate(
+      'Hace veinte años, el valle tenía un solo rey, Aurelio, y una corona con seis brasas: una por cada señor que le juraba lealtad.',
+      'Twenty years ago the valley had a single king, Aurelio, and a crown with six embers: one for each lord sworn to him.',
+    ),
+    'comic-1-rey',
+    'prologo',
   ),
-  narrate(
-    'Anoche ardió el puente de Valdepiedra. Los seis reinos se acusan entre sí. La tregua ha terminado.',
-    'Last night the bridge of Stonevale burned. The six kingdoms blame one another. The truce is over.',
+  panel(
+    narrate(
+      'Cuando el rey murió, la corona se rompió. Cada señor se llevó su brasa y, con ella, su parte del valle.',
+      'When the king died, the crown broke. Each lord took their ember and, with it, their part of the valley.',
+    ),
+    'prologo',
   ),
-  say(MARY, 'Si alguien va a reinar este valle, que sea quien sabe construir. Empecemos por los cimientos.', 'If someone is going to rule this valley, let it be someone who knows how to build. Let us start with the foundations.'),
+  panel(
+    narrate(
+      'Desde entonces solo se construyen murallas. Los campos arden y ya nadie recuerda por qué empezó la guerra.',
+      'Since then only walls get built. The fields burn and no one remembers why the war began.',
+    ),
+    'comic-3-guerra',
+    'corona',
+  ),
+  panel(
+    narrate(
+      'En Valdepiedra, Mary Brickson, la Arquitecta, hizo lo que nadie se atrevía: un puente entre los reinos.',
+      'In Stonevale, Mary Brickson, the Architect, did what no one dared: a bridge between the kingdoms.',
+    ),
+    'comic-4-puente',
+    'epilogo',
+  ),
+  say(MARY, 'Un muro separa. Un puente une. Yo prefiero los puentes.', 'A wall divides. A bridge joins. I prefer bridges.'),
+  panel(
+    narrate(
+      'Anoche alguien le prendió fuego. Los seis reinos se acusan entre sí. La tregua ha terminado.',
+      'Last night someone set it on fire. The six kingdoms blame one another. The truce is over.',
+    ),
+    'comic-5-incendio',
+    'corona',
+  ),
+  panel(
+    say(
+      MARY,
+      'Nadie escucha a una constructora en tiempos de guerra. Entonces les hablaré en el único idioma que respetan: el Pacto de las Brasas.',
+      'No one listens to a builder in wartime. Then I will speak the only language they respect: the Pact of Embers.',
+    ),
+    'comic-6-decision',
+    'epilogo',
+  ),
+  panel(
+    narrate(
+      'El Pacto: dos señores levantan sus castillos frente a frente. Por las buenas, gana quien suba el suyo hasta 100. Por las malas, quien derribe el del otro. El vencido acepta la palabra del vencedor.',
+      'The Pact: two lords raise their castles face to face. The kind way, whoever raises theirs to 100 wins. The hard way, whoever brings the other down. The loser accepts the winner’s word.',
+    ),
+    'comic-7-pacto',
+    'prologo',
+  ),
+  panel(
+    say(
+      MARY,
+      'Mi palabra será la paz. Primero, el Bastión Azur: Idris es terco, pero es justo. Si alguien puede escucharme, es él.',
+      'My word will be peace. First, the Azure Bastion: Idris is stubborn, but fair. If anyone can hear me, it is him.',
+    ),
+    'comic-8-mapa',
+    'mapa',
+  ),
 ];
 
 /** First encounter: a message from the hero before the battle against their first captain. */
@@ -88,8 +153,8 @@ export function fallLines(kingdom: Exclude<KingdomId, 'valdepiedra'>, marshalBea
   switch (kingdom) {
     case 'bastion':
       return [
-        say('guardian', 'Mi muralla cayó, y con ella mi juramento de no servir a nadie. El Pacto es el Pacto. Mi escudo es tuyo, Arquitecta.', 'My wall fell, and with it my oath to serve no one. The Pact is the Pact. My shield is yours, Architect.'),
-        say(MARY, 'No quiero tu escudo delante de mí, Idris. Lo quiero a mi lado.', 'I do not want your shield in front of me, Idris. I want it beside me.'),
+        say('guardian', 'Ganaste el Pacto, y lo ganaste limpio. Escucharé lo que tengas que decir de esa paz tuya. Mi escudo es tuyo, Arquitecta.', 'You won the Pact, and you won it clean. I will hear what you have to say about this peace of yours. My shield is yours, Architect.'),
+        say(MARY, 'No quiero tu escudo delante de mí, Idris. Lo quiero a mi lado, sosteniendo el puente.', 'I do not want your shield in front of me, Idris. I want it beside me, holding up the bridge.'),
       ];
     case 'alambiques':
       return [
