@@ -3,7 +3,7 @@ import { PERSONAS, getKingdom, type Line } from '@cardcraft-castles/campaign';
 import { append, h } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
-import { artUrl } from '../../ui/assets';
+import { artUrl, faceImg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
 
 /** Catalog path of a captain's portrait (one per kingdom); the hero's art stands in until it is painted. */
@@ -12,9 +12,7 @@ export function captainArt(kingdom: string): string {
 }
 
 function portrait(path: string, fallback: string): HTMLImageElement {
-  const img = h('img', { src: artUrl(path), alt: '', draggable: 'false' }) as HTMLImageElement;
-  if (path !== fallback) img.addEventListener('error', () => (img.src = artUrl(fallback)), { once: true });
-  return img;
+  return faceImg(path, fallback);
 }
 
 function speakerOf(line: Line): { name: string; sub: string; art: HTMLImageElement | null; color: string } {

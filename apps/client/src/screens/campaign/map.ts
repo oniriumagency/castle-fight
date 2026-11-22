@@ -38,8 +38,10 @@ import { modal, type Screen } from '../../app/router';
 import { battlefield } from '../../app/stage';
 import { audio } from '../../fx/audio';
 import { deleteCampaign, exportCode, importCode, loadCampaign, saveCampaign, seen, startCampaign } from '../../game/campaignStore';
-import { artUrl, iconSvg } from '../../ui/assets';
+import { artUrl, faceImg, iconSvg } from '../../ui/assets';
 import { heroCss, skyFor } from '../../ui/theme';
+import { attachCardZoom } from '../../ui/cardZoom';
+import { cardFace } from '../../ui/card';
 import { SCENE_ART, captainArt, playDialogue, possessedArt } from './dialogue';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -316,7 +318,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
               build();
             },
           },
-          h('img', { src: artUrl(getHero(id).art), alt: L(getHero(id).name) }),
+          faceImg(getHero(id).art, undefined, { alt: L(getHero(id).name) }),
         ),
       ),
     );
@@ -335,7 +337,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
         ? h(
             'div.campaign-defender',
             null,
-            h('img', { src: artUrl(defender.art), alt: '', onerror: ((e: Event) => ((e.target as HTMLImageElement).src = artUrl(getHero(defender.hero).art))) as EventListener }),
+            faceImg(defender.art, getHero(defender.hero).art),
             h('div', null, h('small', null, t('campaignDefender')), h('strong', null, defender.name), h('span', null, defender.title)),
           )
         : null,
@@ -351,9 +353,14 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
             h('small', null, t('campaignReward')),
             ally ? h('p.campaign-ally', null, t('campaignRewardHero', { hero: L(getHero(ally).name) })) : null,
             h(
-              'ul',
+              'div.campaign-reward-cards',
               null,
-              rewards.map((c) => h('li', { class: `r-${getCard(c).rarity}`, 'data-card': c }, L(getCard(c).name))),
+              rewards.map((c) => {
+                const face = cardFace(c, { lazy: true });
+                face.title = L(getCard(c).name);
+                attachCardZoom(face, c);
+                return face;
+              }),
             ),
           )
         : null,
@@ -485,7 +492,7 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
         h(
           'span.campaign-allies',
           { title: t('campaignAllies') },
-          save.allies.map((a) => h('img', { src: artUrl(getHero(a).art), alt: L(getHero(a).name), title: L(getHero(a).name), style: `--hero:${heroCss(a)}` })),
+          save.allies.map((a) => faceImg(getHero(a).art, undefined, { alt: L(getHero(a).name), title: L(getHero(a).name), style: `--hero:${heroCss(a)}` })),
         ),
       ),
       h('button.btn.icon-only', { type: 'button', title: t('campaignOptions'), 'aria-label': t('campaignOptions'), onclick: options }, html(iconSvg('gear'))),

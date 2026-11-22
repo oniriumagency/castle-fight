@@ -712,3 +712,177 @@
 .dialogue-layer.has-scene .dialogue-scene {
   opacity: 1;
 }
+
+/* Reading a small card: it grows beside the pointer, or opens large on a tap. */
+.zoomable {
+  cursor: zoom-in;
+}
+
+.campaign-reward-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.campaign-reward-cards .card {
+  --w: 78px;
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.campaign-reward-cards .card:hover,
+.campaign-reward-cards .card:focus-visible {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 0 8px rgb(255 200 90 / 55%));
+  outline: none;
+}
+
+.card-zoom-float {
+  position: fixed;
+  z-index: 95;
+  pointer-events: none;
+  filter: drop-shadow(0 12px 28px rgb(0 0 0 / 70%));
+  animation: cardZoomIn 0.14s ease-out both;
+}
+
+.card-zoom-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  display: grid;
+  place-items: center;
+  background: rgb(5 3 2 / 72%);
+  cursor: zoom-out;
+  animation: cardZoomIn 0.16s ease-out both;
+}
+
+.card-zoom-layer .card {
+  --w: min(300px, 80vw, calc(86dvh * 5 / 7));
+}
+
+@keyframes cardZoomIn {
+  from { opacity: 0; transform: scale(0.94); }
+}
+
+/* Campaign results: battle on the left (title, heroes, statistics), what it won on the right,
+   buttons underneath, so nothing needs scrolling. */
+.results-box.campaign {
+  width: min(980px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    'crest summary'
+    'heroes summary'
+    'stats summary'
+    'note note'
+    'actions actions';
+  grid-template-rows: auto auto 1fr auto auto;
+  column-gap: clamp(16px, 3vw, 32px);
+  align-items: center;
+}
+
+.results-box.campaign .results-crest { grid-area: crest; }
+.results-box.campaign .results-heroes { grid-area: heroes; }
+.results-box.campaign .results-stats { grid-area: stats; align-self: start; }
+.results-box.campaign .campaign-summary { grid-area: summary; margin: 0; align-self: center; }
+.results-box.campaign .rematch-note { grid-area: note; }
+.results-box.campaign .results-actions { grid-area: actions; }
+
+.results-box.campaign .results-crest h1 {
+  font-size: clamp(1.8rem, min(5vw, 7vh), 3.2rem);
+}
+
+.results-box.campaign .campaign-summary .campaign-cards .card {
+  --w: clamp(84px, min(13vw, 21vh), 150px);
+}
+
+.campaign-zoom-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.results.peek .results-box.campaign {
+  display: flex;
+}
+
+/* Narrow upright windows: one column again. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .results-box.campaign {
+    display: flex;
+  }
+}
+
+/* Phones on their side: tighter still. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .results-box.campaign {
+    width: min(860px, 100%);
+    row-gap: 4px;
+    grid-template-areas:
+      'crest summary'
+      'heroes summary'
+      'stats summary'
+      'note note'
+      'actions actions';
+  }
+
+  .results-box.campaign {
+    padding: 8px 14px;
+  }
+
+  .results-box.campaign .results-crest h1 {
+    font-size: clamp(1.4rem, 8vh, 2rem);
+  }
+
+  .results-box.campaign .results-crest p {
+    font-size: 0.8rem;
+  }
+
+  .results-box.campaign .results-hero {
+    flex-direction: row;
+    justify-content: center;
+    gap: 6px;
+    text-align: left;
+  }
+
+  .results-box.campaign .results-hero img {
+    width: clamp(30px, 9vh, 40px);
+    height: clamp(30px, 9vh, 40px);
+  }
+
+  .results-box.campaign .results-hero small {
+    display: none;
+  }
+
+  .results-box.campaign .results-stats td,
+  .results-box.campaign .results-stats th {
+    padding-block: clamp(1px, 0.6vh, 4px);
+  }
+
+  .results-box.campaign .results-stats td {
+    font-size: 0.85rem;
+  }
+
+  .results-box.campaign .results-stats th {
+    font-size: 0.6rem;
+  }
+
+  .results-box.campaign .campaign-summary h2 {
+    font-size: 1.05rem;
+  }
+
+  .results-box.campaign .campaign-summary h3 {
+    margin: 4px 0 2px;
+    font-size: 11px;
+  }
+
+  .results-box.campaign .campaign-summary .campaign-cards .card {
+    --w: clamp(64px, 24vh, 100px);
+  }
+
+  .campaign-zoom-hint {
+    margin-top: 2px;
+    font-size: 0.7rem;
+  }
+}

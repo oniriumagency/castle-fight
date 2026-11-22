@@ -5,7 +5,7 @@
  * already up to date are skipped, so this is cheap to run before every dev
  * server start and build.
  */
-import { mkdir, readdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -81,6 +81,25 @@ async function closeSeam(image) {
   return sharp(out, { raw: { width: outW, height, channels } });
 }
 
+/** Portraits also get a sharp round close-up of the face (`<name>-face.webp`), cropped by `art/faces.json`. */
+const FACE_FOLDERS = new Set(['heroes', 'captains']);
+const FACE_SIZE = 256;
+const faces = JSON.parse(await readFile(join(source, 'faces.json'), 'utf8').catch(() => '{}'));
+
+async function buildFace(input, output, key) {
+  const spot = { ...(faces._default ?? { x: 0.5, y: 0.2, size: 0.4 }), ...(faces[key] ?? {}) };
+  const { width, height } = await sharp(input).metadata();
+  const side = Math.min(Math.round(spot.size * height), width, height);
+  const left = Math.max(0, Math.min(width - side, Math.round(spot.x * width - side / 2)));
+  const top = Math.max(0, Math.min(height - side, Math.round(spot.y * height - side / 2)));
+  await sharp(input)
+    .extract({ left, top, width: side, height: side })
+    .resize(FACE_SIZE, FACE_SIZE, { kernel: 'lanczos3' })
+    .sharpen({ sigma: 0.6 })
+    .webp({ quality: 86 })
+    .toFile(output);
+}
+
 let built = 0;
 let skipped = 0;
 for (const folder of FOLDERS) {
@@ -93,6 +112,16 @@ for (const folder of FOLDERS) {
     // The painted battlefield also gets a light copy (`-lite`) for consoles,
     // phones and low effects: the full sky alone is ~4000 px wide, too much
     // GPU memory for a console browser and over some GPUs' texture limit.
+    if (FACE_FOLDERS.has(folder)) {
+      const name = file.replace(/\.(jpe?g|png)$/i, '');
+      const output = join(target, folder, `${name}-face.webp`);
+      const stale = Math.max(await mtime(input), await mtime(join(source, 'faces.json')));
+      if ((await mtime(output)) >= stale) skipped++;
+      else {
+        await buildFace(input, output, `${folder}/${name}`);
+        built++;
+      }
+    }
     const variants = folder === 'scenery' ? [false, true] : [false];
     for (const lite of variants) {
       const output = join(target, folder, file.replace(/\.(jpe?g|png)$/i, lite ? '-lite.webp' : '.webp'));

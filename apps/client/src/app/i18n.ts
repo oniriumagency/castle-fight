@@ -50,6 +50,7 @@ const STRINGS = {
   campaignBackToMap: { es: 'Volver al mapa', en: 'Back to the map' },
   campaignConqueredTitle: { es: '¡{name} es tuyo!', en: '{name} is yours!' },
   campaignNewCards: { es: 'Cartas nuevas', en: 'New cards' },
+  campaignZoomHint: { es: 'Pasa el mouse o toca una carta para leerla.', en: 'Hover or tap a card to read it.' },
   campaignRecovered: { es: 'Recuperas', en: 'Won back' },
   campaignLost: { es: '{name} se queda con una copia de esta carta hasta que lo conquistes.', en: '{name} keeps a copy of this card until you conquer it.' },
   campaignUltimateAwake: { es: 'Tu definitiva ha despertado. Se carga con el daño que recibes.', en: 'Your ultimate has awoken. It charges with the damage you take.' },
