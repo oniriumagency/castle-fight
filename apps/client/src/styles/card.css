@@ -522,3 +522,8 @@
 .card .discard-x {
   font-size: calc(46 * var(--u));
 }
+
+.card .combo-buff {
+  color: #0b7fae;
+}
+

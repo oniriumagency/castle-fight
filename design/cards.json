@@ -1282,12 +1282,12 @@
         "en": "The Sorceress"
       },
       "text": {
-        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura, Escarcha total y 3 de daño perforante al rival.",
-        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn, full Frost and 3 piercing damage on your opponent."
+        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura durante 4 turnos, Escarcha total durante 1 turno y 3 de daño perforante al rival.",
+        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn for 4 turns, full Frost for 1 turn and 3 piercing damage on your opponent."
       },
       "textFfa": {
-        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura, Escarcha total y 2 de daño perforante a cada rival.",
-        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn, full Frost and 2 piercing damage on each rival."
+        "es": "Pasiva: tus estados duran 1 turno más. Definitiva: Quemadura durante 3 turnos, Escarcha total durante 1 turno y 2 de daño perforante a cada rival.",
+        "en": "Passive: your statuses last 1 extra turn. Ultimate: Burn for 3 turns, full Frost for 1 turn and 2 piercing damage on each rival."
       },
       "art": "heroes/hechicera.jpg"
     },

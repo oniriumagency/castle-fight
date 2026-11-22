@@ -3938,3 +3938,7 @@
 .board.phone-portrait .observer-tag span {
   display: none;
 }
+
+.glossary .combo-buff {
+  background: #0b7fae;
+}
