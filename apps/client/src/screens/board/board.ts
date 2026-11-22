@@ -33,6 +33,7 @@ import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilig
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
 import { ReactionDirector, type Reaction, type Voice } from '../../game/reactions';
+import { CAPTAIN_LINES } from '../../game/captainLines';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import {
   boardBuffs,
@@ -1049,9 +1050,16 @@ class BoardScreen implements Screen {
     return this.session.isLocal(seat) ? 'own' : null;
   }
 
+  /** Campaign captains speak their own lines; everyone else, their hero's. */
+  private speakerOf(seat: PlayerId, view: PlayerView): string | undefined {
+    const name = this.session.seats[seat]?.nickname;
+    if (view.players[seat]?.noPassive && name && CAPTAIN_LINES[name]) return `captain:${name}`;
+    return view.players[seat]?.hero;
+  }
+
   private pickReactions(events: GameEvent[], before: readonly PlayerPublicState[], view: PlayerView): Reaction[] {
     try {
-      return this.reactions.pick(events, before, view.players, view.rules.keepWin, (seat) => this.voiceOf(seat), performance.now());
+      return this.reactions.pick(events, before, view.players, view.rules.keepWin, (seat) => this.voiceOf(seat), performance.now(), (seat) => this.speakerOf(seat, view));
     } catch (error) {
       console.error('Hero reactions failed', error);
       return [];

@@ -85,7 +85,7 @@ const arquitecta: Lines = {
   ],
   hitDealt: [
     ['Demolición controlada. Bueno, casi controlada.', 'Controlled demolition. Well, mostly controlled.'],
-    ['Todo muro cae. Solo hay que saber dónde empujar.', 'Every wall falls. You only need to know where to push.'],
+    ['Esa piedra estaba mal asentada. Te hice un favor.', 'That stone was badly set. I did you a favour.'],
     ['Eso no era un muro de carga, ¿verdad? Ahora ya no.', 'That was not load-bearing, was it? Not anymore.'],
   ],
   hitTaken: [
@@ -101,7 +101,7 @@ const arquitecta: Lines = {
   ],
   ultimate: [
     ['Hora de enseñarte lo que es una obra maestra.', 'Time to show you what a masterpiece looks like.'],
-    ['Todo el castillo responde a mi voz.', 'The whole castle answers to my voice.'],
+    ['Que tiemblen los andamios: esto es arquitectura de verdad.', 'Let the scaffolding shake: this is real architecture.'],
     ['Esto estaba en los planos desde el principio.', 'This was in the blueprints from the start.'],
   ],
   backfire: [
@@ -369,7 +369,7 @@ const alquimista: Lines = {
     ['¡Catalizador perfecto! Que alguien lo apunte.', 'Perfect catalyst! Someone write that down.'],
   ],
   ultimate: [
-    ['¡Hora del frasco que no hay que tocar!', 'Time for the flask nobody is supposed to touch!'],
+    ['¡Tres gotas de esto y el mundo cambia de color!', 'Three drops of this and the world changes colour!'],
     ['¡Atrás todos! ¡No sé exactamente qué va a pasar!', 'Stand back, everyone! I do not know exactly what will happen!'],
     ['¡Oro, plomo, caos! Todo a la vez.', 'Gold, lead, chaos! All at once.'],
   ],
@@ -603,7 +603,7 @@ const saboteadora: Lines = {
 const hechicera: Lines = {
   start: [
     ['Comencemos. El hielo tiene paciencia. Yo, algo menos.', 'Let us begin. The ice is patient. I am somewhat less so.'],
-    ['Todo se consume. Tú también.', 'Everything burns away. You too.'],
+    ['Te concedo el primer movimiento. Será el último cómodo.', 'I grant you the first move. It will be your last comfortable one.'],
     ['Abrígate. Esto se va a poner frío.', 'Wrap up warm. This is going to get cold.'],
   ],
   workers: [
@@ -650,7 +650,7 @@ const hechicera: Lines = {
   nearVictory: [
     ['Ya casi. Puedes ir arrodillándote.', 'Almost there. You may start kneeling.'],
     ['El invierno llega a su cima. Y tú, a tu final.', 'Winter reaches its peak. And you, your end.'],
-    ['Paciencia. Todo se consume. Ya casi.', 'Patience. Everything burns away. Almost.'],
+    ['Siente cómo baja la temperatura. Es tu final.', 'Feel the temperature drop. That is your end.'],
   ],
   rivalWorkers: [
     ['Más siervos. Más bocas que alimentar en invierno.', 'More servants. More mouths to feed in winter.'],
@@ -663,7 +663,7 @@ const hechicera: Lines = {
     ['Muy alta. Perfecta para cubrirla de escarcha.', 'Very tall. Perfect for coating in frost.'],
   ],
   rivalKeep: [
-    ['Levantas piedras como si fueran a durar para siempre.', 'You raise stones as if they will last forever.'],
+    ['Una torre para mirarme de cerca. Qué atrevimiento.', 'A tower to look me in the eye. How bold.'],
     ['Cuanto más subes, más frío hace allá arriba.', 'The higher you climb, the colder it gets up there.'],
     ['Bonita torre. En ruinas quedará preciosa.', 'Pretty tower. It will look lovely in ruins.'],
   ],
@@ -757,7 +757,7 @@ const mariscal: Lines = {
   ],
   hitDealt: [
     ['¡Brecha abierta! ¡Adelante!', 'Breach open! Forward!'],
-    ['Los muros bonitos caen igual que los feos.', 'Pretty walls fall just like ugly ones.'],
+    ['¡Mirad cómo vuela esa almena!', 'Look at that battlement fly!'],
     ['Eso, soldado, es un asalto.', 'That, soldier, is an assault.'],
     ['¡Otra andanada! ¡No les dejéis respirar!', 'Another volley! Do not let them breathe!'],
   ],
@@ -775,7 +775,7 @@ const mariscal: Lines = {
   ultimate: [
     ['¡Que suenen los tambores!', 'Sound the drums!'],
     ['¡Todos a la brecha! ¡Sin piedad!', 'Everyone to the breach! No mercy!'],
-    ['Te arrepentirás de haber construido tan alto.', 'You will regret building so high.'],
+    ['¡Arietes, catapultas, todo! ¡Ahora!', 'Rams, catapults, everything! Now!'],
   ],
   backfire: [
     ['¡¿Quién ha cargado ese barril?! ¡Al calabozo!', 'Who loaded that barrel?! To the dungeon!'],

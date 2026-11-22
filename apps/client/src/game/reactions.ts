@@ -1,4 +1,5 @@
 import type { GameEvent, LocalizedText, PlayerId, PlayerPublicState } from '@cardcraft-castles/engine';
+import { CAPTAIN_LINES, CAPTAIN_MOMENT } from './captainLines';
 import { REACTION_LINES, type ReactionKind } from './reactionLines';
 
 /**
@@ -73,53 +74,82 @@ const ALWAYS = new Set<ReactionKind>(['rivalUltimate', 'ultimate', 'nearVictory'
 /** Moments that break the quiet, though a hero does not repeat them too soon. */
 const URGENT = new Set<ReactionKind>(['wallDown', 'keepLow']);
 
-/** How likely a rival is to speak up (the rest: always). */
+/**
+ * How likely a rival is to speak up (the rest: always). Kept low so the
+ * bubbles feel like remarks, not a commentary.
+ */
 const RIVAL_CHANCE: Partial<Record<ReactionKind, number>> = {
-  workers: 0.5,
-  rivalWorkers: 0.55,
-  buildWall: 0.55,
-  buildKeep: 0.6,
-  rivalWall: 0.6,
-  rivalKeep: 0.65,
-  hitDealt: 0.6,
-  shieldBlock: 0.6,
-  combo: 0.7,
-  battleEvent: 0.6,
-  twilight: 0.8,
+  workers: 0.25,
+  rivalWorkers: 0.25,
+  buildWall: 0.3,
+  buildKeep: 0.35,
+  rivalWall: 0.35,
+  rivalKeep: 0.4,
+  hitDealt: 0.35,
+  hitTaken: 0.55,
+  shieldBlock: 0.35,
+  combo: 0.45,
+  rivalCombo: 0.55,
+  burned: 0.6,
+  frozen: 0.6,
+  rusted: 0.6,
+  robbed: 0.6,
+  discarded: 0.6,
+  backfire: 0.8,
+  battleEvent: 0.35,
+  twilight: 0.6,
+  start: 0.85,
 };
 
 /** What the player's own hero reacts to, and how often. */
 const OWN_CHANCE: Partial<Record<ReactionKind, number>> = {
   rivalUltimate: 1,
-  ultimate: 0.6,
-  combo: 0.35,
-  hitDealt: 0.3,
-  hitTaken: 0.3,
-  wallDown: 0.6,
-  keepLow: 0.6,
-  nearVictory: 0.6,
-  rivalNearVictory: 0.5,
-  backfire: 0.7,
-  burned: 0.35,
-  frozen: 0.35,
-  robbed: 0.3,
-  twilight: 0.3,
+  ultimate: 0.5,
+  combo: 0.2,
+  hitDealt: 0.15,
+  hitTaken: 0.15,
+  wallDown: 0.4,
+  keepLow: 0.45,
+  nearVictory: 0.5,
+  rivalNearVictory: 0.4,
+  backfire: 0.5,
+  burned: 0.2,
+  frozen: 0.2,
+  robbed: 0.15,
+  twilight: 0.2,
 };
 
-/** Quiet time after a bubble, and before the same hero says the same kind of thing again. */
-const GAP_MS = 3500;
-const SAME_KIND_MS = 30_000;
+/** Quiet time after any bubble; a fallen Wall or a Castle in danger may break it after the shorter one. */
+const GAP_MS = 12_000;
+const URGENT_GAP_MS = 5_000;
+/** Before the same speaker says the same kind of thing again. */
+const SAME_KIND_MS = 120_000;
 /** A fallen Wall or a Castle in danger again: said again only after this long. */
-const URGENT_REPEAT_MS = 60_000;
+const URGENT_REPEAT_MS = 150_000;
 
 /** Lines not yet said, per hero and moment, so none repeats until all have been said. */
 const bags = new Map<string, number[]>();
 let lastBagPick = new Map<string, number>();
 
-function lineFor(hero: string, kind: ReactionKind, random: () => number): LocalizedText | null {
-  const lines = REACTION_LINES[hero]?.[kind];
-  if (!lines?.length) return null;
-  const key = `${hero}:${kind}`;
+/**
+ * The line set a speaker uses: a campaign captain's own (`captain:<name>`,
+ * grouped by captain moment) or their hero's.
+ */
+function linesFor(speaker: string, kind: ReactionKind): { key: string; lines: [string, string][] } | null {
+  if (speaker.startsWith('captain:')) {
+    const name = speaker.slice('captain:'.length);
+    const moment = CAPTAIN_MOMENT[kind];
+    const lines = moment ? CAPTAIN_LINES[name]?.[moment] : undefined;
+    return lines?.length ? { key: `${speaker}:${moment}`, lines } : null;
+  }
+  const lines = REACTION_LINES[speaker]?.[kind];
+  return lines?.length ? { key: `${speaker}:${kind}`, lines } : null;
+}
+
+function lineFor(speaker: string, kind: ReactionKind, random: () => number): LocalizedText | null {
+  const found = linesFor(speaker, kind);
+  if (!found) return null;
+  const { key, lines } = found;
   let bag = bags.get(key);
   if (!bag?.length) {
     bag = lines.map((_, i) => i);
@@ -291,6 +321,8 @@ export class ReactionDirector {
     keepWin: number,
     voiceOf: (seat: PlayerId) => Voice,
     now: number,
+    /** Whose lines a seat speaks: a hero id or `captain:<name>`. Defaults to the seat's hero. */
+    speakerOf: (seat: PlayerId) => string | undefined = (seat) => after[seat]?.hero,
   ): Reaction[] {
     const all = moments(events, before, after, keepWin).filter((c) => voiceOf(c.seat) !== null);
     // Rivals first, then the strongest moment.
@@ -298,6 +330,7 @@ export class ReactionDirector {
     const out: Reaction[] = [];
     const spoke = new Set<PlayerId>();
     const quiet = now - this.lastAt < GAP_MS;
+    const hush = now - this.lastAt < URGENT_GAP_MS;
     for (const c of all) {
       if (spoke.has(c.seat)) continue;
       const voice = voiceOf(c.seat)!;
@@ -306,14 +339,15 @@ export class ReactionDirector {
       if (out.length >= 1 && !(c.kind === 'rivalUltimate' || out[0]!.kind === 'rivalUltimate')) break;
       if (out.length >= 2) break;
       if (!always && !URGENT.has(c.kind) && (quiet || out.length > 0)) continue;
+      if (!always && URGENT.has(c.kind) && hush) continue;
       if (!always && out.length > 0) continue;
       const kindKey = `${c.seat}:${c.kind}`;
       const repeat = URGENT.has(c.kind) ? URGENT_REPEAT_MS : SAME_KIND_MS;
       if (!always && now - (this.lastKind.get(kindKey) ?? -Infinity) < repeat) continue;
       const chance = voice === 'own' ? (OWN_CHANCE[c.kind] ?? 0) : (RIVAL_CHANCE[c.kind] ?? 1);
       if (chance < 1 && this.random() >= chance) continue;
-      const hero = after[c.seat]?.hero;
-      const text = hero ? lineFor(hero, c.kind, this.random) : null;
+      const speaker = speakerOf(c.seat);
+      const text = speaker ? lineFor(speaker, c.kind, this.random) : null;
       if (!text) continue;
       out.push({ seat: c.seat, kind: c.kind, text, at: c.at });
       spoke.add(c.seat);
