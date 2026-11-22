@@ -35,7 +35,6 @@ function publicPlayer(state: GameState, player: PlayerId, viewer: Viewer): Playe
     frost: { ...p.frost },
     rust: p.rust ?? 0,
     shield: p.shield,
-    drawbridge: p.drawbridge,
     handRevealed: p.handRevealed,
     ultimateCharge: p.ultimateCharge,
     ultimateThreshold: ultimateThreshold(state, player),

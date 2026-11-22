@@ -143,18 +143,19 @@ const CARD_TESTS: Record<string, () => void> = {
   'puente-levadizo': () => {
     let { state } = play('puente-levadizo', { keepTurn: false, rules: { eventEveryRounds: 1000 } });
     expect(state.players[ME].wall).toBe(23);
-    expect(state.players[ME].drawbridge).toBe(true);
+    const raised = (s: typeof state) => s.players[ME].enchantments.find((e) => e.cardId === 'puente-levadizo');
+    expect(raised(state)).toMatchObject({ charges: 1 });
     // It stays up over turns until a piercing attack comes.
     state = pass(pass(state));
-    expect(state.players[ME].drawbridge).toBe(true);
+    expect(raised(state)).toMatchObject({ charges: 1 });
     // The next piercing attack is treated as normal damage and lowers it.
     setHand(state, OPP, ['saetas-negras', 'saetas-negras']);
     state.actionsLeft = 2;
     const first = playCard(state, 'saetas-negras');
     expect(first.state.players[ME].wall).toBe(13);
     expect(first.state.players[ME].keep).toBe(50);
-    expect(first.state.players[ME].drawbridge).toBe(false);
-    expect(first.events.some((e) => e.type === 'drawbridgeLowered')).toBe(true);
+    expect(raised(first.state)).toBeUndefined();
+    expect(first.events.some((e) => e.type === 'enchantmentRemoved' && e.cardId === 'puente-levadizo' && e.reason === 'spent')).toBe(true);
     // The one after goes straight to the Keep again.
     state = playCard(first.state, 'saetas-negras').state;
     expect(state.players[ME].wall).toBe(13);

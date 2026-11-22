@@ -1430,15 +1430,6 @@ class BoardScreen implements Screen {
         this.render();
         await fx.status('cleanse', e.player, ctx);
         break;
-      case 'drawbridgeRaised':
-      case 'drawbridgeLowered':
-        shown[e.player].drawbridge = e.type === 'drawbridgeRaised';
-        this.render();
-        if (e.type === 'drawbridgeRaised') {
-          fx.drawbridge(e.player, ctx);
-          await wait(300);
-        }
-        break;
       case 'handRevealed':
         shown[e.player].handRevealed = true;
         shown[e.player].hand = e.cards.map((c) => ({ uid: c.uid, cardId: c.cardId }));
@@ -1459,6 +1450,7 @@ class BoardScreen implements Screen {
         ];
         this.render();
         fx.enchantment(e.player, ctx);
+        if (e.cardId === 'puente-levadizo') fx.drawbridge(e.player, ctx);
         this.panels[this.sideOf(e.player)].pulse(`.enchant[data-card="${e.cardId}"]`);
         await wait(450);
         break;

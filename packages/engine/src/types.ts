@@ -154,6 +154,8 @@ export interface EnchantmentModifiers {
   onTurnStart?: EffectOp[];
   /** Each attack against the owner's Wall deals this much less damage. */
   wallDamageReduction?: number;
+  /** Piercing attacks against the owner are treated as normal damage. */
+  piercingAsNormal?: boolean;
   /** Each of the owner's attacks deals this much more damage. */
   attackBonus?: number;
   /** The opponent's cards of `school` cost `amount` more. */
@@ -215,15 +217,13 @@ export type EffectOp =
   /**
    * Put the source card on the table as an enchantment. It lasts `turns` of
    * the owner's turns or, with `charges`, that many attacks: each attack that
-   * uses its `attackBonus` or `wallDamageReduction` spends one.
+   * uses its `attackBonus`, `wallDamageReduction` or `piercingAsNormal` spends one.
    */
   | { op: 'enchant'; turns?: number; charges?: number; modifiers: EnchantmentModifiers }
   /** Destroy one enemy enchantment (choice when there are several). */
   | { op: 'destroyEnchantment' }
   /** The opponent's hand is revealed until your next turn. */
   | { op: 'revealHand' }
-  /** The next piercing attack against you is treated as normal damage. */
-  | { op: 'drawbridge' }
   /** Look at the opponent's hand and discard one card of your choice. */
   | { op: 'peekAndDiscard' }
   /** The opponent discards `count` random cards. */
@@ -397,8 +397,6 @@ export interface PlayerState {
   rust?: number;
   /** Shield charges. */
   shield: number;
-  /** The next piercing attack against this player is treated as normal damage. */
-  drawbridge: boolean;
   /** This player's hand is visible to the opponent until the opponent's next turn. */
   handRevealed: boolean;
   /** Who revealed it; the hand hides again when that player's next turn starts. */
@@ -724,8 +722,6 @@ export type GameEvent =
   | { type: 'rustApplied'; player: PlayerId; turns: number; total: number }
   | { type: 'shieldGained'; player: PlayerId; charges: number; total: number }
   | { type: 'statusesCleansed'; player: PlayerId }
-  | { type: 'drawbridgeRaised'; player: PlayerId }
-  | { type: 'drawbridgeLowered'; player: PlayerId }
   | { type: 'handRevealed'; player: PlayerId; cards: CardInstance[] }
   | { type: 'handHidden'; player: PlayerId }
   | {
@@ -779,7 +775,6 @@ export interface PlayerPublicState {
   /** Rust turns left. */
   rust: number;
   shield: number;
-  drawbridge: boolean;
   handRevealed: boolean;
   ultimateCharge: number;
   /** Charge needed for the next ultimate. */

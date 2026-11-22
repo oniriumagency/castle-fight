@@ -200,7 +200,7 @@ function spendCharges(
   state: GameState,
   events: GameEvent[],
   player: PlayerId,
-  modifier: 'attackBonus' | 'wallDamageReduction',
+  modifier: 'attackBonus' | 'wallDamageReduction' | 'piercingAsNormal',
 ): void {
   const p = state.players[player];
   for (const e of [...p.enchantments]) {
@@ -236,6 +236,11 @@ export function wallDamageReduction(state: Board, player: PlayerId): number {
     reduction += getEnchantmentModifiers(e.cardId)?.wallDamageReduction ?? 0;
   }
   return reduction;
+}
+
+/** True while an enchantment turns the piercing attacks against `player` into normal ones. */
+export function piercingAsNormal(state: Board, player: PlayerId): boolean {
+  return state.players[player].enchantments.some((e) => !!getEnchantmentModifiers(e.cardId)?.piercingAsNormal);
 }
 
 /** Damage `player` must take to charge the next ultimate; it grows with every use. */
@@ -449,11 +454,10 @@ export function dealDamage(
     }
   }
 
-  // Drawbridge: the next piercing attack is treated as normal damage, and lowers it.
-  if (kind === 'piercing' && t.drawbridge && options.attack) {
+  // Drawbridge enchantment: a piercing attack is treated as normal damage, and spends it.
+  if (kind === 'piercing' && options.attack && piercingAsNormal(state, target)) {
     kind = 'normal';
-    t.drawbridge = false;
-    events.push({ type: 'drawbridgeLowered', player: target });
+    spendCharges(state, events, target, 'piercingAsNormal');
   }
 
   if (options.attack && kind !== 'piercing' && t.wall > 0) {

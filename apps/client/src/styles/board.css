@@ -502,10 +502,6 @@
   border-color: rgb(174 232 255 / 60%);
 }
 
-.status-chip.drawbridge {
-  color: #e0c890;
-}
-
 .status-chip.revealed {
   color: #e2c4ff;
 }
