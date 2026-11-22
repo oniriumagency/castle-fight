@@ -14,6 +14,7 @@ import {
   SEND_OFF,
   TERRITORIES,
   TERRITORY_WON,
+  TERRITORY_WON_ALLY,
   TIPS,
   attackable,
   awakeningLines,
@@ -102,7 +103,9 @@ function scenesAfter(save: CampaignSave, outcome: BattleOutcome): Line[] {
   const lines: Line[] = [];
   if (!outcome.won) {
     const hero = kingdom ? getKingdom(kingdom).hero : FINAL_RIVALS[0]!;
-    if (DEFEAT[hero]) lines.push({ speaker: { hero }, text: DEFEAT[hero]! });
+    const options = DEFEAT[hero] ?? [];
+    // Each defeat brings the next line, so the same taunt does not come back every time.
+    if (options.length) lines.push({ speaker: { hero }, text: options[(Math.max(1, save.losses) - 1) % options.length]! });
     return lines;
   }
   if (territory.kind === 'final') return EPILOGUE.slice();
@@ -111,7 +114,15 @@ function scenesAfter(save: CampaignSave, outcome: BattleOutcome): Line[] {
     if (outcome.awakened && outcome.ally) lines.push(...awakeningLines(outcome.ally));
   } else if (kingdom) {
     const hero = getKingdom(kingdom).hero;
-    if (TERRITORY_WON[hero]) lines.push({ speaker: { hero }, text: TERRITORY_WON[hero]! });
+    if (isConquered(save, `${kingdom}-castillo`)) {
+      // The hero is an ally by now: no more grumbling, just a word about their old captains.
+      if (TERRITORY_WON_ALLY[hero]) lines.push({ speaker: { hero }, text: TERRITORY_WON_ALLY[hero]! });
+    } else {
+      // The more of their land falls, the less amused they are.
+      const options = TERRITORY_WON[hero] ?? [];
+      const taken = TERRITORIES.filter((t) => t.kingdom === kingdom && t.kind === 'territory' && isConquered(save, t.id)).length;
+      if (options.length) lines.push({ speaker: { hero }, text: options[Math.min(Math.max(taken, 1), options.length) - 1]! });
+    }
   }
   return lines;
 }

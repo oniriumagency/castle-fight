@@ -129,21 +129,84 @@ export function awakeningLines(hero: HeroId): Line[] {
 }
 
 /** The hero's reaction when one of their captains falls. */
-export const TERRITORY_WON: Record<string, LocalizedText> = {
-  guardian: { es: 'Un muro menos. Me quedan muchos.', en: 'One wall fewer. I have plenty left.' },
-  alquimista: { es: '¡Fascinante! Perder también es un dato.', en: 'Fascinating! Losing is data too.' },
-  saboteadora: { es: '¿Ese territorio? Te lo dejé ganar. Seguro.', en: 'That territory? I let you have it. Honestly.' },
-  hechicera: { es: 'Disfrútalo. El hielo siempre vuelve.', en: 'Enjoy it. The ice always comes back.' },
-  mariscal: { es: 'Has ganado una batalla. Las guerras se ganan de otra forma.', en: 'You won a battle. Wars are won another way.' },
+/**
+ * What the rival hero says when the player takes one of their territories, from
+ * the first to the fourth: each one a little less amused than the last.
+ */
+export const TERRITORY_WON: Record<string, LocalizedText[]> = {
+  guardian: [
+    { es: 'Un muro menos. Me quedan muchos.', en: 'One wall fewer. I have plenty left.' },
+    { es: 'Dos. Mis capitanes juran que eran inexpugnables. Tendré que revisar qué significa esa palabra.', en: 'Two. My captains swore they were impregnable. I will have to check what that word means.' },
+    { es: 'Tres torres caídas en mi guardia. Nunca había tenido que escribir tantas cartas a las familias.', en: 'Three towers fallen on my watch. I have never had to write so many letters to families.' },
+    { es: 'Basta. Ya no quedan murallas entre tú y mi castillo. Ven, Arquitecta. Te espero en la puerta.', en: 'Enough. There are no walls left between you and my castle. Come, Architect. I will be waiting at the gate.' },
+  ],
+  alquimista: [
+    { es: '¡Fascinante! Perder también es un dato.', en: 'Fascinating! Losing is data too.' },
+    { es: 'Dos datos. Empiezan a parecer una tendencia, y no me gusta la tendencia.', en: 'Two data points. They are starting to look like a trend, and I do not like the trend.' },
+    { es: '¡Mis huertos! ¡Mis minas! ¿Sabes cuánto cuesta calibrar un alambique de cobre? ¡No lo sabes!', en: 'My orchards! My mines! Do you know how much it costs to calibrate a copper still? You do not!' },
+    { es: 'Ya está. Se acabó la ciencia. Ahora es personal. ¡Que alguien me traiga el frasco que no hay que tocar!', en: 'That is it. No more science. Now it is personal. Someone bring me the flask nobody is supposed to touch!' },
+  ],
+  saboteadora: [
+    { es: '¿Ese territorio? Te lo dejé ganar. Seguro.', en: 'That territory? I let you have it. Honestly.' },
+    { es: 'Vale, ese no te lo dejé ganar. Pero el próximo sí. Probablemente.', en: 'Fine, I did not let you have that one. But the next one, sure. Probably.' },
+    { es: '¿Quién te está pasando mis planos? Dímelo y te perdono. A ti no. A él tampoco.', en: 'Who is passing you my plans? Tell me and I will forgive you. Not you. Not them either.' },
+    { es: 'Ya no tiene gracia, Mary. Ni una pizca. Me has dejado sin túneles, sin mercado y sin paciencia.', en: 'It is not funny anymore, Mary. Not one bit. You have left me without tunnels, without a market and without patience.' },
+  ],
+  hechicera: [
+    { es: 'Disfrútalo. El hielo siempre vuelve.', en: 'Enjoy it. The ice always comes back.' },
+    { es: 'Otra más. El hielo vuelve, he dicho. Solo que tarda.', en: 'Another one. The ice comes back, I said. It just takes its time.' },
+    { es: 'Mis aprendices dicen que ya no hace tanto frío en las cumbres. Diles que se callen.', en: 'My apprentices say it is not so cold on the peaks anymore. Tell them to be quiet.' },
+    { es: 'Me has quitado las cumbres una a una. Muy bien. Entonces subiré a buscarte yo misma.', en: 'You have taken the peaks from me one by one. Very well. Then I will come down for you myself.' },
+  ],
+  mariscal: [
+    { es: 'Has ganado una batalla. Las guerras se ganan de otra forma.', en: 'You won a battle. Wars are won another way.' },
+    { es: 'Dos batallas. Mis sargentos empiezan a mirar al suelo cuando pasan a mi lado.', en: 'Two battles. My sergeants are starting to look at the ground when they walk past me.' },
+    { es: '¡Una cantera con muros no debería ganarle a un ejército! ¿Quién entrena a esta gente? ¡Ah, sí! Yo.', en: 'A quarry with walls should not beat an army! Who trains these people? Ah, right. I do.' },
+    { es: 'Suficiente. Que suenen los tambores. Ya no voy a esperar a que llegues a mi fortaleza, Arquitecta.', en: 'Enough. Sound the drums. I will not wait for you to reach my fortress, Architect.' },
+  ],
 };
 
-/** What the rival hero says when the player loses. */
-export const DEFEAT: Record<string, LocalizedText> = {
-  guardian: { es: 'Vuelve cuando quieras, Arquitecta. Mis muros te esperarán.', en: 'Come back whenever you like, Architect. My walls will be waiting.' },
-  alquimista: { es: 'Hipótesis confirmada. ¿Repetimos para estar seguros?', en: 'Hypothesis confirmed. Shall we repeat it to be sure?' },
-  saboteadora: { es: '¿Otra vez? Ya te estoy echando de menos.', en: 'Again? I miss you already.' },
-  hechicera: { es: 'Ya te lo dije: todo se consume.', en: 'I told you: everything burns away.' },
-  mariscal: { es: 'Los muros bonitos caen igual que los feos.', en: 'Pretty walls fall just like ugly ones.' },
+/** After their castle falls, a hero who is now an ally comments on the rest of their land being taken. */
+export const TERRITORY_WON_ALLY: Record<string, LocalizedText> = {
+  guardian: { es: 'Ese capitán no se había enterado de que ya estamos del mismo lado. Ahora lo sabe.', en: 'That captain had not heard we are on the same side now. Now he knows.' },
+  alquimista: { es: 'Bien hecho. Aunque podrías haber sido más amable con mis alambiques.', en: 'Well done. Although you could have been gentler with my stills.' },
+  saboteadora: { es: 'Mis antiguos chicos. Siempre fueron mejores robando que peleando.', en: 'My old crew. They were always better at stealing than fighting.' },
+  hechicera: { es: 'Una cumbre menos que tenga que vigilar. Te lo agradezco, a mi manera.', en: 'One peak fewer for me to watch over. I thank you, in my own way.' },
+  mariscal: { es: 'Mis soldados aprenden despacio, pero aprenden. Gracias por la lección.', en: 'My soldiers learn slowly, but they learn. Thank you for the lesson.' },
+};
+
+/** What the rival hero says when the player loses; they take turns so the same line does not come back every time. */
+export const DEFEAT: Record<string, LocalizedText[]> = {
+  guardian: [
+    { es: 'Vuelve cuando quieras, Arquitecta. Mis muros te esperarán.', en: 'Come back whenever you like, Architect. My walls will be waiting.' },
+    { es: 'No hay vergüenza en caer ante una muralla. Hay vergüenza en no volver a intentarlo.', en: 'There is no shame in falling before a wall. The shame is in not trying again.' },
+    { es: 'Mis capitanes te han tomado cariño. Dicen que eres la mejor práctica que han tenido.', en: 'My captains have grown fond of you. They say you are the best practice they have ever had.' },
+    { es: 'Descansa. Repara. Vuelve. Así se construye todo, ¿no es lo que dices tú?', en: 'Rest. Repair. Return. That is how everything is built, is it not what you always say?' },
+  ],
+  alquimista: [
+    { es: 'Hipótesis confirmada. ¿Repetimos para estar seguros?', en: 'Hypothesis confirmed. Shall we repeat it to be sure?' },
+    { es: '¡Excelente! Anoto el resultado en la columna de "ya lo sabía".', en: 'Excellent! I am writing the result in the "I knew it" column.' },
+    { es: 'No te desanimes. El noventa y nueve por ciento de mis experimentos también explotan.', en: 'Do not lose heart. Ninety-nine percent of my experiments blow up too.' },
+    { es: 'Interesante. Muy interesante. Vuelve, que todavía me faltan muestras.', en: 'Interesting. Very interesting. Come back, I still need more samples.' },
+  ],
+  saboteadora: [
+    { es: '¿Otra vez? Ya te estoy echando de menos.', en: 'Again? I miss you already.' },
+    { es: 'Me quedo con esta carta de recuerdo. Tranquila, la cuidaré. Más o menos.', en: 'I will keep this card as a souvenir. Relax, I will look after it. More or less.' },
+    { es: 'Deberías revisar tus bolsillos antes de irte. Lo digo por experiencia.', en: 'You should check your pockets before you leave. Speaking from experience.' },
+    { es: 'Así se hace, Mary: primero te distraigo y luego te desarmo. Toma nota.', en: 'That is how it is done, Mary: first I distract you, then I disarm you. Take notes.' },
+  ],
+  hechicera: [
+    { es: 'Ya te lo dije: todo se consume.', en: 'I told you: everything burns away.' },
+    { es: 'El frío no tiene prisa. Tú tampoco deberías tenerla.', en: 'The cold is in no hurry. Neither should you be.' },
+    { es: 'Tus muros son de piedra. La piedra se agrieta cuando hiela.', en: 'Your walls are made of stone. Stone cracks when it freezes.' },
+    { es: 'Vuelve cuando hayas aprendido a escuchar el viento.', en: 'Come back when you have learned to listen to the wind.' },
+  ],
+  mariscal: [
+    { es: 'Los muros bonitos caen igual que los feos.', en: 'Pretty walls fall just like ugly ones.' },
+    { es: 'Retírate y reagrupa. Es lo que yo haría. Aunque yo no habría perdido.', en: 'Fall back and regroup. That is what I would do. Although I would not have lost.' },
+    { es: 'La disciplina gana guerras, Arquitecta. El talento solo gana aplausos.', en: 'Discipline wins wars, Architect. Talent only wins applause.' },
+    { es: 'Otra vez a la cantera. Mis soldados ya te reconocen por el polvo.', en: 'Back to the quarry. My soldiers already recognise you by the dust.' },
+  ],
 };
 
 /** Mary sends an ally into battle in her place. */

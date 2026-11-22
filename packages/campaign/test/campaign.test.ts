@@ -168,3 +168,17 @@ describe('battles', () => {
     }
   });
 });
+
+describe('dialogues', () => {
+  it('every rival hero has four different lines for losing land and for beating the player', async () => {
+    const { TERRITORY_WON, TERRITORY_WON_ALLY, DEFEAT } = await import('../src/dialogues');
+    for (const hero of ['guardian', 'alquimista', 'saboteadora', 'hechicera', 'mariscal']) {
+      for (const set of [TERRITORY_WON[hero]!, DEFEAT[hero]!]) {
+        expect(set).toHaveLength(4);
+        expect(new Set(set.map((l) => l.es)).size).toBe(4);
+        expect(set.every((l) => l.es && l.en)).toBe(true);
+      }
+      expect(TERRITORY_WON_ALLY[hero]?.es).toBeTruthy();
+    }
+  });
+});
