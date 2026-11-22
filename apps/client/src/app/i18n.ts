@@ -304,6 +304,8 @@ const STRINGS = {
   buffBuild: { es: 'Castillo extra al construir', en: 'Extra Castle when building' },
   buffTurns: { es: 'Turnos extra de duración', en: 'Extra turns of duration' },
   buffHero: { es: 'Pasiva de {name}', en: '{name}’s passive' },
+  buffCombo: { es: 'Combo activo', en: 'Combo active' },
+  buffComboDetail: { es: 'Tu última carta fue de la misma escuela', en: 'Your last card was from the same school' },
   buffAttacksLeft: { es: '{name} ({n} ataques más)', en: '{name} ({n} more attacks)' },
   buffAttackLeft: { es: '{name} (1 ataque más)', en: '{name} (1 more attack)' },
   logDiscarded: { es: '{who} descarta {card}', en: '{who} discards {card}' },

@@ -112,13 +112,15 @@ export function rulesHtml(text: string): string {
 }
 
 /** Where a bonus to a printed number comes from. Each source is shown as its own "+X". */
-export type BuffSource = 'hero' | 'enchantment' | 'twilight';
+export type BuffSource = 'hero' | 'enchantment' | 'twilight' | 'combo';
 
 export interface NumberBuff {
   source: BuffSource;
   amount: number;
   /** Who gives it, for the tooltip and the inspect view ("Estandarte de Guerra (3 more attacks)"). */
   label: string;
+  /** The enchantment that gives it. */
+  cardId?: CardId;
 }
 
 /** What is added to the numbers printed on a card: per attack, to each Castle build, and to Burn/Frost/Rust durations. */
@@ -127,9 +129,22 @@ export interface CardBuffs {
   /** Added to every "+N Castle" (the Twilight Fury). Optional: hero-only buffs have none. */
   build?: NumberBuff[];
   status: NumberBuff[];
+  /**
+   * The card gets (or got, once played) its Combo: the Combo amount is added
+   * to the number it raises as one more "+X" ("7+8 damage").
+   */
+  combo?: boolean;
 }
 
-export type BuffKind = 'attack' | 'build' | 'status';
+export type BuffKind = 'attack' | 'build' | 'status' | 'combo';
+
+const NO_BUFFS: CardBuffs = { attack: [], build: [], status: [] };
+
+/** The same bonuses with the card's Combo on (or off). */
+export function withCombo(buffs: CardBuffs | null | undefined, combo: boolean): CardBuffs | null {
+  if (!combo) return buffs?.combo ? { ...buffs, combo: false } : (buffs ?? null);
+  return { ...(buffs ?? NO_BUFFS), combo: true };
+}
 
 function heroStatusBuffs(heroId: HeroId): NumberBuff[] {
   const n = heroPassiveFor(heroId, tableSize > 2).statusDurationBonus ?? 0;
@@ -162,7 +177,7 @@ export function boardBuffs(board: Board, seat: PlayerId, level = twilightLevel(b
     const name = L(getCard(part.cardId!).name);
     const label =
       part.charges === undefined ? name : t(part.charges === 1 ? 'buffAttackLeft' : 'buffAttacksLeft', { name, n: part.charges });
-    return { source: 'enchantment', amount: part.amount, label };
+    return { source: 'enchantment', amount: part.amount, label, cardId: part.cardId! };
   });
   // The engine adds the Fury's level times its build bonus to every Castle build.
   const fury = level * (board.rules.twilightBuildBonus ?? 0);
@@ -173,7 +188,40 @@ export function boardBuffs(board: Board, seat: PlayerId, level = twilightLevel(b
 /** Changes whenever the buffs shown on a card would. */
 export function buffsKey(buffs: CardBuffs | null | undefined): string {
   if (!buffs) return '';
-  return [...buffs.attack, ...(buffs.build ?? []), ...buffs.status].map((b) => `${b.source}:${b.amount}:${b.label}`).join('|');
+  const parts = [...buffs.attack, ...(buffs.build ?? []), ...buffs.status].map((b) => `${b.source}:${b.amount}:${b.label}`);
+  if (buffs.combo) parts.push('combo');
+  return parts.join('|');
+}
+
+/**
+ * The bonuses a card was played with, kept with its history entry so the
+ * history, the discard pile and the rival's played card show the same "+X"
+ * the hit really had. Labels are rebuilt when read, in the current language.
+ */
+type SavedBuff = [source: 'h' | 'e' | 't', amount: number, cardId?: string];
+
+export function encodeBuffs(buffs: CardBuffs, heroId: HeroId): string {
+  const enc = (list: NumberBuff[] | undefined, cards: (string | undefined)[] = []): SavedBuff[] =>
+    (list ?? []).map((b, i) => {
+      const src = b.source === 'hero' ? 'h' : b.source === 'enchantment' ? 'e' : 't';
+      return cards[i] ? [src, b.amount, cards[i]] : [src, b.amount];
+    });
+  return JSON.stringify({ h: heroId, a: enc(buffs.attack, buffs.attack.map((b) => b.cardId)), b: enc(buffs.build), s: enc(buffs.status) });
+}
+
+export function decodeBuffs(raw: string): CardBuffs | null {
+  try {
+    const data = JSON.parse(raw) as { h: HeroId; a?: SavedBuff[]; b?: SavedBuff[]; s?: SavedBuff[] };
+    const dec = (list: SavedBuff[] | undefined): NumberBuff[] =>
+      (list ?? []).map(([src, amount, cardId]): NumberBuff => {
+        if (src === 'h') return { source: 'hero', amount, label: t('buffHero', { name: L(getHero(data.h).name) }) };
+        if (src === 'e' && cardId) return { source: 'enchantment', amount, label: L(getCard(cardId as CardId).name), cardId: cardId as CardId };
+        return { source: 'twilight', amount, label: t('twilightName') };
+      });
+    return { attack: dec(data.a), build: dec(data.b), status: dec(data.s) };
+  } catch {
+    return null;
+  }
 }
 
 /** Players at the table being shown: with 3+, cards read their free-for-all text. */
@@ -202,14 +250,33 @@ interface EffectNumbers {
   perCardDamage: boolean;
   /** "+4 Castle for each": the Twilight Fury adds once to the whole build. */
   perCardBuild: boolean;
+  /** Printed number → what the Combo adds to it, for damage, Wall and Castle. */
+  comboDamage: Map<number, number>;
+  comboWall: Map<number, number>;
+  comboKeep: Map<number, number>;
 }
 
 /** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
 function effectNumbers(
   ops: readonly EffectOp[],
-  out: EffectNumbers = { damage: new Set(), build: new Set(), status: new Set(), perCardDamage: false, perCardBuild: false },
+  out: EffectNumbers = {
+    damage: new Set(),
+    build: new Set(),
+    status: new Set(),
+    perCardDamage: false,
+    perCardBuild: false,
+    comboDamage: new Map(),
+    comboWall: new Map(),
+    comboKeep: new Map(),
+  },
 ): EffectNumbers {
   for (const op of ops) {
+    if ((op.op === 'damage' || op.op === 'wall' || op.op === 'keep') && op.comboBonus) {
+      if (op.op === 'damage') {
+        // Against every rival the engine scales the total, so the Combo adds the difference.
+        out.comboDamage.set(tableAmount(op.amount), tableAmount(op.amount + op.comboBonus) - tableAmount(op.amount));
+      } else (op.op === 'wall' ? out.comboWall : out.comboKeep).set(op.amount, op.comboBonus);
+    }
     if (op.op === 'damage' && op.perDiscard && !op.amount) out.perCardDamage = true;
     else if (op.op === 'damage') out.damage.add(tableAmount(op.amount));
     else if (op.op === 'keep' && op.perDiscard) out.perCardBuild = true;
@@ -241,19 +308,25 @@ const BUFF_CLOSE = '\u0002';
  */
 function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): string {
   const build = buffs.build ?? [];
-  if (!buffs.attack.length && !build.length && !buffs.status.length) return text;
+  if (!buffs.attack.length && !build.length && !buffs.status.length && !buffs.combo) return text;
   const numbers = effectNumbers(ops);
   const marks = (kind: 'a' | 'b' | 's', list: NumberBuff[]): string => list.map((_, i) => `${BUFF_OPEN}${kind}${i}${BUFF_CLOSE}`).join('');
+  // The Combo goes first, as the engine adds it to the printed number before the other bonuses.
+  const combo = (map: Map<number, number>, n: number): string => (buffs.combo && map.get(n) ? `${BUFF_OPEN}c${map.get(n)}${BUFF_CLOSE}` : '');
   const es = locale() === 'es';
   let out = text;
-  if (buffs.attack.length && numbers.damage.size) {
+  if ((buffs.attack.length && numbers.damage.size) || (buffs.combo && numbers.comboDamage.size)) {
     const damage = es ? /(?<![+\d])(\d+)(?= de daño(?! menos| por))/g : /(?<![+\d])(\d+)(?= (?:piercing )?damage(?! per| for each))/g;
-    out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? `${m}${marks('a', buffs.attack)}` : m));
+    out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? `${m}${combo(numbers.comboDamage, Number(m))}${marks('a', buffs.attack)}` : m));
   }
-  if (build.length && numbers.build.size) {
+  if ((build.length && numbers.build.size) || (buffs.combo && numbers.comboKeep.size)) {
     // "+7 Castle", and the stronger "+15 instead" of a conditional build.
     const castle = es ? /(?<=\+)(\d+)(?= (?:Castillo(?! por)|en su lugar))/g : /(?<=\+)(\d+)(?= (?:Castle(?! for each)|instead))/g;
-    out = out.replace(castle, (m) => (numbers.build.has(Number(m)) ? `${m}${marks('b', build)}` : m));
+    out = out.replace(castle, (m) => (numbers.build.has(Number(m)) ? `${m}${combo(numbers.comboKeep, Number(m))}${marks('b', build)}` : m));
+  }
+  if (buffs.combo && numbers.comboWall.size) {
+    const wall = es ? /(?<=\+)(\d+)(?= Muralla)/g : /(?<=\+)(\d+)(?= Wall)/g;
+    out = out.replace(wall, (m) => `${m}${combo(numbers.comboWall, Number(m))}`);
   }
   // Per card discarded: the bonus goes once, at the end of the sentence that counts the cards.
   const perCard = (list: NumberBuff[], kind: 'a' | 'b', eachRival: boolean): void => {
@@ -276,12 +349,19 @@ function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): str
   return out;
 }
 
+function buffSpan(b: NumberBuff): string {
+  return `<span class="buff ${b.source}-buff" title="${escapeHtml(b.label)}">+${b.amount}</span>`;
+}
+
+function comboBuff(amount: number): NumberBuff {
+  return { source: 'combo', amount, label: t('buffComboDetail') };
+}
+
 function buffHtml(html: string, buffs: CardBuffs): string {
-  return html.replace(/\u0001([abs])(\d+)\u0002/g, (_, kind: string, i: string) => {
+  return html.replace(/\u0001([absc])(\d+)\u0002/g, (_, kind: string, i: string) => {
+    if (kind === 'c') return buffSpan(comboBuff(Number(i)));
     const b = (kind === 'a' ? buffs.attack : kind === 'b' ? (buffs.build ?? []) : buffs.status)[Number(i)];
-    if (!b) return '';
-    const cls = b.source === 'hero' ? 'buff hero-buff' : `buff ${b.source}-buff`;
-    return `<span class="${cls}" title="${escapeHtml(b.label)}">+${b.amount}</span>`;
+    return b ? buffSpan(b) : '';
   });
 }
 
@@ -304,11 +384,16 @@ export function buffsOnUltimate(heroId: HeroId, buffs: CardBuffs | null | undefi
 
 function buffsOn(ops: readonly EffectOp[], text: string, buffs: CardBuffs | null | undefined): { buff: NumberBuff; kind: BuffKind }[] {
   if (!buffs) return [];
-  const none: CardBuffs = { attack: [], build: [], status: [] };
-  return (['attack', 'build', 'status'] as const).flatMap((kind) => {
+  const found: { buff: NumberBuff; kind: BuffKind }[] = (['attack', 'build', 'status'] as const).flatMap((kind) => {
     const list = buffs[kind] ?? [];
-    return list.length && buffText(ops, text, { ...none, [kind]: list }) !== text ? list.map((buff) => ({ buff, kind })) : [];
+    return list.length && buffText(ops, text, { ...NO_BUFFS, [kind]: list }) !== text ? list.map((buff) => ({ buff, kind })) : [];
   });
+  if (buffs.combo) {
+    // The Combo amounts the text gets, as they are marked on it.
+    const marked = buffText(ops, text, { ...NO_BUFFS, combo: true });
+    for (const m of marked.matchAll(/\u0001c(\d+)\u0002/g)) found.unshift({ buff: comboBuff(Number(m[1])), kind: 'combo' as const });
+  }
+  return found;
 }
 
 /** Explanations for the keywords a text uses, for the inspect view. */
@@ -340,6 +425,8 @@ export interface CardOptions {
    * Twilight Fury), each shown as its own "+X". Takes the place of `hero`.
    */
   buffs?: CardBuffs | null;
+  /** The card gets (or was played with) its Combo: the Combo amount shows as a "+X" too. */
+  combo?: boolean;
 }
 
 function frame(classes: string, opts: CardOptions): HTMLDivElement {
@@ -355,7 +442,7 @@ export function cardFace(cardId: CardId, opts: CardOptions = {}): HTMLDivElement
   el.dataset.cardId = cardId;
   const cost = opts.cost ?? card.cost;
   const costClass = cost < card.cost ? 'down' : cost > card.cost ? 'up' : '';
-  const buffs = opts.buffs ?? (opts.hero ? heroBuffs(opts.hero) : null);
+  const buffs = withCombo(opts.buffs ?? (opts.hero ? heroBuffs(opts.hero) : null), opts.combo ?? !!opts.buffs?.combo);
   if (buffs) el.dataset.buffs = buffsKey(buffs);
   el.innerHTML = `
     <div class="trim"><div class="body">
@@ -409,21 +496,33 @@ export type Boost = 'combo' | 'boosted' | null;
 const DISCARDED_PREFIX = 'x:';
 const BOOST_PREFIX: Record<'combo' | 'boosted', string> = { combo: 'c:', boosted: 'b:' };
 
-export function historyEntry(cardId: string, discarded: boolean, boost: Boost = null): string {
-  if (discarded) return DISCARDED_PREFIX + cardId;
-  return boost ? BOOST_PREFIX[boost] + cardId : cardId;
+export function historyEntry(cardId: string, discarded: boolean, boost: Boost = null, buffs: string | null = null): string {
+  const base = discarded ? DISCARDED_PREFIX + cardId : boost ? BOOST_PREFIX[boost] + cardId : cardId;
+  return buffs ? base + BUFFS_SEPARATOR + buffs : base;
 }
 
 const COPY_SEPARATOR = '>';
+/** Then the bonuses it was played with (`encodeBuffs`). Older entries have none. */
+const BUFFS_SEPARATOR = '#';
 
 /** The same entry, noting the card it copied. */
 export function withCopiedCard(entry: string, copiedId: string): string {
-  return entry.split(COPY_SEPARATOR)[0] + COPY_SEPARATOR + copiedId;
+  const [main = '', buffs] = entry.split(BUFFS_SEPARATOR);
+  const copied = main.split(COPY_SEPARATOR)[0] + COPY_SEPARATOR + copiedId;
+  return buffs ? copied + BUFFS_SEPARATOR + buffs : copied;
 }
 
-export function parseHistoryEntry(full: string): { cardId: string; discarded: boolean; boost: Boost; copied: string | null } {
-  const [entry = '', copied] = full.split(COPY_SEPARATOR);
-  return { ...parseBase(entry), copied: copied || null };
+export function parseHistoryEntry(full: string): {
+  cardId: string;
+  discarded: boolean;
+  boost: Boost;
+  copied: string | null;
+  /** The bonuses it was played with; null for entries saved before they were kept. */
+  buffs: CardBuffs | null;
+} {
+  const [main = '', buffs] = full.split(BUFFS_SEPARATOR);
+  const [entry = '', copied] = main.split(COPY_SEPARATOR);
+  return { ...parseBase(entry), copied: copied || null, buffs: buffs ? decodeBuffs(buffs) : null };
 }
 
 function parseBase(entry: string): { cardId: string; discarded: boolean; boost: Boost } {
@@ -535,3 +634,4 @@ export function addTilt(el: HTMLElement): void {
     el.style.removeProperty('--hx');
   });
 }
+

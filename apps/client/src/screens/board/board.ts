@@ -37,7 +37,9 @@ import {
   buffsOnUltimate,
   cardBack,
   cardFace,
+  encodeBuffs,
   eventCard,
+  heroBuffs,
   heroCard,
   historyEntry,
   markDiscarded,
@@ -45,6 +47,7 @@ import {
   rulesInnerHtml,
   rulesOf,
   setTableSize,
+  withCombo,
   withCopiedCard,
   type Boost,
   type CardBuffs,
@@ -173,10 +176,11 @@ class BoardScreen implements Screen {
   private raf = 0;
   private backgroundTimer = 0;
   private playedCard: HTMLElement | null = null;
-  /** The bonuses the card on stage was played with, for the discard pile it goes to next. */
+  /** The bonuses the card on stage was played with, and its Combo, for the discard pile it goes to next. */
   private playedLook: HeroId | CardBuffs | undefined;
-  /** Twilight Fury level as the animation has shown it (the round can move on within one update). */
-  private shownTwilight = 0;
+  private playedBoost: Boost = null;
+  /** The bonuses each card of the update being animated was played with. */
+  private playedWith = new Map<GameEvent, CardBuffs>();
   private closeInspect: (() => void) | null = null;
   private resultsShown = false;
   private presence: Presence | null = null;
@@ -222,7 +226,7 @@ class BoardScreen implements Screen {
       const id = this.discardTopId();
       if (!id) return;
       this.hidePilePreview();
-      this.inspectCard(id, this.discardHero, this.discardTopDiscarded);
+      this.inspectCard(id, this.discardHero, this.discardTopDiscarded, this.discardBoost);
     });
     this.eventChip.addEventListener('click', () => this.inspectEvent());
     this.twilightChip.addEventListener('click', () => {
@@ -262,14 +266,14 @@ class BoardScreen implements Screen {
     this.ultMode.pulse = () => fx.ultimateAura(this.fxContext(), this.ultMode.button.classList.contains('usable'));
     for (const panel of this.panels) {
       panel.onInspect = (entry) => {
-        const { cardId, discarded, boost, copied } = parseHistoryEntry(entry);
-        this.inspectCard(cardId, this.heroOf(this.seatOfSide(panel.side)), discarded, boost, copied);
+        const { cardId, discarded, boost, copied, buffs } = parseHistoryEntry(entry);
+        this.inspectCard(cardId, buffs ?? this.heroOf(this.seatOfSide(panel.side)), discarded, boost, copied);
       };
       panel.onInspectHero = (heroId) => this.inspectHero(heroId, this.seatOfSide(panel.side));
       panel.onPreview = (cardId, anchor) => {
         if (cardId && anchor) {
           const entry = parseHistoryEntry(cardId);
-          this.showCardPreview(entry.cardId, anchor, panel.side === 0 ? 'right' : 'left', this.heroOf(this.seatOfSide(panel.side)), entry.discarded, entry.boost);
+          this.showCardPreview(entry.cardId, anchor, panel.side === 0 ? 'right' : 'left', entry.buffs ?? this.heroOf(this.seatOfSide(panel.side)), entry.discarded, entry.boost);
         }
         else this.hidePilePreview();
       };
@@ -406,12 +410,41 @@ class BoardScreen implements Screen {
   }
 
   /**
-   * What adds to `seat`'s numbers at this point of the animation: the
-   * enchantments and Fury level as shown, before the play spends a charge.
+   * The bonuses each card in `events` is played with: the board before the
+   * update, followed event by event (enchantments come, spend charges and go,
+   * the Twilight Fury rises), so a card shows what its hit really got.
    */
-  private shownBuffsOf(seat: PlayerId): CardBuffs | HeroId {
-    if (!this.view || !this.shown) return this.heroOf(seat);
-    return boardBuffs({ ...this.view, players: this.shown }, seat, this.shownTwilight);
+  private bonusesOfPlays(events: readonly GameEvent[]): Map<GameEvent, CardBuffs> {
+    const out = new Map<GameEvent, CardBuffs>();
+    const view = this.view;
+    if (!view) return out;
+    const players = view.players.map((p) => ({ ...p, enchantments: p.enchantments.map((x) => ({ ...x })) }));
+    let level = twilightLevel(view);
+    for (const e of events) {
+      if (e.type === 'twilightRose') level = e.level;
+      else if (e.type === 'enchantmentAdded') {
+        const p = players[e.player]!;
+        p.enchantments = [
+          ...p.enchantments.filter((x) => x.cardId !== e.cardId),
+          { cardId: e.cardId, turnsLeft: e.turns, fresh: true, ...(e.charges !== undefined ? { charges: e.charges } : {}) },
+        ];
+      } else if (e.type === 'enchantmentCharge') {
+        const x = players[e.player]!.enchantments.find((y) => y.cardId === e.cardId);
+        if (x) x.charges = e.charges;
+      } else if (e.type === 'enchantmentRemoved') {
+        players[e.player]!.enchantments = players[e.player]!.enchantments.filter((x) => x.cardId !== e.cardId);
+      } else if (e.type === 'cardPlayed') {
+        out.set(e, boardBuffs({ ...view, players }, e.player, level));
+      }
+    }
+    return out;
+  }
+
+  /** A played card's history entry, with the bonuses it was played with. */
+  private playedEntry(e: Extract<GameEvent, { type: 'cardPlayed' }>): string {
+    const buffs = this.playedWith.get(e);
+    const hero = this.view?.players[e.player]?.hero ?? this.heroOf(e.player);
+    return historyEntry(e.cardId, false, boostOf(e), buffs ? encodeBuffs(buffs, hero) : null);
   }
 
   private seatOfSide(side: number): PlayerId {
@@ -676,7 +709,6 @@ class BoardScreen implements Screen {
         }
         this.view = update.view;
         this.shown = update.view.players.map(clonePlayer);
-        this.shownTwilight = twilightLevel(update.view);
         this.shownActive = update.view.active;
       }
     } finally {
@@ -941,9 +973,10 @@ class BoardScreen implements Screen {
     // After a reload the server only sends the current state: pick up the figures saved before it.
     else if (update.resumed) this.loadStats();
     this.stats.add(events);
+    this.playedWith = this.bonusesOfPlays(events);
     for (const e of events) {
       if (e.type === 'cardPlayed' || e.type === 'cardDiscarded') {
-        const entry = e.type === 'cardDiscarded' ? historyEntry(e.cardId, true) : historyEntry(e.cardId, false, boostOf(e));
+        const entry = e.type === 'cardDiscarded' ? historyEntry(e.cardId, true) : this.playedEntry(e);
         this.history[e.player] = [entry, ...this.history[e.player]].slice(0, HISTORY_SIZE);
       } else if (e.type === 'cardCopied') {
         this.history[e.player] = noteCopy(this.history[e.player], e.cardId);
@@ -1033,7 +1066,6 @@ class BoardScreen implements Screen {
     }
     this.shownHistory = this.history.map((h) => h.slice());
     this.shown = view.players.map(clonePlayer);
-    this.shownTwilight = twilightLevel(view);
     this.shownActive = view.active;
     this.handSeat = view.viewer;
     this.syncObserver();
@@ -1103,7 +1135,6 @@ class BoardScreen implements Screen {
         void fx.battleEventEnded(ctx, this.view ? twilightLevel(this.view) : 0);
         break;
       case 'twilightRose': {
-        this.shownTwilight = e.level;
         const values = this.view ? twilightValues(this.view.rules) : { atk: 0, dmg: 0 };
         if (this.incoming) this.renderTwilightChip(this.incoming);
         const rising = fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
@@ -1166,12 +1197,12 @@ class BoardScreen implements Screen {
         p.hand = p.hand.filter((c) => c.uid !== e.uid);
         p.lastPlayedCard = e.cardId;
         p.discardCount++;
-        this.shownHistory[e.player] = [historyEntry(e.cardId, false, boostOf(e)), ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
+        this.shownHistory[e.player] = [this.playedEntry(e), ...this.shownHistory[e.player]].slice(0, HISTORY_SIZE);
         const from = this.takeFromHand(e.player, e.uid);
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
         fx.cardLaunched();
-        await this.showPlayed(e.cardId, from, boostOf(e), this.shownBuffsOf(e.player));
+        await this.showPlayed(e.cardId, from, boostOf(e), this.playedWith.get(e) ?? this.heroOf(e.player));
         break;
       }
       case 'diceRolled':
@@ -1461,11 +1492,12 @@ class BoardScreen implements Screen {
   private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId | CardBuffs): Promise<void> {
     this.clearPlayed();
     const gen = this.animGen;
-    const card = markBoost(cardFace(cardId, { className: 'played', ...look(hero) }), cardId, boost);
+    const card = markBoost(cardFace(cardId, { className: 'played', ...look(hero), combo: boost === 'combo' }), cardId, boost);
     const combo = boost === 'combo';
     this.stage.replaceChildren(card);
     this.playedCard = card;
     this.playedLook = hero;
+    this.playedBoost = boost;
     const target = card.getBoundingClientRect();
     const dx = from.left + from.width / 2 - (target.left + target.width / 2);
     const dy = from.top + from.height / 2 - (target.top + target.height / 2);
@@ -1581,6 +1613,7 @@ class BoardScreen implements Screen {
     const s = pile.width / Math.max(1, r.width);
     const id = card.dataset.cardId;
     const hero = this.playedLook;
+    const boost = this.playedBoost;
     card
       .animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0.9 }], {
         duration: 380 * animScale(),
@@ -1590,7 +1623,7 @@ class BoardScreen implements Screen {
       .finished.catch(() => undefined)
       .then(() => {
         card.remove();
-        if (id) this.setDiscardTop(id, hero, false);
+        if (id) this.setDiscardTop(id, hero, false, boost);
       });
   }
 
@@ -1598,12 +1631,15 @@ class BoardScreen implements Screen {
   private discardHero: HeroId | CardBuffs | undefined;
   /** The top card of the pile was discarded, not played. */
   private discardTopDiscarded = false;
+  /** How the top card of the pile was strengthened when played (its Combo). */
+  private discardBoost: Boost = null;
 
-  private setDiscardTop(cardId: string | null, hero?: HeroId | CardBuffs, discarded = false): void {
+  private setDiscardTop(cardId: string | null, hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null): void {
     this.hidePilePreview();
     this.discardHero = hero;
     this.discardTopDiscarded = discarded;
-    const top = cardId ? cardFace(cardId, { calm: true, ...look(hero) }) : cardBack();
+    this.discardBoost = boost;
+    const top = cardId ? cardFace(cardId, { calm: true, ...look(hero), combo: boost === 'combo' }) : cardBack();
     if (cardId && discarded) markDiscarded(top);
     const count = this.discardPile.querySelector('.pile-count');
     this.discardPile.replaceChildren(top, count ?? h('span.pile-count'));
@@ -1623,7 +1659,7 @@ class BoardScreen implements Screen {
   /** Large copy of the last card played, next to the discard pile, to read what it did. */
   private showPilePreview(): void {
     const id = this.discardTopId();
-    if (id) this.showCardPreview(id, this.discardPile.getBoundingClientRect(), 'above', this.discardHero, this.discardTopDiscarded);
+    if (id) this.showCardPreview(id, this.discardPile.getBoundingClientRect(), 'above', this.discardHero, this.discardTopDiscarded, this.discardBoost);
     else this.hidePilePreview();
   }
 
@@ -1635,7 +1671,7 @@ class BoardScreen implements Screen {
   private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
-    const big = markBoost(cardFace(cardId, { calm: true, ...look(hero) }), cardId, boost);
+    const big = markBoost(cardFace(cardId, { calm: true, ...look(hero), combo: boost === 'combo' }), cardId, boost);
     if (discarded) markDiscarded(big);
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
@@ -2065,9 +2101,9 @@ class BoardScreen implements Screen {
     const cardId = this.hand.cardIdOf(uid);
     if (!ctx || !cardId) return;
     const reason = blockReason(ctx, cardId);
-    const buffs = this.hand.buffs();
-    const big = cardFace(cardId, { tilt: true, cost: undefined, buffs });
     const handCard = this.hand.elementOf(uid);
+    const buffs = withCombo(this.hand.buffs(), !reason && handCard?.classList.contains('combo') === true);
+    const big = cardFace(cardId, { tilt: true, cost: undefined, buffs });
     big.classList.toggle('combo', !reason && handCard?.classList.contains('combo') === true);
     big.classList.toggle('boosted', !reason && handCard?.classList.contains('boosted') === true);
     if (big.classList.contains('boosted')) big.append(boostTag(cardId, big.classList.contains('combo')));
@@ -2107,7 +2143,7 @@ class BoardScreen implements Screen {
       const cost = handCard.querySelector('.cost');
       if (cost) big.querySelector('.cost')?.replaceWith(cost.cloneNode(true));
       // An enchantment ran out or a new bonus started: the "+X" follow.
-      const buffsNow = this.hand.buffs();
+      const buffsNow = withCombo(this.hand.buffs(), combo);
       if ((big.dataset.buffs ?? '') !== buffsKey(buffsNow)) {
         const rules = big.querySelector('.rules > span');
         if (rules) rules.innerHTML = rulesInnerHtml(cardId, buffsNow);
@@ -2148,13 +2184,15 @@ class BoardScreen implements Screen {
 
   private inspectCard(cardId: string, hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null, copied: string | null = null): void {
     audio.play('cardSelect');
-    const face = markBoost(cardFace(cardId, { tilt: true, ...look(hero) }), cardId, boost);
+    const combo = boost === 'combo';
+    const face = markBoost(cardFace(cardId, { tilt: true, ...look(hero), combo }), cardId, boost);
     if (discarded) markDiscarded(face);
     // A Mirage from the history shows, on its right, the card it copied.
     const extra = copied
       ? h('div.inspect-copied', null, h('p.inspect-copied-label', null, t('copiedCard')), cardFace(copied, { tilt: true, ...look(hero) }))
       : null;
-    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra, typeof hero === 'object' ? buffsOnCard(cardId, hero) : undefined);
+    const shown = typeof hero === 'object' ? hero : hero ? heroBuffs(hero) : null;
+    this.openInspect(face, rulesOf(getCard(cardId)), undefined, undefined, extra, buffsOnCard(cardId, withCombo(shown, combo)));
   }
 
   private inspectHero(heroId: string, seat: PlayerId): void {
