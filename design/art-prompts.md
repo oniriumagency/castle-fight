@@ -533,7 +533,7 @@ A wide panoramic painted landscape without sky, for the background of a strategy
 
 ## Campaña: capitanes de cada reino
 
-Un retrato por reino (`art/captains/<reino>.jpg`, 3:4). Mientras no exista, el juego enseña el retrato del héroe de ese reino. Mismo estilo que los héroes.
+Un retrato por capitán (`art/captains/<territorio>.jpg`, 3:4). Los cinco de abajo ya están pintados y ahora son de Sir Brannoc (`bastion-a`), Tilda Fennick (`alambiques-b`), Corwin Manolenta (`ceniza-c`), Aprendiz Liora (`escarcha-a`) y Sargento Bruck (`carmesi-a`). Los otros quince están en `design/retratos-capitanes.md`.
 
 ### Capitán del Bastión Azur (`art/captains/bastion.jpg`, 3:4)
 

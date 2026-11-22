@@ -798,6 +798,7 @@ class BoardScreen implements Screen {
       fallen,
       name: (seat) => this.name(seat),
       onExit: () => this.exit(),
+      onRetry: () => this.exit(true),
       getPresence: () => this.presence,
     });
   }
@@ -2574,10 +2575,11 @@ class BoardScreen implements Screen {
     );
   }
 
-  private exit(): void {
+  /** Leaves the game; in the campaign, `retry` plays the same territory again. */
+  private exit(retry = false): void {
     const campaign = (this.session as { campaign?: unknown }).campaign;
     void import('../flow').then(({ flow }) => {
-      if (campaign) flow.campaign((this.session as { campaignOutcome?: BattleOutcome | null }).campaignOutcome ?? null);
+      if (campaign) flow.campaign((this.session as { campaignOutcome?: BattleOutcome | null }).campaignOutcome ?? null, retry);
       else if (this.session.kind === 'online') flow.lobby();
       else flow.menu();
     });

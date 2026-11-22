@@ -48,7 +48,7 @@ import { attachCardZoom } from '../../ui/cardZoom';
 import { clickOn, createCoach, type CoachStep } from '../../ui/coach';
 import { tutorial } from '../../game/tutorial';
 import { cardFace } from '../../ui/card';
-import { SCENE_ART, captainArt, playDialogue, possessedArt } from './dialogue';
+import { SCENE_ART, captainArt, captainTitle, playDialogue, possessedArt } from './dialogue';
 
 const SVG = 'http://www.w3.org/2000/svg';
 type RivalKingdom = Exclude<KingdomId, 'valdepiedra'>;
@@ -68,7 +68,7 @@ function defenderOf(territory: Territory): { name: string; title: string; art: s
   if (!territory.kingdom || territory.kind === 'home') return null;
   const kingdom = getKingdom(territory.kingdom);
   if (territory.captain) {
-    return { name: territory.captain.name, title: t('campaignCaptainOf', { kingdom: L(kingdom.name) }), art: captainArt(kingdom.id), hero: kingdom.hero };
+    return { name: territory.captain.name, title: captainTitle(territory.captain.name, L(kingdom.name)), art: captainArt(territory.captain.name), hero: kingdom.hero };
   }
   const hero = getHero(kingdom.hero);
   return { name: PERSONAS[kingdom.hero]?.name ?? L(hero.name), title: L(hero.name), art: hero.art, hero: kingdom.hero };
@@ -132,7 +132,7 @@ function scenesAfter(save: CampaignSave, outcome: BattleOutcome): Line[] {
   return lines;
 }
 
-export function campaignScreen(after: BattleOutcome | null = null): Screen {
+export function campaignScreen(after: BattleOutcome | null = null, retry = false): Screen {
   const el = h('div.campaign-screen');
   let save = loadCampaign();
   let selected: string | null = null;
@@ -589,7 +589,11 @@ export function campaignScreen(after: BattleOutcome | null = null): Screen {
       const field = battlefield();
       field.layout();
       void field.setMood(skyFor(null), 900);
-      if (after && save) {
+      if (after && save && retry && !after.won && attackable(save).includes(after.territory)) {
+        // "Retry" after a defeat: straight back into the same territory.
+        selected = after.territory;
+        void attack(after.territory);
+      } else if (after && save) {
         // A victory sounds over the map: a castle (its hero joins) or the Crown gets the bigger fanfare.
         if (after.won) audio.play(after.ally || getTerritory(after.territory).kind === 'final' ? 'conquestBig' : 'conquest', 0.5, { delay: 350 });
         const lines = scenesAfter(save, after);
@@ -630,8 +634,10 @@ function defenderSeats(territory: Territory): { nickname: string; hero: HeroId; 
         nickname: territory.captain.name,
         hero: kingdom.hero,
         isAi: true,
-        title: { es: `Capitán · ${kingdom.name.es}`, en: `Captain · ${kingdom.name.en}` },
-        portrait: captainArt(kingdom.id),
+        title: territory.captain.female
+          ? { es: `Capitana · ${kingdom.name.es}`, en: `Captain · ${kingdom.name.en}` }
+          : { es: `Capitán · ${kingdom.name.es}`, en: `Captain · ${kingdom.name.en}` },
+        portrait: captainArt(territory.captain.name),
       },
     ];
   }

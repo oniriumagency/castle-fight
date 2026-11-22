@@ -40,6 +40,8 @@ export interface Kingdom {
 
 export interface Captain {
   name: string;
+  /** For the title (Capitán / Capitana) and to match the portrait. */
+  female?: boolean;
   /** One line before the battle. */
   line: LocalizedText;
 }
@@ -127,7 +129,9 @@ const T = (
   captain?: Captain,
 ): Territory => ({ id, kingdom, kind, name: { es, en }, x, y, terrain, rewards, ...(captain ? { captain } : {}) });
 
-const cap = (name: string, es: string, en: string): Captain => ({ name, line: { es, en } });
+const cap = (name: string, es: string, en: string): Captain => ({ name, line: { es, en }, ...(FEMALE.has(name) ? { female: true } : {}) });
+/** The captains who are women (the rest are men). */
+const FEMALE = new Set(['Dama Elowen', 'Capitana Rhoswen', 'Tilda Fennick', 'Ama Cordelia', 'Gilly Ratón', 'Maeve Hollín', 'Aprendiz Liora', 'Maga Seren']);
 
 export const TERRITORIES: readonly Territory[] = [
   T('valdepiedra', 'valdepiedra', 'home', 'Valdepiedra', 'Stonevale', 500, 640, null, []),

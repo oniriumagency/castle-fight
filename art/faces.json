@@ -9,9 +9,9 @@
   "heroes/saboteadora": { "x": 0.48, "y": 0.27, "size": 0.44 },
   "heroes/hechicera-ocaso": { "x": 0.47, "y": 0.21, "size": 0.32 },
   "heroes/mariscal-ocaso": { "x": 0.5, "y": 0.2, "size": 0.32 },
-  "captains/alambiques": { "x": 0.55, "y": 0.2, "size": 0.32 },
-  "captains/bastion": { "x": 0.52, "y": 0.235, "size": 0.35 },
-  "captains/carmesi": { "x": 0.5, "y": 0.25, "size": 0.34 },
-  "captains/ceniza": { "x": 0.59, "y": 0.23, "size": 0.32 },
-  "captains/escarcha": { "x": 0.5, "y": 0.23, "size": 0.32 }
+  "captains/alambiques-b": { "x": 0.55, "y": 0.2, "size": 0.32 },
+  "captains/bastion-a": { "x": 0.52, "y": 0.235, "size": 0.35 },
+  "captains/carmesi-a": { "x": 0.5, "y": 0.25, "size": 0.34 },
+  "captains/ceniza-c": { "x": 0.59, "y": 0.23, "size": 0.32 },
+  "captains/escarcha-a": { "x": 0.5, "y": 0.23, "size": 0.32 }
 }

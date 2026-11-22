@@ -25,6 +25,8 @@ export interface ResultsOptions {
   fallen?: boolean;
   name: (seat: PlayerId) => string;
   onExit: () => void;
+  /** Campaign: play the same territory again after a defeat. */
+  onRetry?: () => void;
   getPresence: () => Presence | null;
 }
 
@@ -113,7 +115,7 @@ export function showResults(o: ResultsOptions): void {
       case 'keepDestroyed':
         return loser !== null ? t('reasonKeepDestroyed', { who: o.name(loser) }) : '';
       case 'concede':
-        return loser !== null ? t('reasonConcede', { who: o.name(loser) }) : '';
+        return loser === null ? '' : loser === o.view.viewer && !o.session.isLocal(1 as PlayerId) ? t('reasonConcedeYou') : t('reasonConcede', { who: o.name(loser) });
       case 'turnLimit':
         return t('reasonTurnLimit');
     }
@@ -207,9 +209,12 @@ export function showResults(o: ResultsOptions): void {
       'div.results-actions',
       null,
       watching || campaign ? null : rematchBtn,
+      campaignOutcome && !campaignOutcome.won && o.onRetry
+        ? h('button.btn.big.primary', { type: 'button', onclick: () => (audio.play('uiClick'), o.onRetry!()) }, t('campaignRetry'))
+        : null,
       h(
         'button.btn.big',
-        { class: campaign ? 'primary' : '', type: 'button', onclick: () => (audio.play('uiBack'), o.onExit()) },
+        { class: campaign && !(campaignOutcome && !campaignOutcome.won && o.onRetry) ? 'primary' : '', type: 'button', onclick: () => (audio.play('uiBack'), o.onExit()) },
         campaign ? t('campaignBackToMap') : o.session.kind === 'online' ? t('back') : t('mainMenu'),
       ),
       hideBtn,
