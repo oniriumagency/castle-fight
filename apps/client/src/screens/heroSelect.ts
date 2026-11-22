@@ -161,10 +161,33 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
     );
   };
 
+  /** Against the AI: a duel or the free-for-all, switched here instead of from the menu. */
+  const setMode = (next: 'ai' | 'ffa'): void => {
+    if (mode === next) return;
+    audio.play('uiClick');
+    mode = next;
+    setTableSize(mode === 'ffa' ? 3 : 2);
+    build();
+  };
+
+  const modeRow = (): HTMLElement =>
+    h(
+      'div.option-row.mode-row',
+      null,
+      h('span', null, t('gameMode')),
+      h(
+        'div.segmented',
+        { role: 'group', 'aria-label': t('gameMode') },
+        h('button', { type: 'button', 'aria-pressed': String(mode === 'ai'), onclick: () => setMode('ai') }, t('modeDuel')),
+        h('button', { type: 'button', 'aria-pressed': String(mode === 'ffa'), onclick: () => setMode('ffa') }, t('playFfa')),
+      ),
+    );
+
   const aiOptions = (): HTMLElement =>
     h(
       'div.ai-options',
       null,
+      modeRow(),
       h(
         'div.option-row',
         null,

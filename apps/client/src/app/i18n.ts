@@ -104,6 +104,8 @@ const STRINGS = {
   dialogueSkip: { es: 'Saltar', en: 'Skip' },
   captainNoPowers: { es: 'Los capitanes no tienen pasiva ni definitiva: pelean con las cartas de su reino.', en: 'Captains have no passive or ultimate: they fight with their kingdom’s cards.' },
   ultimateAsleep: { es: 'Tu definitiva duerme. Despertará cuando venzas a tu primer héroe.', en: 'Your ultimate is asleep. It wakes when you defeat your first hero.' },
+  gameMode: { es: 'Modo', en: 'Mode' },
+  modeDuel: { es: 'Duelo', en: 'Duel' },
   ffaRivals: { es: 'Rivales', en: 'Rivals' },
   ffaAiName: { es: 'IA {n} ({level})', en: 'AI {n} ({level})' },
   ffaRivalsHint: { es: 'Dos IA con héroes al azar. Cada ataque golpea a todos tus rivales a la vez.', en: 'Two AIs with random heroes. Every attack hits all your rivals at once.' },

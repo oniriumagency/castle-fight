@@ -52,6 +52,24 @@ function modeButton(icon: IconName, label: string, hint: string, onClick: () => 
   );
 }
 
+/** A small icon button for the top-right toolbar; `tag` is a short text beside the icon. */
+function toolButton(icon: IconName, label: string, onClick: () => void, tag?: string): HTMLElement {
+  return h(
+    'button.btn.icon-only.tool-btn',
+    {
+      type: 'button',
+      title: label,
+      'aria-label': label,
+      onclick: () => {
+        audio.play('uiClick');
+        onClick();
+      },
+    },
+    html(iconSvg(icon)),
+    tag ? h('span.tool-tag', null, tag) : null,
+  );
+}
+
 /** The campaign, flagged as beta while it is being tested. */
 function campaignButton(): HTMLElement {
   const btn = modeButton('keep', t('playCampaign'), t('playCampaignHint'), () => flow.campaign());
@@ -68,19 +86,30 @@ export function menuScreen(): Screen {
       type: 'text',
       maxlength: 20,
       autocomplete: 'nickname',
-      placeholder: t('nicknamePlaceholder'),
+      placeholder: t('nickname'),
       value: settings.get().nickname,
       'aria-label': t('nickname'),
     });
     nickname.addEventListener('change', () => settings.set({ nickname: nickname.value.trim().slice(0, 20) }));
 
     const [first, second] = GAME_TITLE.split(':');
+    const nextLocale = settings.get().locale === 'es' ? 'en' : 'es';
     el.replaceChildren(
+      // Top right: help, news, settings, language and sound, as icons.
+      h(
+        'div.menu-tools',
+        null,
+        toolButton('book', t('howToPlay'), openHowToPlay),
+        toolButton('scroll', t('whatsNew'), openChangelog),
+        toolButton('gear', t('settings'), openSettings),
+        toolButton('globe', nextLocale === 'en' ? 'English' : 'Español', () => settings.set({ locale: nextLocale }), nextLocale.toUpperCase()),
+        muteButton('btn.icon-only'),
+      ),
       // Left: who you are, what to play, and the rest.
       h(
         'div.menu-main',
         null,
-        h('label.field.nick', null, t('nickname'), nickname),
+        h('div.nick', null, nickname),
         h(
           'nav.modes',
           null,
@@ -89,31 +118,14 @@ export function menuScreen(): Screen {
           modeButton('sword', t('playAi'), t('playAiHint'), () => flow.heroSelect('ai')),
           modeButton('globe', t('playOnline'), t('playOnlineHint'), () => flow.lobby()),
           modeButton('users', t('playLocal'), t('playLocalHint'), () => flow.heroSelect('local')),
-          modeButton('sword', t('playFfa'), t('playFfaHint'), () => flow.ffa()),
         ),
         h(
           'div.menu-secondary',
           null,
-          h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openHowToPlay()) }, html(iconSvg('book')), t('howToPlay')),
-          h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openChangelog()) }, html(iconSvg('scroll')), t('whatsNew')),
           h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openRecord()) }, html(iconSvg('hero')), t('myRecord')),
-          h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), openSettings()) }, html(iconSvg('gear')), t('settings')),
-          h(
-            'button.btn',
-            {
-              type: 'button',
-              onclick: () => {
-                audio.play('uiClick');
-                settings.set({ locale: settings.get().locale === 'es' ? 'en' : 'es' });
-              },
-            },
-            html(iconSvg('globe')),
-            settings.get().locale === 'es' ? 'English' : 'Español',
-          ),
           canInstall()
             ? h('button.btn', { type: 'button', onclick: () => (audio.play('uiClick'), void promptInstall()) }, html(iconSvg('keep')), t('installApp'))
             : null,
-          muteButton('btn.icon-only'),
         ),
         h('footer.menu-foot', null, t('version')),
       ),

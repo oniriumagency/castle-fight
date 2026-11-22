@@ -237,7 +237,29 @@
 }
 
 .nick input {
+  width: 100%;
   text-align: center;
+}
+
+/* Top right: how to play, news, settings, language and sound. */
+.menu-tools {
+  position: absolute;
+  top: max(14px, var(--safe-t));
+  right: max(14px, var(--safe-r));
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+
+.tool-btn:has(.tool-tag) {
+  width: auto;
+  padding: 0 10px;
+  gap: 5px;
+}
+
+.tool-tag {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
 }
 
 /* Not much height on a laptop: smaller cards so everything fits without scrolling. */
@@ -272,6 +294,8 @@
 
   .menu-side {
     order: -1;
+    /* Below the icons in the top right corner. */
+    margin-top: 48px;
   }
 }
 
@@ -322,6 +346,12 @@
     grid-column: 2;
     grid-row: 1 / span 3;
     gap: 8px;
+    /* Room for the icons in the top right corner. */
+    margin-top: 50px;
+  }
+
+  .menu-tools {
+    top: max(10px, var(--safe-t));
   }
 
   .mode-btn {
@@ -443,6 +473,29 @@
   gap: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
+}
+
+/* Against the AI: duel or free-for-all, on one line. */
+.option-row.mode-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+/* On a narrow panel the choice drops below its label instead of overflowing. */
+.mode-row .segmented {
+  flex: 1 0 auto;
+  max-width: 100%;
+}
+
+.mode-row .segmented button {
+  flex: 1 1 auto;
+}
+
+/* With the mode choice the panel has one more row: a shorter portrait keeps it from scrolling. */
+.hero-detail:has(.mode-row) .hero-portrait {
+  max-height: min(30vh, 130px);
 }
 
 .option-row {
@@ -1082,6 +1135,29 @@ input.shake {
   .logo-emblem,
   .tagline {
     display: none;
+  }
+
+  .menu-tools .btn {
+    min-height: 38px;
+    height: 38px;
+  }
+
+  .menu-tools .btn.icon-only:not(.tool-btn:has(.tool-tag)) {
+    width: 38px;
+    min-width: 38px;
+  }
+
+  .modes {
+    margin-top: 44px;
+  }
+
+  .mode-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .mode-text strong {
+    font-size: 1rem;
   }
 }
 
