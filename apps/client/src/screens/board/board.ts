@@ -295,15 +295,14 @@ class BoardScreen implements Screen {
   // ---------------------------------------------------------------------------
 
   /**
-   * The campaign's big battles (a kingdom's castle and the final battle) have
-   * their own music, which plays the whole battle, the Twilight Fury included.
+   * The campaign's final battle, against the possessed heroes, has its own
+   * music, which plays the whole battle, the Twilight Fury included.
    */
   private bossBattle(): boolean {
     const battle = (this.session as { campaign?: { id: string } | null }).campaign;
     const territory = battle?.id.split(':')[0];
     if (!territory || !isTerritoryId(territory)) return false;
-    const kind = getTerritory(territory).kind;
-    return kind === 'castle' || kind === 'final';
+    return getTerritory(territory).kind === 'final';
   }
 
   mount(): void {
