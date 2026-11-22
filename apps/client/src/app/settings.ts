@@ -18,6 +18,8 @@ export interface Settings {
   effectsQuality: 'auto' | 'high' | 'low';
   /** Run the turn clock in games between two people on one device (games against the AI have none). */
   localTimer: boolean;
+  /** Heroes react to the match in speech bubbles next to their portraits (games on this device). */
+  heroReactions: boolean;
 }
 
 const KEY = 'cardcraft-castles:settings';
@@ -38,6 +40,7 @@ function defaults(): Settings {
     screenShake: true,
     effectsQuality: 'auto',
     localTimer: true,
+    heroReactions: true,
   };
 }
 

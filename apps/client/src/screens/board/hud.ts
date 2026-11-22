@@ -252,7 +252,20 @@ export class SidePanel {
     this.presence.classList.toggle('show', !!text);
   }
 
+  /** A hero's line about the match: a speech bubble that stays longer the more it says. */
+  showReaction(text: string): void {
+    const seconds = Math.min(7, Math.max(3.4, 2.4 + text.length * 0.055));
+    this.bubble.style.setProperty('--bubble-time', `${seconds}s`);
+    this.bubble.classList.add('reaction');
+    this.bubble.textContent = text;
+    this.bubble.classList.remove('show');
+    void this.bubble.offsetWidth;
+    this.bubble.classList.add('show');
+  }
+
   showEmote(text: string): void {
+    this.bubble.classList.remove('reaction');
+    this.bubble.style.removeProperty('--bubble-time');
     this.bubble.textContent = text;
     this.bubble.classList.remove('show');
     void this.bubble.offsetWidth;

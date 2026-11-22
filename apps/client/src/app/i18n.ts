@@ -464,6 +464,7 @@ const STRINGS = {
   speedFast: { es: 'Rápida', en: 'Fast' },
   reducedMotion: { es: 'Reducir movimiento', en: 'Reduce motion' },
   screenShake: { es: 'Sacudida de pantalla', en: 'Screen shake' },
+  heroReactions: { es: 'Frases de los héroes durante la partida', en: 'Hero lines during the match' },
   localTimer: { es: 'Reloj de turno con dos jugadores en un dispositivo', en: 'Turn clock with two players on one device' },
   rematchRequested: { es: '{who} pide la revancha', en: '{who} wants a rematch' },
   acceptRematch: { es: 'Aceptar revancha', en: 'Accept rematch' },

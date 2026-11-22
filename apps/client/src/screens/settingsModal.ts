@@ -39,7 +39,7 @@ function slider(key: 'masterVolume' | 'musicVolume' | 'sfxVolume', label: string
   return h('label.field', null, label, input);
 }
 
-function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted', label: string): HTMLElement {
+function toggle(key: 'reducedMotion' | 'screenShake' | 'localTimer' | 'muted' | 'heroReactions', label: string): HTMLElement {
   return h(
     'div.setting-row',
     null,
@@ -94,6 +94,7 @@ export function openSettings(): void {
         ),
         toggle('screenShake', t('screenShake')),
         toggle('reducedMotion', t('reducedMotion')),
+        toggle('heroReactions', t('heroReactions')),
         toggle('localTimer', t('localTimer')),
       );
     };

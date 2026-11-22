@@ -30,6 +30,7 @@ import { describeEvent } from '../../game/describe';
 import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
+import { ReactionDirector, type Reaction, type Voice } from '../../game/reactions';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
 import {
   boardBuffs,
@@ -172,6 +173,8 @@ class BoardScreen implements Screen {
   private lastTick = -1;
   private curtainFor: PlayerId | null = null;
   private stats = new MatchStats();
+  /** Heroes' speech bubbles reacting to the match. */
+  private readonly reactions = new ReactionDirector();
   private unsubscribe: () => void = () => {};
   private unsubscribeSettings: () => void = () => {};
   private raf = 0;
@@ -993,8 +996,15 @@ class BoardScreen implements Screen {
 
     if (!this.shown || update.resumed || starting || events.length === 0) {
       await this.snapTo(update.view, starting);
+      if (starting) {
+        this.reactions.reset();
+        const hello = this.pickReactions(events, update.view.players, update.view);
+        if (hello.length) this.later(() => this.say(hello), 500);
+      }
       return;
     }
+
+    const reactions = this.pickReactions(events, this.shown, update.view);
 
     // On a shared device the next player's cards must not show while animating.
     if (this.session.kind === 'local' && update.view.viewer !== this.handSeat) {
@@ -1002,12 +1012,48 @@ class BoardScreen implements Screen {
     }
 
     const gen = this.animGen;
-    for (const e of events) {
+    for (const [i, e] of events.entries()) {
       if (this.destroyed || gen !== this.animGen) return;
       await this.play(e, update.view);
+      const now = reactions.filter((r) => r.at === i);
+      if (now.length) this.say(now);
     }
     await wait(120);
     this.clearPlayed();
+  }
+
+  /** Who may speak from a seat: AI rivals freely, heroes played here now and then, nobody online. */
+  private voiceOf(seat: PlayerId): Voice {
+    if (this.session.kind === 'online' || this.session.spectator || !settings.get().heroReactions) return null;
+    if (this.session.seats[seat]?.isAi) return 'rival';
+    return this.session.isLocal(seat) ? 'own' : null;
+  }
+
+  private pickReactions(events: GameEvent[], before: readonly PlayerPublicState[], view: PlayerView): Reaction[] {
+    try {
+      return this.reactions.pick(events, before, view.players, view.rules.keepWin, (seat) => this.voiceOf(seat), performance.now());
+    } catch (error) {
+      console.error('Hero reactions failed', error);
+      return [];
+    }
+  }
+
+  /** Shows the bubbles; a second one (an answer) comes a moment later. */
+  private say(reactions: Reaction[]): void {
+    reactions.forEach((r, i) => {
+      const show = (): void => {
+        if (this.destroyed || this.resultsShown) return;
+        this.panels[this.sideOf(r.seat)]?.showReaction(L(r.text));
+      };
+      if (i === 0) show();
+      else this.later(show, 1700 * i);
+    });
+  }
+
+  private later(fn: () => void, ms: number): void {
+    window.setTimeout(() => {
+      if (!this.destroyed) fn();
+    }, ms);
   }
 
   private saveStats(): void {
