@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
+import { offlineCache } from './sw/plugin';
 
 /** `0.1.0+abc1234`: the package version and the commit, shown in player reports. */
 function appVersion(): string {
@@ -25,6 +26,7 @@ export const GAME_PATH = '/cardcraft-castles/';
 
 export default defineConfig({
   base: GAME_PATH,
+  plugins: [offlineCache()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
