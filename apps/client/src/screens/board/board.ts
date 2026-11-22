@@ -173,6 +173,10 @@ class BoardScreen implements Screen {
   private raf = 0;
   private backgroundTimer = 0;
   private playedCard: HTMLElement | null = null;
+  /** The bonuses the card on stage was played with, for the discard pile it goes to next. */
+  private playedLook: HeroId | CardBuffs | undefined;
+  /** Twilight Fury level as the animation has shown it (the round can move on within one update). */
+  private shownTwilight = 0;
   private closeInspect: (() => void) | null = null;
   private resultsShown = false;
   private presence: Presence | null = null;
@@ -399,6 +403,15 @@ class BoardScreen implements Screen {
   /** What adds to the numbers on `seat`'s cards right now (hero, enchantments, Twilight Fury). */
   private buffsOf(seat: PlayerId): CardBuffs | HeroId {
     return this.view ? boardBuffs(this.view, seat) : this.heroOf(seat);
+  }
+
+  /**
+   * What adds to `seat`'s numbers at this point of the animation: the
+   * enchantments and Fury level as shown, before the play spends a charge.
+   */
+  private shownBuffsOf(seat: PlayerId): CardBuffs | HeroId {
+    if (!this.view || !this.shown) return this.heroOf(seat);
+    return boardBuffs({ ...this.view, players: this.shown }, seat, this.shownTwilight);
   }
 
   private seatOfSide(side: number): PlayerId {
@@ -663,6 +676,7 @@ class BoardScreen implements Screen {
         }
         this.view = update.view;
         this.shown = update.view.players.map(clonePlayer);
+        this.shownTwilight = twilightLevel(update.view);
         this.shownActive = update.view.active;
       }
     } finally {
@@ -1019,6 +1033,7 @@ class BoardScreen implements Screen {
     }
     this.shownHistory = this.history.map((h) => h.slice());
     this.shown = view.players.map(clonePlayer);
+    this.shownTwilight = twilightLevel(view);
     this.shownActive = view.active;
     this.handSeat = view.viewer;
     this.syncObserver();
@@ -1088,6 +1103,7 @@ class BoardScreen implements Screen {
         void fx.battleEventEnded(ctx, this.view ? twilightLevel(this.view) : 0);
         break;
       case 'twilightRose': {
+        this.shownTwilight = e.level;
         const values = this.view ? twilightValues(this.view.rules) : { atk: 0, dmg: 0 };
         if (this.incoming) this.renderTwilightChip(this.incoming);
         const rising = fx.twilightRose(this.view?.activeEvent ? 0 : e.level, ctx);
@@ -1155,7 +1171,7 @@ class BoardScreen implements Screen {
         if (e.player === this.handSeat) this.handModel = this.handModel.filter((c) => c.uid !== e.uid);
         this.render();
         fx.cardLaunched();
-        await this.showPlayed(e.cardId, from, boostOf(e), this.heroOf(e.player));
+        await this.showPlayed(e.cardId, from, boostOf(e), this.shownBuffsOf(e.player));
         break;
       }
       case 'diceRolled':
@@ -1442,14 +1458,14 @@ class BoardScreen implements Screen {
   }
 
   /** The played card flies to the centre, is shown big, and stays until the next one. */
-  private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId): Promise<void> {
+  private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId | CardBuffs): Promise<void> {
     this.clearPlayed();
     const gen = this.animGen;
-    const card = markBoost(cardFace(cardId, { className: 'played', hero }), cardId, boost);
+    const card = markBoost(cardFace(cardId, { className: 'played', ...look(hero) }), cardId, boost);
     const combo = boost === 'combo';
-    if (hero) card.dataset.hero = hero;
     this.stage.replaceChildren(card);
     this.playedCard = card;
+    this.playedLook = hero;
     const target = card.getBoundingClientRect();
     const dx = from.left + from.width / 2 - (target.left + target.width / 2);
     const dy = from.top + from.height / 2 - (target.top + target.height / 2);
@@ -1564,7 +1580,7 @@ class BoardScreen implements Screen {
     const dy = pile.top + pile.height / 2 - (r.top + r.height / 2);
     const s = pile.width / Math.max(1, r.width);
     const id = card.dataset.cardId;
-    const hero = card.dataset.hero as HeroId | undefined;
+    const hero = this.playedLook;
     card
       .animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0.9 }], {
         duration: 380 * animScale(),
@@ -1578,16 +1594,16 @@ class BoardScreen implements Screen {
       });
   }
 
-  /** Hero of whoever put the top card on the discard pile, for its numbers. */
-  private discardHero: HeroId | undefined;
+  /** Bonuses of the top card of the discard pile (as played), or its owner's hero, for its numbers. */
+  private discardHero: HeroId | CardBuffs | undefined;
   /** The top card of the pile was discarded, not played. */
   private discardTopDiscarded = false;
 
-  private setDiscardTop(cardId: string | null, hero?: HeroId, discarded = false): void {
+  private setDiscardTop(cardId: string | null, hero?: HeroId | CardBuffs, discarded = false): void {
     this.hidePilePreview();
     this.discardHero = hero;
     this.discardTopDiscarded = discarded;
-    const top = cardId ? cardFace(cardId, { calm: true, hero }) : cardBack();
+    const top = cardId ? cardFace(cardId, { calm: true, ...look(hero) }) : cardBack();
     if (cardId && discarded) markDiscarded(top);
     const count = this.discardPile.querySelector('.pile-count');
     this.discardPile.replaceChildren(top, count ?? h('span.pile-count'));
@@ -2227,10 +2243,12 @@ class BoardScreen implements Screen {
       }
       if (pending.kind === 'discardFromHand') {
         const card = pending.revealed?.find((c) => String(c.uid) === option);
-        const face = card ? cardFace(card.cardId, { calm: true, hero: this.heroOf(this.rivalOf(view.viewer, pending.target)) }) : cardBack();
+        const face = card ? cardFace(card.cardId, { calm: true, ...look(this.buffsOf(this.rivalOf(view.viewer, pending.target))) }) : cardBack();
         return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, face);
       }
-      return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, cardFace(option, { calm: true }));
+      // The rival's enchantments, with what their numbers get on that rival's side.
+      const owner = this.rivalOf(view.viewer, pending.target);
+      return h('button.choice-option.card-option', { type: 'button', onclick: () => choose(option) }, cardFace(option, { calm: true, ...look(this.buffsOf(owner)) }));
     });
     const box = h('div.choice-box.panel', null, h('h2', null, titles[pending.kind]), h('div.choice-options', { class: `kind-${pending.kind}` }, options));
     const wrap = h('div.choice', null, box);

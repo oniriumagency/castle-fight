@@ -59,7 +59,10 @@ const GLOSSARY: { words: LocalizedText; text: LocalizedText }[] = [
   },
   {
     words: { es: 'Quemadura', en: 'Burn' },
-    text: { es: '2 de daño al inicio de cada turno del jugador quemado.', en: '2 damage at the start of each of the burned player’s turns.' },
+    text: {
+      es: `${DEFAULT_RULES.burnDamage} de daño al inicio de cada turno del jugador quemado.`,
+      en: `${DEFAULT_RULES.burnDamage} damage at the start of each of the burned player’s turns.`,
+    },
   },
   {
     words: { es: 'Escarcha', en: 'Frost' },
@@ -147,9 +150,13 @@ export function heroBuffs(heroId: HeroId): CardBuffs {
  * hero's passive, each enchantment on the table and the Twilight Fury, each
  * as its own entry, in the same order the engine adds them.
  */
-export function boardBuffs(board: Board, seat: PlayerId): CardBuffs {
+export function boardBuffs(board: Board, seat: PlayerId, level = twilightLevel(board)): CardBuffs {
   const heroId = board.players[seat]!.hero;
-  const attack = attackBonusParts(board, seat).map((part): NumberBuff => {
+  // The Fury at `level`: a card on stage shows the level it was played at, even if the round moves on after it.
+  const parts = attackBonusParts(board, seat).filter((part) => part.source !== 'twilight');
+  const furyAttack = level * (board.rules.twilightAttackBonus ?? 0);
+  if (furyAttack) parts.push({ source: 'twilight', amount: furyAttack });
+  const attack = parts.map((part): NumberBuff => {
     if (part.source === 'hero') return { source: 'hero', amount: part.amount, label: t('buffHero', { name: L(getHero(heroId).name) }) };
     if (part.source === 'twilight') return { source: 'twilight', amount: part.amount, label: t('twilightName') };
     const name = L(getCard(part.cardId!).name);
@@ -158,7 +165,7 @@ export function boardBuffs(board: Board, seat: PlayerId): CardBuffs {
     return { source: 'enchantment', amount: part.amount, label };
   });
   // The engine adds the Fury's level times its build bonus to every Castle build.
-  const fury = twilightLevel(board) * (board.rules.twilightBuildBonus ?? 0);
+  const fury = level * (board.rules.twilightBuildBonus ?? 0);
   const build: NumberBuff[] = fury ? [{ source: 'twilight', amount: fury, label: t('twilightName') }] : [];
   return { attack, build, status: heroStatusBuffs(heroId) };
 }
@@ -169,7 +176,6 @@ export function buffsKey(buffs: CardBuffs | null | undefined): string {
   return [...buffs.attack, ...(buffs.build ?? []), ...buffs.status].map((b) => `${b.source}:${b.amount}:${b.label}`).join('|');
 }
 
-/** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
 /** Players at the table being shown: with 3+, cards read their free-for-all text. */
 let tableSize = 2;
 
@@ -188,11 +194,26 @@ function tableAmount(n: number): number {
   return tableSize > 2 ? Math.max(1, Math.round(n * DEFAULT_RULES.multiAllScale)) : n;
 }
 
-function effectNumbers(ops: readonly EffectOp[], out = { damage: new Set<number>(), build: new Set<number>(), status: new Set<number>() }) {
+interface EffectNumbers {
+  damage: Set<number>;
+  build: Set<number>;
+  status: Set<number>;
+  /** "4 damage for each card discarded": the bonus is added once to the whole hit, not to each card. */
+  perCardDamage: boolean;
+  /** "+4 Castle for each": the Twilight Fury adds once to the whole build. */
+  perCardBuild: boolean;
+}
+
+/** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
+function effectNumbers(
+  ops: readonly EffectOp[],
+  out: EffectNumbers = { damage: new Set(), build: new Set(), status: new Set(), perCardDamage: false, perCardBuild: false },
+): EffectNumbers {
   for (const op of ops) {
-    if (op.op === 'damage') out.damage.add(tableAmount(op.amount));
-    // Per-card builds ("+4 Castle for each") get the bonus once, not per card: they keep their printed number.
-    else if (op.op === 'keep' && !op.perDiscard) out.build.add(op.amount);
+    if (op.op === 'damage' && op.perDiscard && !op.amount) out.perCardDamage = true;
+    else if (op.op === 'damage') out.damage.add(tableAmount(op.amount));
+    else if (op.op === 'keep' && op.perDiscard) out.perCardBuild = true;
+    else if (op.op === 'keep') out.build.add(op.amount);
     else if (op.op === 'enchant' && op.modifiers?.onTurnStart) effectNumbers(op.modifiers.onTurnStart, out);
     else if (op.op === 'burn') out.status.add(tableAmount(op.turns));
     else if (op.op === 'frost' || op.op === 'rust') out.status.add(op.turns);
@@ -214,8 +235,9 @@ const BUFF_CLOSE = '\u0002';
 /**
  * Card text with what is added to its numbers, each source on its own:
  * "13 damage" becomes "13+2+3 damage" for the Marshal with a War Banner up,
- * "for 4 turns" becomes "for 4+1 turns" for the Sorceress. Hits that are not
- * single attacks (per card discarded, Burn ticks) stay as printed.
+ * "for 4 turns" becomes "for 4+1 turns" for the Sorceress. Amounts per card
+ * discarded keep their number and get the bonus once, after them: "4 damage
+ * for each (+2 in total)". Burn ticks are not attacks and stay as printed.
  */
 function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): string {
   const build = buffs.build ?? [];
@@ -233,6 +255,16 @@ function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): str
     const castle = es ? /(?<=\+)(\d+)(?= (?:Castillo(?! por)|en su lugar))/g : /(?<=\+)(\d+)(?= (?:Castle(?! for each)|instead))/g;
     out = out.replace(castle, (m) => (numbers.build.has(Number(m)) ? `${m}${marks('b', build)}` : m));
   }
+  // Per card discarded: the bonus goes once, at the end of the sentence that counts the cards.
+  const perCard = (list: NumberBuff[], kind: 'a' | 'b', eachRival: boolean): void => {
+    const sentence = (es ? /(?:por cada|por 1, 2 o 3 cartas)[^.]*/ : /(?:for each|for 1, 2 or 3 cards)[^.]*/).exec(out);
+    if (!sentence) return;
+    const at = sentence.index + sentence[0].length;
+    const where = eachRival ? (es ? 'a cada uno' : 'to each') : es ? 'al total' : 'in total';
+    out = `${out.slice(0, at)} (${marks(kind, list)} ${where})${out.slice(at)}`;
+  };
+  if (buffs.attack.length && numbers.perCardDamage) perCard(buffs.attack, 'a', tableSize > 2);
+  if (build.length && numbers.perCardBuild) perCard(build, 'b', false);
   if (buffs.status.length && numbers.status.size) {
     const turns = es ? /(?<=durante )(\d+) turnos?/g : /(?<=for )(\d+) turns?/g;
     out = out.replace(turns, (m, n: string) => {
