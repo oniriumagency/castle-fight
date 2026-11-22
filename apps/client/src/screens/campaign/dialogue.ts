@@ -1,14 +1,24 @@
 import { getHero } from '@cardcraft-castles/engine';
-import { PERSONAS, getKingdom, type Line } from '@cardcraft-castles/campaign';
+import { PERSONAS, TERRITORIES, getKingdom, type Line } from '@cardcraft-castles/campaign';
 import { append, h } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio, voiceOf } from '../../fx/audio';
 import { artUrl, faceImg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
 
-/** Catalog path of a captain's portrait (one per kingdom); the hero's art stands in until it is painted. */
-export function captainArt(kingdom: string): string {
-  return `captains/${kingdom}.jpg`;
+/** Where a captain stands guard, found by name. */
+function captainPost(name: string): (typeof TERRITORIES)[number] | undefined {
+  return TERRITORIES.find((x) => x.captain?.name === name);
+}
+
+/** Catalog path of a captain's portrait: one per captain, named after the territory they hold (`captains/bastion-b.jpg`). */
+export function captainArt(name: string): string {
+  return `captains/${captainPost(name)?.id ?? 'unknown'}.jpg`;
+}
+
+/** "Capitán · Bastión Azur", or "Capitana" for a woman. */
+export function captainTitle(name: string, kingdom: string): string {
+  return t(captainPost(name)?.captain?.female ? 'campaignCaptainaOf' : 'campaignCaptainOf', { kingdom });
 }
 
 function portrait(path: string, fallback: string): HTMLImageElement {
@@ -25,7 +35,7 @@ function speakerOf(line: Line): { name: string; sub: string; art: HTMLImageEleme
   if ('captain' in s) {
     const kingdom = getKingdom(s.kingdom);
     const heroArt = getHero(kingdom.hero).art;
-    return { name: s.captain, sub: t('campaignCaptainOf', { kingdom: L(kingdom.name) }), art: portrait(captainArt(s.kingdom), heroArt), color: heroCss(kingdom.hero) };
+    return { name: s.captain, sub: captainTitle(s.captain, L(kingdom.name)), art: portrait(captainArt(s.captain), heroArt), color: heroCss(kingdom.hero) };
   }
   return { name: '', sub: '', art: null, color: 'var(--gold)' };
 }

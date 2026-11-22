@@ -120,10 +120,10 @@ export const flow = {
   },
 
   /** The campaign map (or its start screen), with the scenes that follow `outcome` when coming back from a battle. */
-  campaign(outcome: BattleOutcome | null = null): void {
+  campaign(outcome: BattleOutcome | null = null, retry = false): void {
     setRoomInUrl(null);
     setScreenName('campaign');
-    show(campaignScreen(outcome));
+    show(campaignScreen(outcome, retry));
   },
 
   /** First start of the game: a new campaign (normal difficulty), its opening comic and the guide. */

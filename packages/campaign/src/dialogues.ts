@@ -116,26 +116,31 @@ export const INTRO: Record<Exclude<KingdomId, 'valdepiedra'>, Line[]> = {
     say('guardian', 'Mary Brickson, la Arquitecta. Dicen que tus muros son los más bellos del valle. Los míos no son bellos. Simplemente, nunca han caído.', 'Mary Brickson, the Architect. They say your walls are the finest in the valley. Mine are not fine. They have simply never fallen.'),
     say(MARY, 'Todo muro cae, Idris. Solo hay que saber dónde empujar.', 'Every wall falls, Idris. You only need to know where to push.'),
     say('guardian', 'Entonces empuja. Descubrirás por qué me llaman el Muro que No Cae.', 'Then push. You will learn why they call me the Wall That Never Falls.'),
+    say('guardian', 'Pero no será conmigo, todavía. Cada paso de mi tierra lo guarda uno de mis capitanes, y ninguno ha cedido jamás. Si los vences a todos, te espero en mi castillo.', 'But not with me, not yet. Every pass of my land is held by one of my captains, and none has ever given way. Beat them all and I will be waiting in my castle.'),
   ],
   alambiques: [
     say('alquimista', '¡La Arquitecta en persona! ¿Sabías que la piedra, bien calentada, se vuelve vidrio? Me muero por comprobar si contigo pasa lo mismo.', 'The Architect herself! Did you know that stone, heated just right, turns into glass? I am dying to find out whether the same happens to you.'),
     say(MARY, 'Barnaby, ¿eso ha sido una amenaza?', 'Barnaby, was that a threat?'),
     say('alquimista', '¡Ha sido una hipótesis! Por algo me llaman el Oro Loco. Empecemos el experimento.', 'It was a hypothesis! They do not call me Mad Gold for nothing. Let the experiment begin.'),
+    say('alquimista', '¡Pero primero, mis capitanes! Si los superas a todos, el laboratorio es tuyo... y yo también.', 'But first, my captains! Get past all of them and the laboratory is yours... and so am I.'),
   ],
   ceniza: [
     say('saboteadora', 'Mary Brickson, ¿verdad? Te esperaba. Bueno, esperaba que cayeras en mi trampa, pero esto también vale.', 'Mary Brickson, right? I was expecting you. Well, I was expecting you to fall into my trap, but this will do.'),
     say(MARY, 'Quemaste mi puente, Nell.', 'You burned my bridge, Nell.'),
     say('saboteadora', 'Ojalá. Si hubiera sido yo, no habría quedado ni el humo. Ven, te enseño por qué me llaman la Mecha Corta.', 'I wish. If it had been me, not even the smoke would be left. Come, let me show you why they call me the Short Fuse.'),
+    say('saboteadora', 'Eso sí, yo no salgo a la puerta. Primero te entretendrán mis capitanes. Si sobrevives, te espero en la Guarida.', 'Mind you, I do not answer the door myself. My captains will keep you busy first. Survive them and I will be waiting in the Den.'),
   ],
   escarcha: [
     say('hechicera', 'La Arquitecta. Levantas piedras como si fueran a durar para siempre. Qué tierno. Yo he visto arder montañas.', 'The Architect. You raise stones as if they will last forever. How sweet. I have seen mountains burn.'),
     say(MARY, 'Y yo las he visto volver a levantarse.', 'And I have seen them rise again.'),
     say('hechicera', 'Entonces aprenderás por qué me llaman la Llama Helada: el fuego que no se apaga y el frío que no perdona.', 'Then you will learn why they call me the Frozen Flame: the fire that never dies and the cold that never forgives.'),
+    say('hechicera', 'No saldré a recibirte. Para eso tengo a mis capitanes. Si los apagas a todos, hablaremos en mi torre.', 'I will not come out to greet you. That is what my captains are for. Put them all out and we will talk in my tower.'),
   ],
   carmesi: [
     say('mariscal', 'Mary Brickson, también conocida como la Arquitecta. He oído de tus hazañas, pero jamás imaginé que llegarías a mis tierras.', 'Mary Brickson, also known as the Architect. I have heard of your deeds, but I never imagined you would reach my lands.'),
     say(MARY, 'Tampoco yo imaginé que tendría que hacerlo.', 'Nor did I imagine I would have to.'),
     say('mariscal', 'Descubrirás por qué me llaman el Rompemurallas. Y te arrepentirás de haber construido tan alto.', 'You will learn why they call me the Wallbreaker. And you will regret building so high.'),
+    say('mariscal', 'Pero un mariscal no pelea en la vanguardia. Antes de verme a mí, tendrás que vencer a mis capitanes.', 'But a marshal does not fight in the vanguard. Before you face me, you will have to beat my captains.'),
   ],
 };
 
