@@ -71,7 +71,10 @@ describe('progress', () => {
     expect(save.unlocked).toContain('puntales');
     expect(attackable(save)).toContain('bastion-c');
     expect(attackable(save)).not.toContain('bastion-castillo');
-    save = win(save, 'bastion-c');
+    save = win(win(save, 'bastion-c'), 'bastion-b');
+    // The hero is always the last battle of their kingdom.
+    expect(attackable(save)).not.toContain('bastion-castillo');
+    save = win(save, 'bastion-d');
     expect(attackable(save)).toContain('bastion-castillo');
     const started = startBattle(save, 'bastion-castillo', 'arquitecta', 'x');
     const { save: after, outcome } = settleBattle(started, 'x', true)!;
@@ -105,7 +108,7 @@ describe('progress', () => {
 
   it('the Crown opens after the five castles and ends the campaign', () => {
     let save = newCampaign();
-    const order = ['bastion-a', 'bastion-c', 'bastion-castillo', 'bastion-b', 'ceniza-a', 'ceniza-c', 'ceniza-castillo', 'ceniza-b', 'carmesi-a', 'carmesi-c', 'carmesi-castillo', 'carmesi-b', 'escarcha-b', 'escarcha-c', 'escarcha-castillo', 'escarcha-a', 'alambiques-b', 'alambiques-c', 'alambiques-castillo'];
+    const order = ['bastion', 'alambiques', 'ceniza', 'escarcha', 'carmesi'].flatMap((k) => ['a', 'c', 'b', 'd', 'castillo'].map((x) => `${k}-${x}`));
     for (const t of order) {
       expect(attackable(save)).not.toContain('corona');
       save = win(save, t);
@@ -135,7 +138,7 @@ describe('battles', () => {
     expect(setup.seats[1]).toMatchObject({ noPassive: true, ultimateLocked: true });
     expect(setup.seats[1]!.deck).toContain('puntales');
     expect(setup.rules.wallStart).toBe(25);
-    const castle = battleSetup(win(win(save, 'bastion-a'), 'bastion-c'), 'bastion-castillo', 'arquitecta');
+    const castle = battleSetup(['bastion-a', 'bastion-c', 'bastion-b', 'bastion-d'].reduce((acc, id) => win(acc, id), save), 'bastion-castillo', 'arquitecta');
     expect(castle.seats[1]!.noPassive).toBeUndefined();
     expect(castle.seats[1]!.deck).toContain('ciudadela-eterna');
     expect(rivalDeck(save, 'corona')).toBeUndefined();
@@ -145,7 +148,7 @@ describe('battles', () => {
     const save = newCampaign();
     // The first castle gets a softer AI on purpose: its deck already makes it the hardest fight so far.
     expect(rivalTier(save, 'bastion-castillo')).toBeLessThan(rivalTier(save, 'bastion-a'));
-    const later = win(win(win(save, 'bastion-a'), 'bastion-c'), 'bastion-castillo');
+    const later = ['bastion-a', 'bastion-c', 'bastion-b', 'bastion-d', 'bastion-castillo'].reduce((acc, id) => win(acc, id), save);
     expect(rivalTier(later, 'alambiques-a')).toBeLessThan(rivalTier(later, 'alambiques-castillo'));
     expect(rivalTier(later, 'alambiques-a')).toBeGreaterThan(rivalTier(save, 'alambiques-a'));
     expect(rivalTier(newCampaign('historia'), 'bastion-a')).toBeLessThan(rivalTier(save, 'bastion-a'));

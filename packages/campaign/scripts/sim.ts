@@ -17,10 +17,10 @@ const games = Number(arg('games', '40'));
 const playerTier = Number(arg('player', '1'));
 const difficulty = arg('difficulty', 'normal') as CampaignDifficulty;
 
+// Each kingdom in order, its hero last: a, c, b, d and then the castle.
 const PATH = [
-  'bastion-a', 'bastion-c', 'bastion-castillo', 'alambiques-a', 'alambiques-c', 'alambiques-castillo',
-  'bastion-b', 'ceniza-a', 'ceniza-c', 'ceniza-castillo', 'alambiques-b', 'escarcha-a', 'escarcha-c', 'escarcha-castillo',
-  'ceniza-b', 'carmesi-a', 'carmesi-c', 'carmesi-castillo', 'corona',
+  ...['bastion', 'alambiques', 'ceniza', 'escarcha', 'carmesi'].flatMap((k) => ['a', 'c', 'b', 'd', 'castillo'].map((x) => `${k}-${x}`)),
+  'corona',
 ];
 
 function play(save: CampaignSave, territory: string, seed: string): boolean {
