@@ -69,7 +69,6 @@ function guessPlayer(
     frost: { ...pub.frost },
     rust: pub.rust,
     shield: pub.shield,
-    drawbridge: pub.drawbridge,
     handRevealed: pub.handRevealed,
     ultimateCharge: pub.ultimateCharge,
     ultimateUses: pub.ultimateUses,

@@ -50,7 +50,6 @@ function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean, seat
     frost: emptyResources(),
     rust: 0,
     shield: 0,
-    drawbridge: false,
     handRevealed: false,
     ultimateCharge: 0,
     ultimateUses: 0,

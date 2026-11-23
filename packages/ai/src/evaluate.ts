@@ -129,6 +129,8 @@ function modifiersPerTurn(mods: EnchantmentModifiers, w: Weights): number {
   for (const op of mods.onTurnStart ?? []) value += opNominal(op, w);
   value += (mods.attackBonus ?? 0) * w.enchantAttack;
   value += (mods.wallDamageReduction ?? 0) * w.enchantWallReduction;
+  // It waits for the next piercing attack, however long that takes.
+  if (mods.piercingAsNormal) value += 3;
   value += (mods.opponentCostIncrease?.amount ?? 0) * w.enchantCostIncrease;
   return value;
 }
@@ -183,9 +185,6 @@ function opNominal(op: EffectOp, w: Weights): number {
       return 5;
     case 'revealHand':
       return 1;
-    case 'drawbridge':
-      // It waits for the next piercing attack, however long that takes.
-      return 3;
     case 'peekAndDiscard':
       return 6;
     case 'discardRandom':

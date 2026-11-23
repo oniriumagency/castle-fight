@@ -467,11 +467,6 @@ function applyOp(
       }
       return null;
 
-    case 'drawbridge':
-      self.drawbridge = true;
-      events.push({ type: 'drawbridgeRaised', player: me });
-      return null;
-
     case 'peekAndDiscard': {
       let hit = false;
       if (targets.length > 1) {

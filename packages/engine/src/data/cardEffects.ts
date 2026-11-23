@@ -35,7 +35,7 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
   'fortaleza-viva': [
     { op: 'enchant', turns: 5, modifiers: { onTurnStart: [{ op: 'keep', amount: 5 }] } },
   ],
-  'puente-levadizo': [{ op: 'wall', amount: 8 }, { op: 'drawbridge' }],
+  'puente-levadizo': [{ op: 'wall', amount: 8 }, { op: 'enchant', charges: 1, modifiers: { piercingAsNormal: true } }],
   'maestro-de-obras': [
     { op: 'gainWorker', worker: 'piedra', amount: 1 },
     { op: 'wall', amount: 10 },

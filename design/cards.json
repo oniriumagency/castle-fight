@@ -267,8 +267,8 @@
         "en": "Drawbridge"
       },
       "text": {
-        "es": "+8 Muralla. El próximo ataque perforante que recibas cuenta como daño normal.",
-        "en": "+8 Wall. The next piercing attack against you is treated as normal damage."
+        "es": "Encantamiento (1 ataque): +8 Muralla. El próximo ataque perforante que recibas cuenta como daño normal.",
+        "en": "Enchantment (1 attack): +8 Wall. The next piercing attack against you is treated as normal damage."
       },
       "art": "cards/puente-levadizo.jpg"
     },

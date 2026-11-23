@@ -325,7 +325,6 @@ const STRINGS = {
   burnTurns: { es: 'Quemadura: {n} turno(s), {dmg} de daño por turno', en: 'Burn: {n} turn(s), {dmg} damage per turn' },
   rustTurns: { es: 'Óxido: {n} turno(s), tus cartas de Asalto cuestan 2 más', en: 'Rust: {n} turn(s), your Assault cards cost 2 more' },
   shieldCharges: { es: 'Escudo: bloquea {n} ataque(s)', en: 'Shield: blocks {n} attack(s)' },
-  drawbridgeUp: { es: 'Puente levadizo: el próximo ataque perforante cuenta como normal', en: 'Drawbridge: the next piercing attack counts as normal' },
   handVisible: { es: 'Mano revelada', en: 'Hand revealed' },
   turnsLeft: { es: '{n} turno(s)', en: '{n} turn(s)' },
   attacksLeft: { es: '{n} ataque(s)', en: '{n} attack(s)' },
