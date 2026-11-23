@@ -719,9 +719,9 @@ export class Castle extends Container {
     // Windows, banners and ivy break up the repeating stones (sparser on the busy Keep, denser on the plain Wall).
     if (p?.ornaments.length) {
       const seed = this.facing > 0 ? 3 : 11;
-      this.keepTower.painted?.setOrnaments(p.ornaments, seed, 0.5);
-      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7, 0.4);
-      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 0.7);
+      this.keepTower.painted?.setOrnaments(p.ornaments, seed, 0.8);
+      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7, 0.6);
+      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 0.85);
     }
     this.invalidate();
   }

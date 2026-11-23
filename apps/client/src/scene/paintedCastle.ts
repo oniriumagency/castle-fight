@@ -38,11 +38,11 @@ export interface PaintedCastle {
   wall: StackedPiece | null;
   ruins: Texture | null;
   /** Windows, banners, lanterns and ivy laid over the plain shafts as they grow. */
-  ornaments: Texture[];
+  ornaments: Ornament[];
 }
 
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: number[][] }[] }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind] | null)[] }[] }>;
 
 let foot: Texture | null = null;
 
@@ -104,7 +104,8 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
       const sheets = await Promise.all(
         (entry.ornaments ?? []).map(async (o) => {
           const t = await texture(`castles/${hero}/${o.name}.webp`);
-          return t ? o.frames.map(([x, y, w, h]) => new Texture({ source: t.source, frame: new Rectangle(x!, y!, w!, h!) })) : [];
+          if (!t) return [];
+          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4] }] : []));
         }),
       );
       const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
@@ -121,6 +122,21 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
   }
   return set;
 }
+
+/**
+ * How an ornament sits on a tower. win, deco: front-facing, on the shaft.
+ * hang: hangs from its top (banner, ivy). edgeR / edgeL: seen from the side,
+ * fixed to a wall on its left / right, so it sticks out of that edge.
+ * bal: a balcony set under a window. balD: a balcony with its own door.
+ */
+export type OrnamentKind = 'win' | 'deco' | 'hang' | 'edgeR' | 'edgeL' | 'bal' | 'balD';
+export interface Ornament {
+  tex: Texture;
+  kind: OrnamentKind;
+}
+
+/** How often each kind is picked: mostly windows, with the rest for variety. */
+const KIND_WEIGHT: Record<OrnamentKind, number> = { win: 3, deco: 1.1, hang: 1, edgeR: 0.8, edgeL: 0.8, bal: 0.9, balD: 0.6 };
 
 export type ScarKind = 'cracks' | 'holes' | 'scorch';
 
@@ -180,9 +196,11 @@ export class Stack {
   private readonly baseCrop: Texture;
   private cropKey = -1;
   /** Ornaments on the shaft, one slot per course of the climb; made when first reached. */
-  private ornaments: Texture[] = [];
+  private ornaments: Ornament[] = [];
   private seed = 0;
-  private readonly slots: (Sprite | null)[] = [];
+  private density = 0.55;
+  /** Each slot's group, built at a shaft width of 1 and scaled; null: a bare stretch. */
+  private readonly slots: ({ root: Container; half: number } | null)[] = [];
   private readonly ornamentLayer = new Container();
 
   constructor(readonly piece: StackedPiece) {
@@ -291,20 +309,75 @@ export class Stack {
    * Scatters these ornaments up the shaft (seeded, so the same tower always
    * wears the same ones). `density`: share of slots that get one.
    */
-  setOrnaments(textures: Texture[], seed: number, density = 0.55): void {
-    this.ornaments = textures;
+  setOrnaments(ornaments: Ornament[], seed: number, density = 0.55): void {
+    this.ornaments = ornaments;
     this.seed = seed;
     this.density = density;
-    for (const s of this.slots) s?.destroy();
+    for (const s of this.slots) s?.root.destroy({ children: true });
     this.slots.length = 0;
   }
 
-  private density = 0.55;
+  /** One slot's ornament (and the window behind a bare balcony), sized for a shaft 1 wide. */
+  private makeSlot(r: (n: number) => number): { root: Container; half: number } | null {
+    const all = this.ornaments;
+    const windows = all.filter((o) => o.kind === 'win');
+    const pool = all.filter((o) => o.kind !== 'bal' || windows.length);
+    let total = 0;
+    for (const o of pool) total += KIND_WEIGHT[o.kind];
+    let pick = r(2) * total;
+    const o = pool.find((p) => (pick -= KIND_WEIGHT[p.kind]) < 0) ?? pool[0];
+    if (!o) return null;
+    const root = new Container();
+    const sprite = (tex: Texture, width: number, maxH: number): Sprite => {
+      const sp = new Sprite(tex);
+      sp.anchor.set(0.5);
+      const k = Math.min(width / tex.width, maxH / tex.height);
+      sp.scale.set(k);
+      root.addChild(sp);
+      return sp;
+    };
+    const jitter = (r(3) - 0.5) * 0.2;
+    let top = 0;
+    let bottom = 0;
+    switch (o.kind) {
+      case 'edgeR':
+      case 'edgeL': {
+        const sp = sprite(o.tex, 0.55, 0.5);
+        // The fixing overlaps the edge a little; the rest sticks out into the air.
+        const side = o.kind === 'edgeR' ? 1 : -1;
+        sp.x = side * (0.5 + sp.width * 0.2);
+        top = -sp.height / 2;
+        bottom = sp.height / 2;
+        break;
+      }
+      case 'bal': {
+        const win = windows[Math.floor(r(4) * windows.length)]!;
+        const w = sprite(win.tex, 0.42, 0.62);
+        const b = sprite(o.tex, 0.82, 0.5);
+        w.position.set(jitter, -w.height * 0.2);
+        b.position.set(jitter, w.y + w.height / 2 + b.height * 0.1);
+        top = w.y - w.height / 2;
+        bottom = b.y + b.height / 2;
+        break;
+      }
+      default: {
+        const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
+        const sp = sprite(o.tex, width, maxH);
+        sp.x = jitter;
+        top = -sp.height / 2;
+        bottom = sp.height / 2;
+      }
+    }
+    // Centre the group on the slot.
+    for (const c of root.children) c.y -= (top + bottom) / 2;
+    this.ornamentLayer.addChild(root);
+    return { root, half: (bottom - top) / 2 };
+  }
 
   private layoutOrnaments(w: number, h: number, baseH: number, crownH: number): void {
     if (!this.ornaments.length) return;
-    // One slot every ~0.95 shaft widths above the base; the top one stays clear of the crown.
-    const step = w * 0.95;
+    // One slot every ~1.15 shaft widths above the base; the top one stays clear of the crown.
+    const step = w * 1.15;
     const top = h - Math.min(crownH * 0.15, w * 0.2);
     const count = Math.max(0, Math.floor((h - baseH) / step) + 1);
     for (let i = 0; i < Math.max(count, this.slots.length); i++) {
@@ -312,25 +385,15 @@ export class Stack {
         const x = Math.sin((this.seed + 1) * 127.1 + i * 311.7 + n * 74.7) * 43758.5453;
         return x - Math.floor(x);
       };
-      const y = baseH + step * (i + 0.5) + (r(1) - 0.5) * step * 0.3;
-      let sp = this.slots[i];
-      if (sp === undefined) {
-        sp = r(0) < this.density ? new Sprite(this.ornaments[Math.floor(r(2) * this.ornaments.length)]!) : null;
-        if (sp) {
-          sp.anchor.set(0.5);
-          this.ornamentLayer.addChild(sp);
-        }
-        this.slots[i] = sp;
-      }
-      if (!sp) continue;
-      const t = sp.texture;
-      // Long things (banners, ivy) hang longer; the rest sit within the shaft.
-      const k = Math.min((w * 0.5) / t.width, (w * (t.height > t.width * 1.6 ? 0.95 : 0.55)) / t.height);
-      sp.scale.set(k);
-      const half = (t.height * k) / 2;
-      sp.position.set((r(3) - 0.5) * w * 0.3, -y);
+      if (this.slots[i] === undefined) this.slots[i] = r(0) < this.density ? this.makeSlot(r) : null;
+      const slot = this.slots[i];
+      if (!slot) continue;
+      const y = baseH + step * (i + 0.5) + (r(1) - 0.5) * step * 0.25;
+      slot.root.scale.set(w);
+      slot.root.position.set(0, -y);
       // Shown only while the courses it hangs on stand.
-      sp.visible = y + half < top && y - half > baseH * 0.9;
+      const half = slot.half * w;
+      slot.root.visible = y + half < top && y - half > baseH * 0.92;
     }
   }
 

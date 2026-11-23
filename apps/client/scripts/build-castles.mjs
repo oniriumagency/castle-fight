@@ -387,10 +387,10 @@ async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
         if (y > b) b = y;
       }
     }
-    if (r > l && b > t) frames.push([x0 + l, y0 + t, r - l + 1, b - t + 1]);
+    frames.push(r > l && b > t ? [x0 + l, y0 + t, r - l + 1, b - t + 1] : null);
   }
   await webp(data, width, height, join(outDir, `${name}.webp`));
-  return { kind, frames };
+  return { kind, frames: grid === 2 ? frames.filter(Boolean) : frames };
 }
 
 /**
@@ -473,6 +473,7 @@ async function ruins(input, outDir) {
 export async function buildCastles(source, target) {
   const root = join(source, 'castles');
   const heroes = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const ornamentKinds = JSON.parse(await readFile(join(root, 'ornaments.json'), 'utf8').catch(() => '{}'));
   const slices = JSON.parse(await readFile(join(root, 'slices.json'), 'utf8').catch(() => '{}'));
   const manifestPath = join(target, 'castles', 'manifest.json');
   const old = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{}'));
@@ -496,12 +497,13 @@ export async function buildCastles(source, target) {
       manifest[hero] ??= {};
       const list = (manifest[hero].ornaments ??= []);
       const was = old[hero]?.ornaments?.find((o) => o.name === name);
-      if (was && (await mtime(join(outDir, `${name}.webp`))) >= (await mtime(input))) {
+      if (was && (await mtime(join(outDir, `${name}.webp`))) >= Math.max(await mtime(input), await mtime(join(root, 'ornaments.json')))) {
         list.push(was);
         continue;
       }
       const sheet = await decalSheet(input, outDir, name, 'ornaments', 3, 1152);
-      list.push({ name, frames: sheet.frames });
+      const kinds = ornamentKinds[`${hero}/${name}`] ?? [];
+      list.push({ name, frames: sheet.frames.map((f, i) => (f && kinds[i] !== 'x' ? [...f, kinds[i] ?? 'deco'] : null)) });
       built++;
     }
     for (const file of files) {
