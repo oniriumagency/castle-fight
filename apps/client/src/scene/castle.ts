@@ -38,6 +38,9 @@ export interface CastleLayout {
   maxPoints: number;
 }
 
+/** The drawn gravestone on a fallen castle; off until there is a painted one. */
+const SHOW_GRAVESTONES = false;
+
 // ---------------------------------------------------------------------------
 // Colour helpers
 // ---------------------------------------------------------------------------
@@ -284,6 +287,8 @@ export class Castle extends Container {
       this.shieldSweep,
     );
     this.shieldSweep.blendMode = 'add';
+    // The drawn gravestone clashes with the painted ruins: hidden for now (the fallen state still counts).
+    this.grave.visible = SHOW_GRAVESTONES;
     this.buildTowers();
     this.loadPainted();
   }
