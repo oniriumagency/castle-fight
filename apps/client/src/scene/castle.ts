@@ -215,6 +215,8 @@ export class Castle extends Container {
   private readonly anim = new Graphics();
   /** Animated pieces that stand behind the Keep (the crane). */
   private readonly animBack = new Graphics();
+  /** Flags of a painted castle: behind every tower, so the cloth never covers the painting. */
+  private readonly flagsBack = new Graphics();
   private readonly glows = new Container();
   private readonly smoke = new Container();
   private readonly frostCoat = new Graphics();
@@ -267,6 +269,7 @@ export class Castle extends Container {
     this.addChild(
       this.mound,
       this.smoke,
+      this.flagsBack,
       this.backLayer,
       this.animBack,
       this.keepLayer,
@@ -1575,6 +1578,58 @@ export class Castle extends Container {
     sp.alpha = alpha;
   }
 
+  /**
+   * A painted-style banner: cloth in strips shaded by its folds (lit where the
+   * wave faces the sun, dark in the troughs), gold-trimmed edges, a swallowtail
+   * end (or a long pennant) and a soft dark outline, hung from a pole tip.
+   */
+  private drawCloth(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number): void {
+    const steps = 14;
+    const wave = (t: number): number => Math.sin(phase * 1.1 - t * 3.4) * h * 0.3 * t + Math.sin(phase * 2.3 - t * 7) * h * 0.06 * t;
+    const shade = (t: number): number => Math.cos(phase * 1.1 - t * 3.4);
+    // Tip shape: a pennant tapers to a point; a banner ends in a swallowtail notch.
+    const height = (t: number): number => (pennant ? h * (1 - t * 0.85) : h * (1 - t * 0.12));
+    const top = (t: number): number => y + wave(t) + (pennant ? h * 0.42 * t : 0);
+    const px = (t: number): number => x + dir * len * t * (1 - Math.abs(Math.sin(phase * 1.1 - t * 3.4)) * 0.04 * t);
+    // Gold hems, or dark ones on a banner that is itself gold, so they always read.
+    const lum = (c: number): number => ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11;
+    const warm = ((color >> 16) & 255) > (color & 255) + 60 && lum(color) > 110;
+    const trim = warm ? darken(color, 0.55) : mix(this.style.metal, 0xffffff, 0.08);
+    const dark = darken(color, 0.55);
+    const outline: number[] = [];
+    for (let i = 0; i < steps; i++) {
+      const t0 = i / steps;
+      const t1 = (i + 1) / steps;
+      const y0 = top(t0);
+      const y1 = top(t1);
+      const h0 = height(t0);
+      const h1 = height(t1);
+      const k = shade((t0 + t1) / 2);
+      // Lit folds toward the warm sun, troughs cool and dark.
+      const cloth = k > 0 ? mix(color, 0xffe2b0, k * 0.3) : mix(color, 0x140c1c, -k * 0.5);
+      const notch = !pennant && i === steps - 1;
+      if (notch) {
+        const mid0 = y0 + h0 / 2;
+        g.poly([px(t0), y0, px(t1), y1, px(t0) + dir * len * 0.02, mid0, px(t1), y1 + h1, px(t0), y0 + h0]).fill({ color: cloth });
+      } else {
+        g.poly([px(t0), y0, px(t1), y1, px(t1), y1 + h1, px(t0), y0 + h0]).fill({ color: cloth });
+      }
+      // Gold trim along the top and bottom hems (not on a pennant's point).
+      if (!pennant || t0 < 0.7) {
+        const band0 = h0 * 0.12;
+        const band1 = h1 * 0.12;
+        const gold = k > 0 ? mix(trim, 0xffffff, k * 0.25) : darken(trim, -k * 0.4);
+        g.poly([px(t0), y0, px(t1), y1, px(t1), y1 + band1, px(t0), y0 + band0]).fill({ color: gold, alpha: 0.9 });
+        if (!notch) g.poly([px(t0), y0 + h0 - band0, px(t1), y1 + h1 - band1, px(t1), y1 + h1, px(t0), y0 + h0]).fill({ color: gold, alpha: 0.9 });
+      }
+    }
+    for (let i = 0; i <= steps; i++) outline.push(px(i / steps), top(i / steps));
+    for (let i = steps; i >= 0; i--) outline.push(px(i / steps), top(i / steps) + height(i / steps));
+    g.poly(outline).stroke({ width: Math.max(0.8, h * 0.05), color: dark, alpha: 0.55 });
+    // A small finial cap where the cloth meets the pole.
+    g.circle(x, y - h * 0.08, Math.max(1.2, h * 0.09)).fill({ color: trim });
+  }
+
   private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number = this.facing): void {
     const pts: number[] = [];
     const steps = 8;
@@ -1595,6 +1650,7 @@ export class Castle extends Container {
     const l = this.layoutValue;
     const g = this.anim.clear();
     const back = this.animBack.clear();
+    const flags = this.flagsBack.clear();
     for (const sp of this.glowSprites) sp.visible = false;
     if (!l) return;
     const s = this.style;
@@ -1616,7 +1672,7 @@ export class Castle extends Container {
     if (painted && !fallen && !k.broken && s.signature !== 'orb') {
       // A pole off to one side flies its flag outward, clear of the roof.
       const dir = k.apexX < -k.w * 0.12 ? -1 : k.apexX > k.w * 0.12 ? 1 : this.facing;
-      this.drawFlag(g, k.cx + k.apexX, k.topY + k.apex + 1, k.w * 0.62, k.w * 0.24, this.bannerColor, false, p, dir);
+      this.drawCloth(flags, k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.7, k.w * 0.3, this.bannerColor, false, p, dir);
     }
     // Keep flag (the Sorceress has her orb instead).
     if (!painted && !fallen && !k.broken && s.signature !== 'orb') {
@@ -1631,7 +1687,7 @@ export class Castle extends Container {
       if (!t.shape.pennant || t.broken || t.h < 2) continue;
       if (t.painted) {
         const dir = t.apexX < -t.w * 0.12 ? -1 : t.apexX > t.w * 0.12 ? 1 : this.facing;
-        this.drawFlag(g, t.cx + t.apexX, t.topY + t.apex + 1, t.w * 0.7, t.w * 0.2, this.bannerColor, true, p + t.index * 1.7, dir);
+        this.drawCloth(flags, t.cx + t.apexX, t.topY + t.apex + t.w * 0.05, t.w * 0.8, t.w * 0.26, this.bannerColor, true, p + t.index * 1.7, dir);
         continue;
       }
       const top = t.topY + t.apex;
