@@ -4,7 +4,7 @@ import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
 import { glowTexture } from './textures';
 import { drawTombstone } from './tombstone';
-import { paintedCastle, Stack, type PaintedCastle, type StackedPiece } from './paintedCastle';
+import { castleKit, paintedCastle, Stack, type CastleKit, type PaintedCastle, type ScarKind, type StackedPiece } from './paintedCastle';
 
 /**
  * One castle, drawn in the style of its hero (see `castleStyles.ts`).
@@ -37,6 +37,11 @@ export interface CastleLayout {
   /** Visual cap so a huge Wall does not leave the screen. */
   maxPoints: number;
 }
+
+/** The drawn gravestone on a fallen castle; off until there is a painted one. */
+const SHOW_GRAVESTONES = false;
+/** The wind blows the way the clouds drift (left to right): every flag streams that way, on both castles. */
+const WIND = 1;
 
 // ---------------------------------------------------------------------------
 // Colour helpers
@@ -180,6 +185,24 @@ class Tower {
 // The castle
 // ---------------------------------------------------------------------------
 
+/** A painted wound on the Keep or the Wall, pinned to its stones (it goes when that height is lost or rebuilt). */
+interface Scar {
+  part: 'keep' | 'wall';
+  sprite: Sprite;
+  /** Across the body (-0.5..0.5 of its width) and up from the ground (Keep widths). */
+  fx: number;
+  yk: number;
+  /** Width, as a share of the body's width. */
+  size: number;
+  flip: number;
+  age: number;
+}
+
+/** Most wounds shown at once on each part (the oldest heal first). */
+const MAX_SCARS = { keep: 7, wall: 4 };
+/** How long the masons' scaffold stands after building (ms). */
+const SCAFFOLD_MS = 1900;
+
 interface Puff {
   sprite: Sprite;
   life: number;
@@ -202,6 +225,10 @@ export class Castle extends Container {
   private readonly backLayer = new Container();
   private readonly keepLayer = new Container();
   private readonly cracks = new Graphics();
+  private readonly scarsKeep = new Container();
+  private readonly scarsWall = new Container();
+  private readonly scaffoldKeep = new Container();
+  private readonly scaffoldWall = new Container();
   private readonly wallLayer = new Container();
   private readonly wallBody: TilingSprite;
   private readonly wallShade: Sprite;
@@ -215,6 +242,8 @@ export class Castle extends Container {
   private readonly anim = new Graphics();
   /** Animated pieces that stand behind the Keep (the crane). */
   private readonly animBack = new Graphics();
+  /** Flags of a painted castle: behind every tower, so the cloth never covers the painting. */
+  private readonly flagsBack = new Graphics();
   private readonly glows = new Container();
   private readonly smoke = new Container();
   private readonly frostCoat = new Graphics();
@@ -232,6 +261,14 @@ export class Castle extends Container {
   private painted: PaintedCastle | null = null;
   private wallStack: Stack | null = null;
   private ruinsSprite: Sprite | null = null;
+  /** Soft shadow pooled under a painted castle. */
+  private readonly groundShadow = new Sprite(glowTexture('0,0,0', 128));
+  private kit: CastleKit | null = null;
+  /** Trees and farms behind the castle, grass and rocks before it (added to the scene by the battlefield, so hits and shakes leave them be). */
+  readonly sceneryBack = new Container();
+  readonly sceneryFront = new Container();
+  private scars: Scar[] = [];
+  private scaffolds: Partial<Record<'keep' | 'wall', { stack: Stack; left: number }>> = {};
   private towers: Tower[] = [];
   private puffs: Puff[] = [];
   private puffTimer = 0;
@@ -244,6 +281,8 @@ export class Castle extends Container {
   private crackKey = '';
   private frozen = false;
   private hitColor = 0xffffff;
+  /** Light of the sky and the battle event on the castle (a multiply tint). */
+  private ambient = 0xffffff;
   private hitLeft = 0;
   private kick = 0;
   private kickPhase = 0;
@@ -266,12 +305,18 @@ export class Castle extends Container {
     this.glows.blendMode = 'add';
     this.addChild(
       this.mound,
+      this.groundShadow,
       this.smoke,
+      this.flagsBack,
       this.backLayer,
       this.animBack,
       this.keepLayer,
       this.cracks,
+      this.scarsKeep,
+      this.scaffoldKeep,
       this.wallLayer,
+      this.scarsWall,
+      this.scaffoldWall,
       this.rubble,
       this.grave,
       this.anim,
@@ -281,8 +326,15 @@ export class Castle extends Container {
       this.shieldSweep,
     );
     this.shieldSweep.blendMode = 'add';
+    // The drawn gravestone clashes with the painted ruins: hidden for now (the fallen state still counts).
+    this.grave.visible = SHOW_GRAVESTONES;
     this.buildTowers();
     this.loadPainted();
+    void castleKit().then((k) => {
+      if (this.destroyed) return;
+      this.kit = k;
+      this.layoutScenery();
+    });
   }
 
   /** Swaps in the hero's painted castle if there is one (the drawn one stands until it loads). */
@@ -291,6 +343,7 @@ export class Castle extends Container {
     void paintedCastle(hero).then((set) => {
       if (hero !== this.hero || set === this.painted || this.destroyed) return;
       this.painted = set;
+      this.clearScars();
       this.buildTowers();
       if (this.layoutValue) this.setLayout(this.layoutValue);
     });
@@ -354,7 +407,60 @@ export class Castle extends Container {
     this.wallBody.tileScale.set((l.keepWidth / 4.6 / s.wallStone.brickW) * 0.95);
     this.invalidate();
     this.drawMound();
+    this.layoutScenery();
     this.redraw();
+  }
+
+  /**
+   * Plants the scenery around a painted castle: a farm and trees behind it on
+   * its outer side, hazy with distance, and grass, ferns, rocks and logs along
+   * its foot in front. Seeded per side, so it stays put between games.
+   */
+  private layoutScenery(): void {
+    for (const c of [this.sceneryBack, this.sceneryFront]) for (const child of c.removeChildren()) child.destroy();
+    const l = this.layoutValue;
+    const sc = this.kit?.scenery;
+    if (!l || !sc || !this.painted) return;
+    const kw = l.keepWidth;
+    const f = this.facing;
+    const seed = f > 0 ? 17 : 53;
+    const r = (n: number): number => hash(seed + n * 1.618);
+    const pick = <T,>(list: T[] | undefined, n: number): T | undefined => (list?.length ? list[Math.floor(r(n) * list.length) % list.length] : undefined);
+    const plant = (layer: Container, tex: Texture | undefined, x: number, y: number, size: number, byHeight: boolean, haze: number): void => {
+      if (!tex) return;
+      const sp = new Sprite(tex);
+      sp.anchor.set(0.5, 1);
+      const k = byHeight ? size / tex.height : size / tex.width;
+      sp.scale.set(r(x) < 0.5 ? -k : k, k);
+      sp.position.set(x, y);
+      if (haze > 0) sp.tint = mix(0xffffff, 0x9aa2c0, haze);
+      layer.addChild(sp);
+    };
+    const far = l.x - f * kw * 1.75;
+    const near = this.wallCx() + f * this.wallW() * 0.6;
+    const farms = [...(sc.farm ?? []), ...(sc.farm2 ?? [])];
+    // Furthest first, so nearer things overlap them. Out in the field toward the middle, small with
+    // distance: a farmstead. Past the castle's outer side: more of it (often off screen on phones).
+    const inner = (d: number): number => near + f * kw * d;
+    plant(this.sceneryBack, pick(farms, 10), inner(1.6 + r(11) * 0.6), l.groundY - kw * 0.42, kw * (0.62 + r(12) * 0.12), false, 0.48);
+    plant(this.sceneryBack, pick(farms, 13), inner(2.45 + r(14) * 0.5), l.groundY - kw * 0.38, kw * (0.5 + r(15) * 0.12), false, 0.5);
+    for (let i = 0; i < 2; i++) plant(this.sceneryBack, pick(farms, 20 + i), far - f * kw * (1 + i * 1.1 + r(22 + i) * 0.3), l.groundY - kw * 0.16, kw * (0.95 + r(24 + i) * 0.3), false, 0.32);
+    const trees = sc.trees;
+    plant(this.sceneryBack, pick(trees, 40), far - f * kw * (0.3 + r(41) * 0.3), l.groundY - kw * 0.06, kw * (2 + r(42) * 0.5), true, 0.18);
+    // Between the Keep and the Wall, its crown above the Wall.
+    plant(this.sceneryBack, pick(trees, 43), (l.x + this.wallCx()) / 2 + f * kw * 0.1, l.groundY - kw * 0.1, kw * (1.7 + r(45) * 0.4), true, 0.22);
+    plant(this.sceneryBack, pick(trees, 46), inner(0.45 + r(47) * 0.3), l.groundY - kw * 0.08, kw * (1.5 + r(48) * 0.4), true, 0.18);
+    plant(this.sceneryBack, pick(trees, 49), inner(1.15 + r(50) * 0.3), l.groundY - kw * 0.3, kw * (1.1 + r(51) * 0.3), true, 0.4);
+    // In front, along the foot and a little into the field (never over the Keep's door).
+    const low = [...(sc.grass ?? []), ...(sc.grass ?? []), ...(sc.rocks ?? [])];
+    const from = far - f * kw * 0.5;
+    const to = near + f * kw * 1.1;
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const x = from + (to - from) * ((i + 0.15 + r(60 + i) * 0.7) / n);
+      if (Math.abs(x - l.x) < kw * 0.32) continue;
+      plant(this.sceneryFront, pick(low, 70 + i), x, l.groundY + kw * (0.04 + r(80 + i) * 0.14), kw * (0.48 + r(90 + i) * 0.3), false, 0);
+    }
   }
 
   /** Immediate heights (animation is driven from outside by calling this every frame). */
@@ -373,6 +479,109 @@ export class Castle extends Container {
     if (this.shieldCharges <= 0 && charges > 0) this.shieldRise = 0;
     this.shieldCharges = charges;
     this.drawShield();
+  }
+
+  /**
+   * A blow leaves its mark on the painted stones: cracks, a broken hole or
+   * scorch, high on the part that was struck. Rebuilding mends them.
+   */
+  scar(part: 'keep' | 'wall', kind: ScarKind): void {
+    const frames = this.kit?.decals[kind];
+    const b = this.bodies();
+    if (!frames?.length || !this.painted || !b) return;
+    const body = b[part];
+    const kw = b.groundY - b.keep.top >= 0 ? this.keepWidth : 40;
+    const h = b.groundY - body.top;
+    const size = (kind === 'holes' ? 0.42 : kind === 'scorch' ? 0.55 : 0.58) * (0.85 + Math.random() * 0.3) * (part === 'wall' ? 0.8 : 1);
+    if (h < body.w * size * 0.9) return;
+    const sprite = new Sprite(frames[Math.floor(Math.random() * frames.length)]!);
+    sprite.anchor.set(0.5);
+    sprite.rotation = (Math.random() - 0.5) * 0.6;
+    sprite.alpha = 0;
+    // Scorch climbs from where it burns; holes and cracks land in the upper half, where blows strike.
+    const margin = (body.w * size) / 2;
+    const y = margin + (h - margin * 2) * (kind === 'scorch' ? 0.3 + Math.random() * 0.6 : 0.4 + Math.random() * 0.55);
+    const scar: Scar = { part, sprite, fx: (Math.random() - 0.5) * 0.4, yk: y / kw, size, flip: Math.random() < 0.5 ? -1 : 1, age: 0 };
+    (part === 'keep' ? this.scarsKeep : this.scarsWall).addChild(sprite);
+    this.scars.push(scar);
+    const mine = this.scars.filter((s) => s.part === part);
+    if (mine.length > MAX_SCARS[part]) this.dropScar(mine[0]!);
+    this.layoutScars();
+  }
+
+  /** Masons mend the newest wounds of a part. */
+  mend(part: 'keep' | 'wall', count: number): void {
+    for (let i = 0; i < count; i++) {
+      const last = [...this.scars].reverse().find((s) => s.part === part);
+      if (!last) return;
+      this.dropScar(last);
+    }
+  }
+
+  /** The masons' scaffold stands against a part while it is built, then comes down. */
+  raiseScaffold(part: 'keep' | 'wall'): void {
+    const piece = this.kit?.scaffold;
+    if (!piece || !this.painted) return;
+    let s = this.scaffolds[part];
+    if (!s) {
+      s = { stack: new Stack(piece), left: 0 };
+      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(s.stack.root);
+      this.scaffolds[part] = s;
+    }
+    s.left = SCAFFOLD_MS;
+    this.layoutScaffold(part);
+  }
+
+  private layoutScaffold(part: 'keep' | 'wall'): void {
+    const s = this.scaffolds[part];
+    const b = this.bodies();
+    if (!s || !b) return;
+    const body = b[part];
+    const w = body.w * (part === 'keep' ? 0.82 : 0.7);
+    const h = b.groundY - body.top;
+    // The crane's platform sits near the top course; the crown (crane and pulley) rises above it.
+    const crown = (s.stack.piece.meta.crown * w) / s.stack.piece.meta.shaftWidth;
+    s.stack.layout(body.x + this.facing * body.w * 0.12, b.groundY + 2, w, Math.max(0, h - crown * 0.62), this.facing < 0, true);
+    const t = s.left / SCAFFOLD_MS;
+    s.stack.root.alpha = Math.min(1, (1 - t) * 6, t * 4);
+    s.stack.root.visible = s.left > 0 && h > body.w * 0.3;
+  }
+
+  private dropScar(s: Scar): void {
+    this.scars.splice(this.scars.indexOf(s), 1);
+    s.sprite.destroy();
+  }
+
+  private clearScars(): void {
+    for (const s of this.scars) s.sprite.destroy();
+    this.scars = [];
+  }
+
+  /** Pins every wound to its part; one whose stones are gone is gone with them. */
+  private layoutScars(): void {
+    const b = this.bodies();
+    if (!b) return;
+    const kw = this.keepWidth;
+    for (const s of [...this.scars]) {
+      const body = b[s.part];
+      const y = b.groundY - s.yk * kw;
+      const w = body.w * s.size;
+      // Lost with the courses that were knocked off.
+      if (y - w * 0.3 < body.top) {
+        this.dropScar(s);
+        continue;
+      }
+      const tex = s.sprite.texture;
+      s.sprite.scale.set((w / tex.width) * s.flip, w / tex.width);
+      s.sprite.position.set(body.x + s.fx * body.w, y);
+    }
+  }
+
+  /** The sky's light on the castle, so it sits in the same dusk, eclipse or storm as the land. */
+  setAmbient(color: number): void {
+    this.ambient = color;
+    this.sceneryBack.tint = this.sceneryFront.tint = color;
+    if (this.hitLeft <= 0) this.tint = color;
   }
 
   /** Flash of colour and a small recoil when struck. */
@@ -493,7 +702,8 @@ export class Castle extends Container {
       this.hitLeft = Math.max(0, this.hitLeft - dt);
       const k = this.hitLeft / 260;
       const c = this.hitColor;
-      const ch = (shift: number): number => Math.round(255 + (((c >> shift) & 255) - 255) * k) << shift;
+      const a = this.ambient;
+      const ch = (shift: number): number => Math.round(((255 + (((c >> shift) & 255) - 255) * k) * ((a >> shift) & 255)) / 255) << shift;
       this.tint = ch(16) | ch(8) | ch(0);
     }
     let x = 0;
@@ -511,6 +721,15 @@ export class Castle extends Container {
       this.quake = 0;
     }
     this.x = x;
+    this.sceneryBack.visible = this.sceneryFront.visible = this.visible;
+    for (const s of this.scars) if (s.age < 1) s.sprite.alpha = s.age = Math.min(1, s.age + dt / 220);
+    for (const part of ['keep', 'wall'] as const) {
+      const sc = this.scaffolds[part];
+      if (sc && sc.left > 0) {
+        sc.left = Math.max(0, sc.left - dt);
+        this.layoutScaffold(part);
+      }
+    }
     if (!calm) this.phase += dt * 0.004;
     this.drawAnim(dt, calm);
     if (this.graveRise >= 0 && this.graveRise < 1) {
@@ -559,6 +778,13 @@ export class Castle extends Container {
       (spec.front ? this.keepLayer : this.backLayer).addChild(t.root);
       return t;
     });
+    // Windows, banners and ivy break up the repeating stones (sparser on the busy Keep, denser on the plain Wall).
+    if (p?.ornaments.length) {
+      const seed = this.facing > 0 ? 3 : 11;
+      this.keepTower.painted?.setOrnaments(p.ornaments, seed, 0.8);
+      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7, 0.6);
+      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 0.85);
+    }
     this.invalidate();
   }
 
@@ -608,9 +834,23 @@ export class Castle extends Container {
     const w = Math.abs(near - far);
     // Painted towers stand on their own patch of grass: only a soft contact shadow under them.
     if (this.painted) {
-      for (let i = 0; i < 4; i++) g.ellipse(cx, l.groundY + 2, w * (0.62 - i * 0.07), l.keepWidth * (0.16 - i * 0.025)).fill({ color: 0x0c0a08, alpha: 0.12 });
+      // Trodden earth and spilled stones under the castle, then a soft shadow cast toward the viewer.
+      const kw = l.keepWidth;
+      for (let i = 0; i < 18; i++) {
+        const x = cx + (hash(i * 3.3 + this.facing) - 0.5) * w * 1.05;
+        const y = l.groundY + 3 + (hash(i * 5.1) - 0.3) * kw * 0.12;
+        const rx = kw * (0.25 + hash(i * 1.7) * 0.4);
+        g.ellipse(x, y, rx, rx * 0.16).fill({ color: i % 3 ? dark : mid, alpha: 0.18 + hash(i * 9.1) * 0.12 });
+      }
+      this.groundShadow.visible = true;
+      this.groundShadow.anchor.set(0.5);
+      this.groundShadow.width = w * 1.35;
+      this.groundShadow.height = kw * 0.55;
+      this.groundShadow.alpha = 0.9;
+      this.groundShadow.position.set(cx, l.groundY + kw * 0.05);
       return;
     }
+    this.groundShadow.visible = false;
     g.ellipse(cx, l.groundY + 5, w * 0.6, l.keepWidth * 0.3).fill({ color: dark });
     g.ellipse(cx, l.groundY + 2, w * 0.53, l.keepWidth * 0.2).fill({ color: mid });
     g.ellipse(cx - this.facing * w * 0.12, l.groundY, w * 0.36, l.keepWidth * 0.1).fill({ color: light, alpha: 0.7 });
@@ -647,7 +887,19 @@ export class Castle extends Container {
     }
 
     this.drawWall(l);
-    this.drawCracks(l, dmg);
+    if (fallen) this.clearScars();
+    // A painted castle wears painted wounds; seed a few if it is already hurt (a game joined late).
+    if (this.painted && this.kit && !fallen) {
+      if (dmg >= 1 && !this.scars.some((s) => s.part === 'keep')) {
+        this.scar('keep', 'cracks');
+        if (dmg >= 2) this.scar('keep', 'holes');
+      }
+      this.cracks.clear();
+      this.crackKey = '';
+    } else {
+      this.drawCracks(l, dmg);
+    }
+    this.layoutScars();
     this.drawRubble(l, fallen);
     if (this.graveRise >= 0) this.drawGrave();
     if (this.shieldCharges > 0) this.drawShield();
@@ -1575,7 +1827,59 @@ export class Castle extends Container {
     sp.alpha = alpha;
   }
 
-  private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number = this.facing): void {
+  /**
+   * A painted-style banner: cloth in strips shaded by its folds (lit where the
+   * wave faces the sun, dark in the troughs), gold-trimmed edges, a swallowtail
+   * end (or a long pennant) and a soft dark outline, hung from a pole tip.
+   */
+  private drawCloth(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number): void {
+    const steps = 14;
+    const wave = (t: number): number => Math.sin(phase * 1.1 - t * 3.4) * h * 0.3 * t + Math.sin(phase * 2.3 - t * 7) * h * 0.06 * t;
+    const shade = (t: number): number => Math.cos(phase * 1.1 - t * 3.4);
+    // Tip shape: a pennant tapers to a point; a banner ends in a swallowtail notch.
+    const height = (t: number): number => (pennant ? h * (1 - t * 0.85) : h * (1 - t * 0.12));
+    const top = (t: number): number => y + wave(t) + (pennant ? h * 0.42 * t : 0);
+    const px = (t: number): number => x + dir * len * t * (1 - Math.abs(Math.sin(phase * 1.1 - t * 3.4)) * 0.04 * t);
+    // Gold hems, or dark ones on a banner that is itself gold, so they always read.
+    const lum = (c: number): number => ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11;
+    const warm = ((color >> 16) & 255) > (color & 255) + 60 && lum(color) > 110;
+    const trim = warm ? darken(color, 0.55) : mix(this.style.metal, 0xffffff, 0.08);
+    const dark = darken(color, 0.55);
+    const outline: number[] = [];
+    for (let i = 0; i < steps; i++) {
+      const t0 = i / steps;
+      const t1 = (i + 1) / steps;
+      const y0 = top(t0);
+      const y1 = top(t1);
+      const h0 = height(t0);
+      const h1 = height(t1);
+      const k = shade((t0 + t1) / 2);
+      // Lit folds toward the warm sun, troughs cool and dark.
+      const cloth = k > 0 ? mix(color, 0xffe2b0, k * 0.3) : mix(color, 0x140c1c, -k * 0.5);
+      const notch = !pennant && i === steps - 1;
+      if (notch) {
+        const mid0 = y0 + h0 / 2;
+        g.poly([px(t0), y0, px(t1), y1, px(t0) + dir * len * 0.02, mid0, px(t1), y1 + h1, px(t0), y0 + h0]).fill({ color: cloth });
+      } else {
+        g.poly([px(t0), y0, px(t1), y1, px(t1), y1 + h1, px(t0), y0 + h0]).fill({ color: cloth });
+      }
+      // Gold trim along the top and bottom hems (not on a pennant's point).
+      if (!pennant || t0 < 0.7) {
+        const band0 = h0 * 0.12;
+        const band1 = h1 * 0.12;
+        const gold = k > 0 ? mix(trim, 0xffffff, k * 0.25) : darken(trim, -k * 0.4);
+        g.poly([px(t0), y0, px(t1), y1, px(t1), y1 + band1, px(t0), y0 + band0]).fill({ color: gold, alpha: 0.9 });
+        if (!notch) g.poly([px(t0), y0 + h0 - band0, px(t1), y1 + h1 - band1, px(t1), y1 + h1, px(t0), y0 + h0]).fill({ color: gold, alpha: 0.9 });
+      }
+    }
+    for (let i = 0; i <= steps; i++) outline.push(px(i / steps), top(i / steps));
+    for (let i = steps; i >= 0; i--) outline.push(px(i / steps), top(i / steps) + height(i / steps));
+    g.poly(outline).stroke({ width: Math.max(0.8, h * 0.05), color: dark, alpha: 0.55 });
+    // A small finial cap where the cloth meets the pole.
+    g.circle(x, y - h * 0.08, Math.max(1.2, h * 0.09)).fill({ color: trim });
+  }
+
+  private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number = WIND): void {
     const pts: number[] = [];
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
@@ -1595,6 +1899,7 @@ export class Castle extends Container {
     const l = this.layoutValue;
     const g = this.anim.clear();
     const back = this.animBack.clear();
+    const flags = this.flagsBack.clear();
     for (const sp of this.glowSprites) sp.visible = false;
     if (!l) return;
     const s = this.style;
@@ -1615,8 +1920,8 @@ export class Castle extends Container {
     // A painted Keep has its own flagpole: the flag flies from its tip.
     if (painted && !fallen && !k.broken && s.signature !== 'orb') {
       // A pole off to one side flies its flag outward, clear of the roof.
-      const dir = k.apexX < -k.w * 0.12 ? -1 : k.apexX > k.w * 0.12 ? 1 : this.facing;
-      this.drawFlag(g, k.cx + k.apexX, k.topY + k.apex + 1, k.w * 0.62, k.w * 0.24, this.bannerColor, false, p, dir);
+      const dir = WIND;
+      this.drawCloth(flags, k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.7, k.w * 0.3, this.bannerColor, false, p, dir);
     }
     // Keep flag (the Sorceress has her orb instead).
     if (!painted && !fallen && !k.broken && s.signature !== 'orb') {
@@ -1630,8 +1935,8 @@ export class Castle extends Container {
     for (const t of this.towers) {
       if (!t.shape.pennant || t.broken || t.h < 2) continue;
       if (t.painted) {
-        const dir = t.apexX < -t.w * 0.12 ? -1 : t.apexX > t.w * 0.12 ? 1 : this.facing;
-        this.drawFlag(g, t.cx + t.apexX, t.topY + t.apex + 1, t.w * 0.7, t.w * 0.2, this.bannerColor, true, p + t.index * 1.7, dir);
+        const dir = WIND;
+        this.drawCloth(flags, t.cx + t.apexX, t.topY + t.apex + t.w * 0.05, t.w * 0.8, t.w * 0.26, this.bannerColor, true, p + t.index * 1.7, dir);
         continue;
       }
       const top = t.topY + t.apex;
@@ -1642,6 +1947,16 @@ export class Castle extends Container {
 
     // Painted castles carry their signature in the painting: only its light moves.
     if (painted) {
+      // The painting's own lights flicker like candles and fires, and go out as the castle is wrecked.
+      const dmg = this.damage();
+      const dim = dmg === 0 ? 1 : dmg === 1 ? 0.7 : dmg === 2 ? 0.38 : 0;
+      [k, ...this.towers].forEach((t, i) => {
+        if (!t.painted) return;
+        const f = calm ? 1 : 0.8 + Math.sin(p * 6.3 + i * 2.1) * 0.1 + Math.sin(p * 15.7 + i * 1.3) * 0.07 + Math.sin(p * 2.1 + i) * 0.05;
+        const lit = (t.broken ? 0.12 : dim) * f;
+        t.painted.setGlow(lit * 1.2, lit * 1.05);
+      });
+      this.wallStack?.setGlow(dim * (calm ? 1 : 0.85 + Math.sin(p * 5.1) * 0.1), dim);
       if (!fallen && !k.broken) {
         const ax = k.cx + k.apexX;
         const ay = k.topY + k.apex;

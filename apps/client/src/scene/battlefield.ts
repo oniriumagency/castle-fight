@@ -5,6 +5,7 @@ import { settings } from '../app/settings';
 import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle } from './castle';
+import type { ScarKind } from './paintedCastle';
 import {
   KEEP_STONE,
   WALL_STONE,
@@ -316,7 +317,8 @@ export class Battlefield {
     this.paintedSky.visible = false;
     this.skyTile.visible = false;
     this.world.addChild(this.skyA, this.skyB, this.skyFloor, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
-    this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
+    const [c0, c1, c2] = this.castles as [Castle, Castle, Castle];
+    this.world.addChild(c2.sceneryBack, c0.sceneryBack, c1.sceneryBack, c2, c0, c1, c2.sceneryFront, c0.sceneryFront, c1.sceneryFront, this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
     this.skyB.alpha = 0;
@@ -350,6 +352,7 @@ export class Battlefield {
       this.painted.texture = land;
       this.painted.visible = true;
       this.painted.tint = this.paintedFloor.tint = paintTint(this.mood);
+      for (const castle of this.castles) castle.setAmbient(this.painted.tint as number);
       for (const layer of [this.far, this.mid, this.near, this.ground]) layer.visible = false;
       // A whole backdrop brings its own sky.
       if (!terrain && !sky) {
@@ -583,6 +586,7 @@ export class Battlefield {
         };
         this.applyTints();
         this.painted.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
+        for (const castle of this.castles) castle.setAmbient(this.painted.tint as number);
         this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
       .then(() => {
@@ -686,6 +690,19 @@ export class Battlefield {
         area: { w: width * 0.4, h: 6 },
       });
     }
+  }
+
+  /** A painted wound (cracks, a hole, scorch) on a castle's Keep or Wall. */
+  scar(player: PlayerId, part: 'keep' | 'wall', kind: ScarKind): void {
+    this.castles[player]?.scar(part, kind);
+  }
+
+  /** Masons at work: the scaffold goes up against the part and its newest wounds are mended. */
+  mend(player: PlayerId, part: 'keep' | 'wall', amount: number): void {
+    const c = this.castles[player];
+    if (!c) return;
+    c.mend(part, 1 + Math.floor(amount / 6));
+    if (!settings.get().reducedMotion) c.raiseScaffold(part);
   }
 
   /** Chunks of a castle's own stone break off a part and tumble down its face, with dust at its foot. */

@@ -191,6 +191,100 @@ function seamless(data, width, height) {
   return { data: out, height: outH };
 }
 
+/** A small seeded random, so a rebuild gives the same picture. */
+function seeded(text) {
+  let h = 2166136261;
+  for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A short shaft repeated up a tall tower shows the same stones over and over.
+ * Stack several copies into one longer tile and weather each differently:
+ * broad patches of grime, damp and sun-bleached stone, wrapping top to bottom
+ * so the long tile is still seamless.
+ */
+function weather(shaft, width, seed) {
+  const copies = Math.max(3, Math.ceil((width * 1.8) / shaft.height));
+  const H = shaft.height * copies;
+  const out = Buffer.alloc(width * H * 4);
+  for (let i = 0; i < copies; i++) shaft.data.copy(out, i * shaft.data.length);
+  const rand = seeded(seed);
+  const blobs = [];
+  for (let i = 0; i < copies * 5; i++) {
+    blobs.push({
+      x: rand() * width,
+      y: rand() * H,
+      rx: width * (0.12 + rand() * 0.3),
+      ry: width * (0.1 + rand() * 0.35),
+      // Mostly grime and damp (darker, a touch green or brown), some paler, sunned stone.
+      k: rand() < 0.65 ? -(0.04 + rand() * 0.08) : 0.025 + rand() * 0.04,
+      tint: rand() < 0.5 ? [0.98, 0.99, 0.97] : [1.02, 0.99, 0.96],
+    });
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (!out[i + 3]) continue;
+      let m = 1;
+      const t = [1, 1, 1];
+      for (const b of blobs) {
+        // Wrap vertically: the tile repeats, so a patch at its bottom continues at its top.
+        let dy = Math.abs(y - b.y);
+        dy = Math.min(dy, H - dy) / b.ry;
+        const dx = (x - b.x) / b.rx;
+        const d = dx * dx + dy * dy;
+        if (d >= 1) continue;
+        const f = (1 - d) * (1 - d);
+        m += b.k * f;
+        if (b.k < 0) for (let c = 0; c < 3; c++) t[c] += (b.tint[c] - 1) * f;
+      }
+      for (let c = 0; c < 3; c++) out[i + c] = Math.max(0, Math.min(255, Math.round(out[i + c] * m * t[c])));
+    }
+  }
+  return { data: out, height: H };
+}
+
+/**
+ * Light the painting gives off itself: windows, braziers, crystals, potions.
+ * Bright, strongly coloured pixels are kept (sunlit stone is bright but not
+ * saturated enough), blurred a little into a glow the game adds on top and
+ * makes flicker. Returns null when a band has no light of its own.
+ */
+async function glowOf(buf, width, height) {
+  // Brightness of the neighbourhood: a lit window stands out from the stone around it.
+  const lumBuf = Buffer.alloc(width * height);
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
+  const around = await sharp(lumBuf, { raw: { width, height, channels: 1 } }).blur(Math.max(3, width / 40)).raw().toBuffer();
+  const out = Buffer.alloc(buf.length);
+  let lit = 0;
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) {
+    if (buf[i + 3] < 128) continue;
+    const r = buf[i];
+    const g = buf[i + 1];
+    const b = buf[i + 2];
+    const lum = lumBuf[j];
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const pop = lum - around[j];
+    const k =
+      Math.min(1, Math.max(0, (pop - 22) / 34)) *
+      Math.min(1, Math.max(0, (sat - 80) / 60)) *
+      Math.min(1, Math.max(0, (lum - 100) / 60));
+    if (k <= 0) continue;
+    lit++;
+    out[i] = r;
+    out[i + 1] = g;
+    out[i + 2] = b;
+    out[i + 3] = Math.round(k * 255);
+  }
+  if (lit < 12) return null;
+  return sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+}
+
 const webp = (data, width, height, file) => sharp(data, { raw: { width, height, channels: 4 } }).webp({ quality: 86, alphaQuality: 92 }).toFile(file);
 
 async function load(input, width) {
@@ -224,7 +318,11 @@ async function stacked(input, outDir, piece, override) {
   for (let y = 0; y < b.base - b.crown; y++) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
-  const shaft = seamless(band, width, b.base - b.crown);
+  const shaft = weather(seamless(band, width, b.base - b.crown), width, input.split(/[\\/]/).slice(-2).join('/'));
+  const crownGlow = await glowOf(slice(0, b.crown), width, b.crown);
+  const baseGlow = await glowOf(slice(b.base, height), width, height - b.base);
+  if (crownGlow) await webp(crownGlow, width, b.crown, join(outDir, `${piece}-crown-glow.webp`));
+  if (baseGlow) await webp(baseGlow, width, height - b.base, join(outDir, `${piece}-base-glow.webp`));
   await webp(slice(0, b.crown), width, b.crown, join(outDir, `${piece}-crown.webp`));
   await webp(shaft.data, width, shaft.height, join(outDir, `${piece}-shaft.webp`));
   await webp(slice(b.base, height), width, height - b.base, join(outDir, `${piece}-base.webp`));
@@ -252,7 +350,132 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+}
+
+/**
+ * Damage decals: 2x2 sprite sheets of cracks, holes and scorch painted on
+ * magenta, shared by every castle. Cracks and holes keep their dark strokes
+ * and let their pale stone fade out, so they sit on any hero's masonry.
+ * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
+ */
+const DECALS = { props: null, ornaments: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
+
+async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
+  const { data, info } = await sharp(input).resize({ width: size, height: size, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  keyOut(data, info);
+  const fade = DECALS[kind];
+  if (fade) {
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      data[i + 3] = Math.round(data[i + 3] * Math.max(0, Math.min(1, (fade.dark - lum) / fade.range)) ** fade.power);
+    }
+  }
+  const { width, height } = info;
+  const frames = [];
+  const half = Math.floor(width / grid);
+  for (let q = 0; q < grid * grid; q++) {
+    const x0 = (q % grid) * half;
+    const y0 = Math.floor(q / grid) * half;
+    let l = half, r = -1, t = half, b = -1;
+    for (let y = 0; y < half; y++) {
+      for (let x = 0; x < half; x++) {
+        if (data[((y0 + y) * width + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    frames.push(r > l && b > t ? [x0 + l, y0 + t, r - l + 1, b - t + 1] : null);
+  }
+  // Props stand on a strip of painted ground cut flat along the bottom: fade that edge so it melts into the field.
+  if (kind === 'props') {
+    for (const f of frames) {
+      if (!f) continue;
+      const [fx, fy, fw, fh] = f;
+      const band = Math.max(4, Math.round(fh * 0.1));
+      for (let y = fy + fh - band; y < fy + fh; y++) {
+        const k = (fy + fh - y) / band;
+        for (let x = fx; x < fx + fw; x++) data[(y * width + x) * 4 + 3] = Math.round(data[(y * width + x) * 4 + 3] * k);
+      }
+    }
+  }
+  await webp(data, width, height, join(outDir, `${name}.webp`));
+  return { kind, frames: grid === 2 ? frames.filter(Boolean) : frames };
+}
+
+/**
+ * The masons' scaffold shown while a part is built: cut like a tower, with
+ * one bay of the lattice (beam to beam) as the shaft so it repeats cleanly.
+ */
+async function scaffold(input, outDir) {
+  const { data, info } = await load(input, 420);
+  const { width, height } = info;
+  const rows = spans(data, width, height);
+  // The posts: the columns opaque down most of the height.
+  const cols = new Array(width).fill(0);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (data[(y * width + x) * 4 + 3] > 128) cols[x]++;
+  const posts = cols.map((c, x) => (c > height * 0.6 ? x : -1)).filter((x) => x >= 0);
+  const left = posts[0];
+  const right = posts[posts.length - 1];
+  // Beams: rows solid from post to post.
+  const solid = [];
+  for (let y = 0; y < height; y++) {
+    let n = 0;
+    for (let x = left; x <= right; x++) if (data[(y * width + x) * 4 + 3] > 128) n++;
+    solid.push(n > (right - left + 1) * 0.9);
+  }
+  const beams = [];
+  for (let y = 0; y < height; y++) {
+    if (!solid[y]) continue;
+    let e = y;
+    while (e + 1 < height && solid[e + 1]) e++;
+    beams.push(Math.round((y + e) / 2));
+    y = e;
+  }
+  // The bay that starts nearest the middle, with beams below it (the base keeps the ladder).
+  let best = null;
+  for (let i = 0; i + 2 < beams.length; i++) {
+    const d = Math.abs(beams[i] / height - 0.42);
+    if (!best || d < best.d) best = { d, a: beams[i], b: beams[i + 1] };
+  }
+  if (!best) throw new Error('scaffold: no lattice bay found');
+  const slice = (y0, y1) => {
+    const buf = Buffer.alloc(width * (y1 - y0) * 4);
+    data.copy(buf, 0, y0 * width * 4, y1 * width * 4);
+    return buf;
+  };
+  await webp(slice(0, best.a), width, best.a, join(outDir, 'scaffold-crown.webp'));
+  await webp(slice(best.a, best.b), width, best.b - best.a, join(outDir, 'scaffold-shaft.webp'));
+  await webp(slice(best.b, height), width, height - best.b, join(outDir, 'scaffold-base.webp'));
+  const top = rows.findIndex(Boolean);
+  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top } };
+}
+
+async function shared(dir, outDir, manifest, old) {
+  const files = await readdir(dir).catch(() => []);
+  let built = 0;
+  await mkdir(outDir, { recursive: true });
+  for (const file of files) {
+    const m = /^((cracks|holes|scorch)(-[a-z0-9]+)?|scaffold|grass|rocks|trees|farm2?)\.(png|jpe?g|webp)$/i.exec(file);
+    if (!m) continue;
+    const name = m[1].toLowerCase();
+    const input = join(dir, file);
+    const probe = join(outDir, name === 'scaffold' ? 'scaffold-shaft.webp' : `${name}.webp`);
+    const key = name === 'scaffold' ? 'scaffold' : name;
+    // Scenery sheets (grass, rocks, trees, farm): four props each, standing on the bottom of their frame.
+    const group = name === 'scaffold' ? null : m[2] ? 'decals' : 'props';
+    const into = group ? (manifest[group] ??= {}) : manifest;
+    const was = group ? old[group]?.[name] : old.scaffold;
+    if (was && (await mtime(probe)) >= (await mtime(input))) {
+      into[key] = was;
+      continue;
+    }
+    into[key] = !group ? await scaffold(input, outDir) : await decalSheet(input, outDir, name, group === 'props' ? 'props' : m[2].toLowerCase());
+    built++;
+  }
+  return built;
 }
 
 async function ruins(input, outDir) {
@@ -264,17 +487,42 @@ async function ruins(input, outDir) {
 export async function buildCastles(source, target) {
   const root = join(source, 'castles');
   const heroes = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const ornamentKinds = JSON.parse(await readFile(join(root, 'ornaments.json'), 'utf8').catch(() => '{}'));
   const slices = JSON.parse(await readFile(join(root, 'slices.json'), 'utf8').catch(() => '{}'));
   const manifestPath = join(target, 'castles', 'manifest.json');
   const old = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{}'));
   const manifest = {};
   let built = 0;
+  const common = {};
+  built += await shared(join(root, '_comun'), join(target, 'castles', '_comun'), common, old._comun ?? {});
+  const scenery = {};
+  built += await shared(join(root, '_escenario'), join(target, 'castles', '_escenario'), scenery, old._escenario ?? {});
+  if (Object.keys(scenery).length) manifest._escenario = scenery;
+  if (Object.keys(common).length) manifest._comun = common;
   for (const dir of heroes) {
-    if (!dir.isDirectory()) continue;
+    if (!dir.isDirectory() || dir.name.startsWith('_')) continue;
     const hero = dir.name;
     const files = await readdir(join(root, hero));
     const outDir = join(target, 'castles', hero);
     await mkdir(outDir, { recursive: true });
+    // Wall ornaments: 3 x 3 sheets of windows, banners, lanterns and ivy laid over the shafts.
+    for (const file of files.sort()) {
+      const m = /^(ornaments(-[a-z0-9]+)?)\.(png|jpe?g|webp)$/i.exec(file);
+      if (!m) continue;
+      const name = m[1].toLowerCase();
+      const input = join(root, hero, file);
+      manifest[hero] ??= {};
+      const list = (manifest[hero].ornaments ??= []);
+      const was = old[hero]?.ornaments?.find((o) => o.name === name);
+      if (was && (await mtime(join(outDir, `${name}.webp`))) >= Math.max(await mtime(input), await mtime(join(root, 'ornaments.json')))) {
+        list.push(was);
+        continue;
+      }
+      const sheet = await decalSheet(input, outDir, name, 'ornaments', 3, 1152);
+      const kinds = ornamentKinds[`${hero}/${name}`] ?? [];
+      list.push({ name, frames: sheet.frames.map((f, i) => (f && kinds[i] !== 'x' ? [...f, kinds[i] ?? 'deco'] : null)) });
+      built++;
+    }
     for (const file of files) {
       const m = /^(keep|tower1|tower2|tower|wall|ruins)\.(png|jpe?g|webp)$/i.exec(file);
       if (!m) continue;

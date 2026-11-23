@@ -280,6 +280,9 @@ export const fx = {
       if (!fell) {
         if (e.wallLoss > 0) field.crumble(target, 'wall', e.wallLoss);
         if (e.keepLoss > 0) field.crumble(target, 'keep', e.keepLoss);
+        const kind = style === 'fire' || style === 'comet' || style === 'orb' ? 'scorch' : e.kind === 'piercing' || big ? 'holes' : 'cracks';
+        if (e.keepLoss > 0) field.scar(target, 'keep', kind);
+        if (e.wallLoss > 0) field.scar(target, 'wall', kind);
       }
       field.shake(Math.min(20, 3 + lost * 0.75));
       field.hitCastle(target, e.kind === 'piercing' ? 0xd0a0ff : 0xff9a7a, Math.min(1.5, lost / 10));
@@ -290,6 +293,7 @@ export const fx = {
     } else if (lost > 0) {
       field.burst(at.x, at.y, { count: 6 + lost, texture: 'rubble', color: field.stoneColors(target), speed: 3, gravity: 0.35, size: 8, life: 1600 });
       field.hitCastle(target, 0xff7a30, 0.3);
+      field.scar(target, e.keepLoss > 0 ? 'keep' : 'wall', 'scorch');
     }
     if (lost > 0) ctx.float(`−${lost}`, at.x, at.y - 10, 'damage');
     if (fell) {
@@ -305,6 +309,7 @@ export const fx = {
     const at = ctx.field.anchor(side, target);
     audio.play('crumble', 0.5, { pan: pan(ctx, seat) });
     ctx.field.crumble(side, target, amount);
+    ctx.field.scar(side, target, 'cracks');
     ctx.field.hitCastle(side, 0xd0b090, 0.6);
     ctx.float(`−${amount}`, at.x, at.y - 10, 'damage');
     await ctx.field.animateCastle(side, heights.keep, heights.wall, ms(500));
@@ -321,6 +326,7 @@ export const fx = {
     const before = field.anchor(side, target);
     const grow = field.animateCastle(side, heights.keep, heights.wall, ms(620 + Math.min(400, amount * 15)));
     field.placeBlocks(side, target, 2 + amount / 3);
+    field.mend(side, target, amount);
     // Dust where the masons work, then motes of gold up the new courses.
     const x = target === 'keep' ? base.x : before.x;
     field.burst(x, base.y - 6, { count: 4 + Math.round(amount / 4), texture: 'smoke', color: 0xb8a080, speed: 1.6, spread: Math.PI * 0.8, gravity: -0.01, size: 44, life: 1200, alpha: 0.55, area: { w: 60, h: 8 } });
