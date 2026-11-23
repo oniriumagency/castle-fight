@@ -141,9 +141,13 @@ const KIND_WEIGHT: Record<OrnamentKind, number> = { win: 3, deco: 1.1, hang: 1, 
 export type ScarKind = 'cracks' | 'holes' | 'scorch';
 
 /** What every painted castle shares: damage decals and the masons' scaffold. */
+export type ScenerySheet = 'grass' | 'rocks' | 'trees' | 'farm' | 'farm2';
+
 export interface CastleKit {
   decals: Record<ScarKind, Texture[]>;
   scaffold: StackedPiece | null;
+  /** Props planted around the castles, four per sheet, each standing on the bottom of its frame. */
+  scenery: Partial<Record<ScenerySheet, Texture[]>>;
 }
 
 let kit: Promise<CastleKit | null> | null = null;
@@ -152,7 +156,7 @@ let kit: Promise<CastleKit | null> | null = null;
 export function castleKit(): Promise<CastleKit | null> {
   kit ??= loadManifest().then(async (m) => {
     const common = (m as unknown as Record<string, { decals?: Record<string, { kind: ScarKind; frames: number[][] }>; scaffold?: StackedMeta }>)._comun;
-    if (!common) return null;
+    if (!common) return { decals: { cracks: [], holes: [], scorch: [] }, scaffold: null, scenery: {} };
     const decals: Record<ScarKind, Texture[]> = { cracks: [], holes: [], scorch: [] };
     await Promise.all(
       Object.entries(common.decals ?? {}).map(async ([name, sheet]) => {
@@ -162,7 +166,15 @@ export function castleKit(): Promise<CastleKit | null> {
       }),
     );
     const scaffold = await stacked('_comun', 'scaffold', common.scaffold);
-    return { decals, scaffold };
+    const props = (m as unknown as Record<string, { props?: Record<string, { frames: number[][] }> }>)._escenario?.props ?? {};
+    const scenery: Partial<Record<ScenerySheet, Texture[]>> = {};
+    await Promise.all(
+      Object.entries(props).map(async ([name, sheet]) => {
+        const t = await texture(`castles/_escenario/${name}.webp`);
+        if (t) scenery[name as ScenerySheet] = sheet.frames.map(([x, y, w, h]) => new Texture({ source: t.source, frame: new Rectangle(x!, y!, w!, h!) }));
+      }),
+    );
+    return { decals, scaffold, scenery };
   });
   return kit;
 }

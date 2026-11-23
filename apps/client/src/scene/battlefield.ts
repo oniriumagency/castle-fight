@@ -1,4 +1,3 @@
-import type { ScarKind } from './paintedCastle';
 import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { consoleBrowser, density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
@@ -6,6 +5,7 @@ import { settings } from '../app/settings';
 import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle } from './castle';
+import type { ScarKind } from './paintedCastle';
 import {
   KEEP_STONE,
   WALL_STONE,
@@ -317,7 +317,8 @@ export class Battlefield {
     this.paintedSky.visible = false;
     this.skyTile.visible = false;
     this.world.addChild(this.skyA, this.skyB, this.skyFloor, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
-    this.world.addChild(this.castles[2], this.castles[0], this.castles[1], this.fxLayer, this.bolts, this.weather);
+    const [c0, c1, c2] = this.castles as [Castle, Castle, Castle];
+    this.world.addChild(c2.sceneryBack, c0.sceneryBack, c1.sceneryBack, c2, c0, c1, c2.sceneryFront, c0.sceneryFront, c1.sceneryFront, this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
     this.applySky(DEFAULT_SKY, this.skyA);
     this.skyB.alpha = 0;

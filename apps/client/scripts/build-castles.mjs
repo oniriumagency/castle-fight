@@ -359,7 +359,7 @@ async function stacked(input, outDir, piece, override) {
  * and let their pale stone fade out, so they sit on any hero's masonry.
  * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
  */
-const DECALS = { ornaments: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
+const DECALS = { props: null, ornaments: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
 
 async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
   const { data, info } = await sharp(input).resize({ width: size, height: size, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -388,6 +388,18 @@ async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
       }
     }
     frames.push(r > l && b > t ? [x0 + l, y0 + t, r - l + 1, b - t + 1] : null);
+  }
+  // Props stand on a strip of painted ground cut flat along the bottom: fade that edge so it melts into the field.
+  if (kind === 'props') {
+    for (const f of frames) {
+      if (!f) continue;
+      const [fx, fy, fw, fh] = f;
+      const band = Math.max(4, Math.round(fh * 0.1));
+      for (let y = fy + fh - band; y < fy + fh; y++) {
+        const k = (fy + fh - y) / band;
+        for (let x = fx; x < fx + fw; x++) data[(y * width + x) * 4 + 3] = Math.round(data[(y * width + x) * 4 + 3] * k);
+      }
+    }
   }
   await webp(data, width, height, join(outDir, `${name}.webp`));
   return { kind, frames: grid === 2 ? frames.filter(Boolean) : frames };
@@ -446,19 +458,21 @@ async function shared(dir, outDir, manifest, old) {
   let built = 0;
   await mkdir(outDir, { recursive: true });
   for (const file of files) {
-    const m = /^((cracks|holes|scorch)(-[a-z0-9]+)?|scaffold)\.(png|jpe?g|webp)$/i.exec(file);
+    const m = /^((cracks|holes|scorch)(-[a-z0-9]+)?|scaffold|grass|rocks|trees|farm2?)\.(png|jpe?g|webp)$/i.exec(file);
     if (!m) continue;
     const name = m[1].toLowerCase();
     const input = join(dir, file);
     const probe = join(outDir, name === 'scaffold' ? 'scaffold-shaft.webp' : `${name}.webp`);
     const key = name === 'scaffold' ? 'scaffold' : name;
-    const into = name === 'scaffold' ? manifest : (manifest.decals ??= {});
-    const was = name === 'scaffold' ? old.scaffold : old.decals?.[name];
+    // Scenery sheets (grass, rocks, trees, farm): four props each, standing on the bottom of their frame.
+    const group = name === 'scaffold' ? null : m[2] ? 'decals' : 'props';
+    const into = group ? (manifest[group] ??= {}) : manifest;
+    const was = group ? old[group]?.[name] : old.scaffold;
     if (was && (await mtime(probe)) >= (await mtime(input))) {
       into[key] = was;
       continue;
     }
-    into[key] = name === 'scaffold' ? await scaffold(input, outDir) : await decalSheet(input, outDir, name, m[2].toLowerCase());
+    into[key] = !group ? await scaffold(input, outDir) : await decalSheet(input, outDir, name, group === 'props' ? 'props' : m[2].toLowerCase());
     built++;
   }
   return built;
@@ -481,6 +495,9 @@ export async function buildCastles(source, target) {
   let built = 0;
   const common = {};
   built += await shared(join(root, '_comun'), join(target, 'castles', '_comun'), common, old._comun ?? {});
+  const scenery = {};
+  built += await shared(join(root, '_escenario'), join(target, 'castles', '_escenario'), scenery, old._escenario ?? {});
+  if (Object.keys(scenery).length) manifest._escenario = scenery;
   if (Object.keys(common).length) manifest._comun = common;
   for (const dir of heroes) {
     if (!dir.isDirectory() || dir.name.startsWith('_')) continue;

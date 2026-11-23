@@ -262,6 +262,9 @@ export class Castle extends Container {
   /** Soft shadow pooled under a painted castle. */
   private readonly groundShadow = new Sprite(glowTexture('0,0,0', 128));
   private kit: CastleKit | null = null;
+  /** Trees and farms behind the castle, grass and rocks before it (added to the scene by the battlefield, so hits and shakes leave them be). */
+  readonly sceneryBack = new Container();
+  readonly sceneryFront = new Container();
   private scars: Scar[] = [];
   private scaffolds: Partial<Record<'keep' | 'wall', { stack: Stack; left: number }>> = {};
   private towers: Tower[] = [];
@@ -326,7 +329,9 @@ export class Castle extends Container {
     this.buildTowers();
     this.loadPainted();
     void castleKit().then((k) => {
-      if (!this.destroyed) this.kit = k;
+      if (this.destroyed) return;
+      this.kit = k;
+      this.layoutScenery();
     });
   }
 
@@ -400,7 +405,60 @@ export class Castle extends Container {
     this.wallBody.tileScale.set((l.keepWidth / 4.6 / s.wallStone.brickW) * 0.95);
     this.invalidate();
     this.drawMound();
+    this.layoutScenery();
     this.redraw();
+  }
+
+  /**
+   * Plants the scenery around a painted castle: a farm and trees behind it on
+   * its outer side, hazy with distance, and grass, ferns, rocks and logs along
+   * its foot in front. Seeded per side, so it stays put between games.
+   */
+  private layoutScenery(): void {
+    for (const c of [this.sceneryBack, this.sceneryFront]) for (const child of c.removeChildren()) child.destroy();
+    const l = this.layoutValue;
+    const sc = this.kit?.scenery;
+    if (!l || !sc || !this.painted) return;
+    const kw = l.keepWidth;
+    const f = this.facing;
+    const seed = f > 0 ? 17 : 53;
+    const r = (n: number): number => hash(seed + n * 1.618);
+    const pick = <T,>(list: T[] | undefined, n: number): T | undefined => (list?.length ? list[Math.floor(r(n) * list.length) % list.length] : undefined);
+    const plant = (layer: Container, tex: Texture | undefined, x: number, y: number, size: number, byHeight: boolean, haze: number): void => {
+      if (!tex) return;
+      const sp = new Sprite(tex);
+      sp.anchor.set(0.5, 1);
+      const k = byHeight ? size / tex.height : size / tex.width;
+      sp.scale.set(r(x) < 0.5 ? -k : k, k);
+      sp.position.set(x, y);
+      if (haze > 0) sp.tint = mix(0xffffff, 0x9aa2c0, haze);
+      layer.addChild(sp);
+    };
+    const far = l.x - f * kw * 1.75;
+    const near = this.wallCx() + f * this.wallW() * 0.6;
+    const farms = [...(sc.farm ?? []), ...(sc.farm2 ?? [])];
+    // Furthest first, so nearer things overlap them. Out in the field toward the middle, small with
+    // distance: a farmstead. Past the castle's outer side: more of it (often off screen on phones).
+    const inner = (d: number): number => near + f * kw * d;
+    plant(this.sceneryBack, pick(farms, 10), inner(1.6 + r(11) * 0.6), l.groundY - kw * 0.42, kw * (0.62 + r(12) * 0.12), false, 0.48);
+    plant(this.sceneryBack, pick(farms, 13), inner(2.45 + r(14) * 0.5), l.groundY - kw * 0.38, kw * (0.5 + r(15) * 0.12), false, 0.5);
+    for (let i = 0; i < 2; i++) plant(this.sceneryBack, pick(farms, 20 + i), far - f * kw * (1 + i * 1.1 + r(22 + i) * 0.3), l.groundY - kw * 0.16, kw * (0.95 + r(24 + i) * 0.3), false, 0.32);
+    const trees = sc.trees;
+    plant(this.sceneryBack, pick(trees, 40), far - f * kw * (0.3 + r(41) * 0.3), l.groundY - kw * 0.06, kw * (2 + r(42) * 0.5), true, 0.18);
+    // Between the Keep and the Wall, its crown above the Wall.
+    plant(this.sceneryBack, pick(trees, 43), (l.x + this.wallCx()) / 2 + f * kw * 0.1, l.groundY - kw * 0.1, kw * (1.7 + r(45) * 0.4), true, 0.22);
+    plant(this.sceneryBack, pick(trees, 46), inner(0.45 + r(47) * 0.3), l.groundY - kw * 0.08, kw * (1.5 + r(48) * 0.4), true, 0.18);
+    plant(this.sceneryBack, pick(trees, 49), inner(1.15 + r(50) * 0.3), l.groundY - kw * 0.3, kw * (1.1 + r(51) * 0.3), true, 0.4);
+    // In front, along the foot and a little into the field (never over the Keep's door).
+    const low = [...(sc.grass ?? []), ...(sc.grass ?? []), ...(sc.rocks ?? [])];
+    const from = far - f * kw * 0.5;
+    const to = near + f * kw * 1.1;
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const x = from + (to - from) * ((i + 0.15 + r(60 + i) * 0.7) / n);
+      if (Math.abs(x - l.x) < kw * 0.32) continue;
+      plant(this.sceneryFront, pick(low, 70 + i), x, l.groundY + kw * (0.04 + r(80 + i) * 0.14), kw * (0.48 + r(90 + i) * 0.3), false, 0);
+    }
   }
 
   /** Immediate heights (animation is driven from outside by calling this every frame). */
@@ -520,6 +578,7 @@ export class Castle extends Container {
   /** The sky's light on the castle, so it sits in the same dusk, eclipse or storm as the land. */
   setAmbient(color: number): void {
     this.ambient = color;
+    this.sceneryBack.tint = this.sceneryFront.tint = color;
     if (this.hitLeft <= 0) this.tint = color;
   }
 
@@ -660,6 +719,7 @@ export class Castle extends Container {
       this.quake = 0;
     }
     this.x = x;
+    this.sceneryBack.visible = this.sceneryFront.visible = this.visible;
     for (const s of this.scars) if (s.age < 1) s.sprite.alpha = s.age = Math.min(1, s.age + dt / 220);
     for (const part of ['keep', 'wall'] as const) {
       const sc = this.scaffolds[part];
