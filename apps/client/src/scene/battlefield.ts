@@ -17,6 +17,7 @@ import {
   particleTexture,
   raysTexture,
   ringTexture,
+  debrisTextures,
   rubbleTexture,
   seededRandom,
   smokeTexture,
@@ -60,6 +61,8 @@ interface Particle {
   colorFrom: number;
   colorTo: number | null;
   floor: boolean;
+  /** Where a falling chunk lands (a little in front of or behind the castle line). */
+  floorY: number;
 }
 
 export type ParticleShape = 'glow' | 'rubble' | 'smoke' | 'spark' | 'crystal' | 'flame';
@@ -242,6 +245,9 @@ export class Battlefield {
   private readonly pool: Sprite[] = [];
   private readonly flashes: Flash[] = [];
   private readonly textures: Record<ParticleShape, Texture>;
+  private readonly debrisTex: Texture[];
+  /** Last heights seen while a castle animates, to shed stones or motes as it moves. */
+  private readonly lastTops: ({ keep: number; wall: number } | null)[] = [null, null, null];
   private readonly ringTex: Texture;
   private readonly raysTex: Texture;
   private readonly flareTex: Texture;
@@ -283,6 +289,7 @@ export class Battlefield {
       crystal: crystalTexture(),
       flame: flameTexture(),
     };
+    this.debrisTex = debrisTextures();
     this.ringTex = ringTexture();
     this.raysTex = raysTexture();
     this.flareTex = flareTexture();
@@ -606,17 +613,168 @@ export class Battlefield {
     });
   }
 
-  /** Grow or shrink one castle smoothly. */
+  /** Grow or shrink one castle smoothly, shedding stones as it falls and motes of light as it rises. */
   animateCastle(player: PlayerId, keep: number, wall: number, ms = 700): Promise<void> {
     const castle = this.castles[player];
     const from = { keep: castle.keep, wall: castle.wall };
     this.castleTargets[player] = { keep, wall };
     const growing = keep >= from.keep && wall >= from.wall;
+    this.lastTops[player] = null;
     return this.tweens.run(
       ms,
-      (t) => castle.setHeights(from.keep + (keep - from.keep) * t, from.wall + (wall - from.wall) * t),
+      (t) => {
+        castle.setHeights(from.keep + (keep - from.keep) * t, from.wall + (wall - from.wall) * t);
+        this.shed(player);
+      },
       growing ? ease.outBack : ease.outCubic,
     );
+  }
+
+  /** Stone colours of a castle's debris (its own masonry, trim and roof). */
+  stoneColors(player: PlayerId): number[] {
+    return this.castles[player]?.debrisColors() ?? [0xb8a582];
+  }
+
+  /**
+   * Called on every frame of a height change: a part that drops sheds grit
+   * and dust from its broken top; a part that rises leaves a line of mortar
+   * dust and golden motes where the new course is being laid.
+   */
+  private shed(player: PlayerId): void {
+    const castle = this.castles[player];
+    const b = castle?.bodies();
+    if (!b || settings.get().reducedMotion) return;
+    const last = this.lastTops[player];
+    this.lastTops[player] = { keep: b.keep.top, wall: b.wall.top };
+    if (!last) return;
+    for (const part of ['keep', 'wall'] as const) {
+      const body = b[part];
+      const moved = body.top - last[part];
+      if (Math.abs(moved) < 0.5 || b.groundY - body.top < 1) continue;
+      const x = body.x + this.world.x;
+      const y = body.top + this.world.y;
+      if (moved > 0) {
+        const n = Math.min(6, moved / 3);
+        if (Math.random() < n) {
+          this.burst(x, y + 3, { count: Math.ceil(n), texture: 'rubble', color: this.stoneColors(player), speed: 1.4, angle: -Math.PI / 2, spread: Math.PI * 1.5, gravity: 0.3, size: 6, life: 1800, area: { w: body.w * 0.9, h: 4 } });
+        }
+        if (Math.random() < 0.35) this.burst(x, y, { count: 1, texture: 'smoke', color: 0xa89878, speed: 0.5, gravity: -0.006, size: body.w * 0.7, life: 1200, alpha: 0.35, area: { w: body.w, h: 6 } });
+      } else {
+        if (Math.random() < Math.min(1, -moved / 4)) {
+          this.burst(x, y, { count: 2, color: [0xffe7a0, 0xfff4d0], speed: 0.6, angle: -Math.PI / 2, spread: 1.2, gravity: -0.02, size: 7, life: 900, area: { w: body.w, h: 3 } });
+          this.burst(x, y + 2, { count: 1, texture: 'smoke', color: 0xd8c8a8, speed: 0.4, gravity: -0.004, size: body.w * 0.45, life: 900, alpha: 0.3, area: { w: body.w, h: 3 } });
+        }
+      }
+    }
+  }
+
+  /** Dust that rolls out along the ground from `x`, both ways. */
+  groundDust(x: number, y: number, width: number, power = 1, color = 0x9c8a72): void {
+    for (const dir of [-1, 1]) {
+      this.burst(x + dir * width * 0.3, y - 6, {
+        count: 2 + power * 3,
+        texture: 'smoke',
+        color,
+        speed: 1.4 + power * 0.9,
+        angle: dir > 0 ? -0.08 : Math.PI + 0.08,
+        spread: 0.35,
+        gravity: -0.006,
+        drag: 0.972,
+        size: 36 + power * 20,
+        life: 1500 + power * 500,
+        alpha: 0.5,
+        area: { w: width * 0.4, h: 6 },
+      });
+    }
+  }
+
+  /** Chunks of a castle's own stone break off a part and tumble down its face, with dust at its foot. */
+  crumble(player: PlayerId, target: 'keep' | 'wall', amount: number): void {
+    const b = this.castles[player]?.bodies();
+    if (!b) return;
+    const part = b[target];
+    const x = part.x + this.world.x;
+    const top = part.top + this.world.y;
+    const colors = this.stoneColors(player);
+    const n = Math.min(26, 5 + amount * 1.4);
+    this.burst(x, top + 4, { count: n, texture: 'rubble', color: colors, speed: 2.2 + Math.min(4, amount * 0.14), angle: -Math.PI / 2, spread: Math.PI * 1.3, gravity: 0.32, size: 9 + Math.min(9, amount * 0.45), life: 2600, area: { w: part.w * 0.8, h: 8 } });
+    this.burst(x, top + 12, { count: Math.ceil(n * 0.7), texture: 'rubble', color: colors, speed: 0.5, angle: Math.PI / 2, spread: 0.5, gravity: 0.25, size: 5, life: 2000, area: { w: part.w * 0.95, h: 24 } });
+    this.burst(x, top, { count: 2 + Math.round(amount / 4), texture: 'smoke', color: 0xa89878, speed: 0.8, gravity: -0.01, size: part.w * 0.8, life: 1500, alpha: 0.45, area: { w: part.w, h: 10 } });
+    this.groundDust(x, b.groundY + this.world.y, part.w, Math.min(2, 0.5 + amount / 10));
+  }
+
+  /**
+   * The Keep comes down: a rain of its stones and roof from its whole height,
+   * a column of dust and a wave of it rolling out along the ground. Call it
+   * before the height animates to 0.
+   */
+  collapse(player: PlayerId): void {
+    const b = this.castles[player]?.bodies();
+    if (!b) return;
+    const x = b.keep.x + this.world.x;
+    const gy = b.groundY + this.world.y;
+    const h = Math.max(b.keep.w, b.groundY - b.keep.top);
+    const w = b.keep.w;
+    const colors = this.stoneColors(player);
+    const steps = 6;
+    for (let i = 0; i < steps; i++) {
+      void this.tweens.run(i * 110, () => {}, (t) => t).then(() => {
+        const y = gy - h * (1 - i / steps);
+        this.burst(x, y, { count: 9, texture: 'rubble', color: colors, speed: 2.4, angle: -Math.PI / 2, spread: Math.PI * 1.6, gravity: 0.34, size: 10 + Math.random() * 8, life: 3200, area: { w: w * 1.1, h: h / steps } });
+        this.burst(x, y, { count: 2, texture: 'smoke', color: 0x8c7c66, speed: 1, angle: -Math.PI / 2, spread: 1.4, gravity: -0.012, size: w * 0.9, life: 2000, alpha: 0.4, area: { w, h: h / steps } });
+      });
+    }
+    this.burst(x, gy - 10, { count: 10, texture: 'rubble', color: colors, speed: 5, angle: -Math.PI / 2, spread: Math.PI * 0.9, gravity: 0.32, size: 18, life: 3400, area: { w: w * 1.2, h: 10 } });
+    this.groundDust(x, gy, w * 1.4, 2.2, 0x8a7a66);
+    this.flare(x, gy - h * 0.3, 0xffd8a0, w * 4, 600, 0.35);
+  }
+
+  /**
+   * Masons at work: blocks of the castle's stone drop one by one onto the top
+   * of the part being built, each landing with a puff of mortar and a glint.
+   */
+  placeBlocks(player: PlayerId, target: 'keep' | 'wall', count: number): void {
+    const castle = this.castles[player];
+    if (!castle?.bodies() || settings.get().reducedMotion) return;
+    const colors = this.stoneColors(player);
+    const n = Math.max(2, Math.min(8, Math.round(count)));
+    for (let i = 0; i < n; i++) {
+      void this.tweens.run(60 + i * 95, () => {}, (t) => t).then(() => {
+        const b = castle.bodies();
+        if (!b) return;
+        const part = b[target];
+        const sprite = this.takeSprite(this.debrisTex[i % this.debrisTex.length]!);
+        if (!sprite) return;
+        const size = part.w * (0.2 + Math.random() * 0.08);
+        const dx = (Math.random() - 0.5) * part.w * 0.7;
+        sprite.tint = colors[i % colors.length]!;
+        sprite.blendMode = 'normal';
+        sprite.scale.set(size / 32);
+        const fromY = part.top - part.w * (0.9 + Math.random() * 0.6);
+        const spin = (Math.random() - 0.5) * 2;
+        const ms = 300 + Math.random() * 80;
+        void this.tweens
+          .run(
+            ms,
+            (t) => {
+              // Follow the top as it grows, so each block lands on the newest course.
+              const now = castle.bodies();
+              const landY = (now ? now[target].top : part.top) + this.world.y;
+              const x = (now ? now[target].x : part.x) + dx + this.world.x;
+              sprite.position.set(x, fromY + this.world.y + (landY - (fromY + this.world.y)) * t);
+              sprite.rotation = spin * (1 - t);
+              sprite.alpha = Math.min(1, t * 4);
+            },
+            (t) => t * t,
+          )
+          .then(() => {
+            this.releaseSprite(sprite);
+            const at = { x: sprite.x, y: sprite.y };
+            this.burst(at.x, at.y, { count: 2, texture: 'smoke', color: 0xd8c8a8, speed: 0.9, angle: -Math.PI / 2, spread: Math.PI, gravity: -0.004, size: part.w * 0.4, life: 800, alpha: 0.4 });
+            this.burst(at.x, at.y, { count: 4, texture: 'spark', color: [0xffe7a0, 0xffffff], speed: 2.2, angle: -Math.PI / 2, spread: Math.PI * 0.9, gravity: 0.06, size: 10, life: 360 });
+          });
+      });
+    }
   }
 
   /** Where an attack from `from` meets the Shield dome (screen px), or null without one. */
@@ -707,12 +865,12 @@ export class Battlefield {
 
   burst(x: number, y: number, opts: BurstOptions = {}): void {
     const count = Math.max(1, Math.round((opts.count ?? 16) * density()));
-    const colors = Array.isArray(opts.color) ? opts.color : [opts.color ?? 0xffd27a];
     const shape = opts.texture ?? 'glow';
+    const colors = Array.isArray(opts.color) ? opts.color : [opts.color ?? (shape === 'rubble' ? 0xb8a582 : 0xffd27a)];
     const texture = this.textures[shape];
     const additive = shape === 'glow' || shape === 'spark' || shape === 'flame' || shape === 'crystal';
     for (let i = 0; i < count; i++) {
-      const sprite = this.takeSprite(texture);
+      const sprite = this.takeSprite(shape === 'rubble' ? this.debrisTex[(Math.random() * this.debrisTex.length) | 0]! : texture);
       if (!sprite) return;
       const px = x + (opts.area ? (Math.random() - 0.5) * opts.area.w : 0);
       const py = y + (opts.area ? (Math.random() - 0.5) * opts.area.h : 0);
@@ -745,6 +903,7 @@ export class Battlefield {
         colorFrom: color,
         colorTo: opts.colorTo ?? null,
         floor: shape === 'rubble',
+        floorY: this.groundY + 2 + Math.random() * 16,
       });
       if (shape === 'crystal' || shape === 'rubble') sprite.rotation = Math.random() * Math.PI * 2;
     }
@@ -1016,11 +1175,21 @@ export class Battlefield {
       p.vy = p.vy * p.drag + p.gravity * step;
       p.sprite.x += p.vx * step;
       p.sprite.y += p.vy * step;
-      if (p.floor && p.sprite.y > this.groundY + 6 && p.gravity > 0) {
-        p.sprite.y = this.groundY + 6;
-        p.vy *= -0.3;
-        p.vx *= 0.6;
+      if (p.floor && p.sprite.y > p.floorY && p.gravity > 0) {
+        // Bounce, tumble a little less each time, then settle on the grass.
+        p.sprite.y = p.floorY;
+        if (Math.abs(p.vy) < 1.2) {
+          p.vy = 0;
+          p.gravity = 0;
+          p.vx *= 0.5;
+          p.spin = 0;
+        } else {
+          p.vy *= -0.32;
+          p.vx *= 0.6;
+          p.spin *= 0.5;
+        }
       }
+      if (p.floor && p.gravity === 0) p.vx *= 0.85;
       const k = p.life / p.maxLife;
       p.sprite.alpha = p.alpha * Math.min(1, k * 1.6);
       if (p.colorTo !== null) p.sprite.tint = lerpColor(p.colorFrom, p.colorTo, 1 - k);

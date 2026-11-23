@@ -33,6 +33,8 @@ export async function initStage(): Promise<void> {
   });
   field = new Battlefield(app);
   field.layout();
+  // Lets local tooling (screenshots, effect tests) drive the scene.
+  if (import.meta.env.DEV) (window as unknown as { __field?: Battlefield }).__field = field;
   field.onAmbient = (kind) => audio.play(kind, 0.5, { gain: 0.7, pan: Math.random() - 0.5 });
   window.addEventListener('resize', () => requestAnimationFrame(() => app.resize()));
 }
