@@ -37,10 +37,12 @@ export interface PaintedCastle {
   towers: (StackedPiece | null)[];
   wall: StackedPiece | null;
   ruins: Texture | null;
+  /** Windows, banners, lanterns and ivy laid over the plain shafts as they grow. */
+  ornaments: Texture[];
 }
 
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number } }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: number[][] }[] }>;
 
 let foot: Texture | null = null;
 
@@ -99,6 +101,12 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
     set = loadManifest().then(async (m) => {
       const entry = m[hero];
       if (!entry?.keep) return null;
+      const sheets = await Promise.all(
+        (entry.ornaments ?? []).map(async (o) => {
+          const t = await texture(`castles/${hero}/${o.name}.webp`);
+          return t ? o.frames.map(([x, y, w, h]) => new Texture({ source: t.source, frame: new Rectangle(x!, y!, w!, h!) })) : [];
+        }),
+      );
       const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
         stacked(hero, 'keep', entry.keep),
         stacked(hero, 'tower1', entry.tower1),
@@ -107,7 +115,7 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
         stacked(hero, 'wall', entry.wall),
         entry.ruins ? texture(`castles/${hero}/ruins.webp`) : Promise.resolve(null),
       ]);
-      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins } : null;
+      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments: sheets.flat() } : null;
     });
     sets.set(hero, set);
   }
@@ -171,6 +179,11 @@ export class Stack {
   /** The base cropped to its lower part when the body is shorter than it. */
   private readonly baseCrop: Texture;
   private cropKey = -1;
+  /** Ornaments on the shaft, one slot per course of the climb; made when first reached. */
+  private ornaments: Texture[] = [];
+  private seed = 0;
+  private readonly slots: (Sprite | null)[] = [];
+  private readonly ornamentLayer = new Container();
 
   constructor(readonly piece: StackedPiece) {
     this.crown = new Sprite(piece.crown);
@@ -181,6 +194,7 @@ export class Stack {
     this.baseCrop = new Texture({ source: piece.base.source, frame: new Rectangle(0, 0, piece.base.width, piece.base.height), dynamic: true });
     this.base = new Sprite(this.baseCrop);
     this.root.addChild(this.shaft, this.base, this.crown, this.foot);
+    this.root.addChild(this.ornamentLayer);
     this.crownGlow = piece.crownGlow ? new Sprite(piece.crownGlow) : null;
     this.baseGlowCrop = piece.baseGlow ? new Texture({ source: piece.baseGlow.source, frame: new Rectangle(0, 0, piece.baseGlow.width, piece.baseGlow.height), dynamic: true }) : null;
     this.baseGlow = this.baseGlowCrop ? new Sprite(this.baseGlowCrop) : null;
@@ -254,6 +268,8 @@ export class Stack {
       this.baseGlow.height = rows * k;
     }
 
+    this.layoutOrnaments(w, h, baseH, m.crown * k);
+
     const crownH = m.crown * k;
     this.crown.visible = crown && h > 0.5;
     this.crown.position.set(left, -h - crownH);
@@ -269,6 +285,53 @@ export class Stack {
 
     const apexX = (left + m.apex.x * k) * (mirror ? -1 : 1);
     return { crown: crownH, apexY: -(m.crown - m.apex.y) * k, apexX };
+  }
+
+  /**
+   * Scatters these ornaments up the shaft (seeded, so the same tower always
+   * wears the same ones). `density`: share of slots that get one.
+   */
+  setOrnaments(textures: Texture[], seed: number, density = 0.55): void {
+    this.ornaments = textures;
+    this.seed = seed;
+    this.density = density;
+    for (const s of this.slots) s?.destroy();
+    this.slots.length = 0;
+  }
+
+  private density = 0.55;
+
+  private layoutOrnaments(w: number, h: number, baseH: number, crownH: number): void {
+    if (!this.ornaments.length) return;
+    // One slot every ~0.95 shaft widths above the base; the top one stays clear of the crown.
+    const step = w * 0.95;
+    const top = h - Math.min(crownH * 0.15, w * 0.2);
+    const count = Math.max(0, Math.floor((h - baseH) / step) + 1);
+    for (let i = 0; i < Math.max(count, this.slots.length); i++) {
+      const r = (n: number): number => {
+        const x = Math.sin((this.seed + 1) * 127.1 + i * 311.7 + n * 74.7) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      const y = baseH + step * (i + 0.5) + (r(1) - 0.5) * step * 0.3;
+      let sp = this.slots[i];
+      if (sp === undefined) {
+        sp = r(0) < this.density ? new Sprite(this.ornaments[Math.floor(r(2) * this.ornaments.length)]!) : null;
+        if (sp) {
+          sp.anchor.set(0.5);
+          this.ornamentLayer.addChild(sp);
+        }
+        this.slots[i] = sp;
+      }
+      if (!sp) continue;
+      const t = sp.texture;
+      // Long things (banners, ivy) hang longer; the rest sit within the shaft.
+      const k = Math.min((w * 0.5) / t.width, (w * (t.height > t.width * 1.6 ? 0.95 : 0.55)) / t.height);
+      sp.scale.set(k);
+      const half = (t.height * k) / 2;
+      sp.position.set((r(3) - 0.5) * w * 0.3, -y);
+      // Shown only while the courses it hangs on stand.
+      sp.visible = y + half < top && y - half > baseH * 0.9;
+    }
   }
 
   /** How bright the painting's own lights burn (0 out, 1 as painted, more for a bloom). */

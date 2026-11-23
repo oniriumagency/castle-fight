@@ -359,10 +359,10 @@ async function stacked(input, outDir, piece, override) {
  * and let their pale stone fade out, so they sit on any hero's masonry.
  * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
  */
-const DECALS = { cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
+const DECALS = { ornaments: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
 
-async function decalSheet(input, outDir, name, kind) {
-  const { data, info } = await sharp(input).resize({ width: 1024, height: 1024, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
+  const { data, info } = await sharp(input).resize({ width: size, height: size, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   keyOut(data, info);
   const fade = DECALS[kind];
   if (fade) {
@@ -373,10 +373,10 @@ async function decalSheet(input, outDir, name, kind) {
   }
   const { width, height } = info;
   const frames = [];
-  const half = width / 2;
-  for (let q = 0; q < 4; q++) {
-    const x0 = (q % 2) * half;
-    const y0 = Math.floor(q / 2) * half;
+  const half = Math.floor(width / grid);
+  for (let q = 0; q < grid * grid; q++) {
+    const x0 = (q % grid) * half;
+    const y0 = Math.floor(q / grid) * half;
     let l = half, r = -1, t = half, b = -1;
     for (let y = 0; y < half; y++) {
       for (let x = 0; x < half; x++) {
@@ -487,6 +487,23 @@ export async function buildCastles(source, target) {
     const files = await readdir(join(root, hero));
     const outDir = join(target, 'castles', hero);
     await mkdir(outDir, { recursive: true });
+    // Wall ornaments: 3 x 3 sheets of windows, banners, lanterns and ivy laid over the shafts.
+    for (const file of files.sort()) {
+      const m = /^(ornaments(-[a-z0-9]+)?)\.(png|jpe?g|webp)$/i.exec(file);
+      if (!m) continue;
+      const name = m[1].toLowerCase();
+      const input = join(root, hero, file);
+      manifest[hero] ??= {};
+      const list = (manifest[hero].ornaments ??= []);
+      const was = old[hero]?.ornaments?.find((o) => o.name === name);
+      if (was && (await mtime(join(outDir, `${name}.webp`))) >= (await mtime(input))) {
+        list.push(was);
+        continue;
+      }
+      const sheet = await decalSheet(input, outDir, name, 'ornaments', 3, 1152);
+      list.push({ name, frames: sheet.frames });
+      built++;
+    }
     for (const file of files) {
       const m = /^(keep|tower1|tower2|tower|wall|ruins)\.(png|jpe?g|webp)$/i.exec(file);
       if (!m) continue;
