@@ -549,8 +549,8 @@ export class Castle extends Container {
     // Furthest towers first so nearer ones overlap them.
     const specs = s.towers.map((spec, i) => ({ spec, i })).sort((a, b) => b.spec.offset - a.spec.offset);
     this.towers = specs.map(({ spec, i }) => {
-      // A painted castle without its own back tower uses its Keep, smaller.
-      const piece = p ? (p.tower ?? p.keep) : null;
+      // A painted castle without this back tower uses its Keep, smaller.
+      const piece = p ? (p.towers[i] ?? p.keep) : null;
       const t = new Tower({ roof: spec.roof, parapet: spec.parapet, round: !!spec.round, pennant: !!spec.pennant }, false, i, tex.keepStone, piece);
       t.mirror = this.facing < 0;
       // Towers further back sit in the haze: a touch darker and bluer.
@@ -633,7 +633,9 @@ export class Castle extends Container {
     for (const t of this.towers) {
       const spec = this.style.towers[t.index];
       const stump = l.keepWidth * (0.35 + t.index * 0.12);
-      const h = fallen ? stump : Math.max(l.unit * 2, kh * spec.ratio);
+      let h = fallen ? stump : Math.max(l.unit * 2, kh * spec.ratio);
+      // A painted back tower is scenery: it never sinks below its own base, so its door and windows stay whole.
+      if (t.painted && !fallen) h = Math.max(h, t.painted.baseHeight(t.w) * 1.04);
       // Damage breaks the furthest towers first.
       const broken = fallen || dmg >= 2 || (dmg === 1 && t.index === 0);
       t.setHeight(h, l.unit, broken, (tw, u) => this.drawTower(tw, u));

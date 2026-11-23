@@ -29,12 +29,14 @@ export interface StackedPiece {
 
 export interface PaintedCastle {
   keep: StackedPiece;
-  tower: StackedPiece | null;
+  /** The back towers, furthest first: each has its own role and look. */
+  towers: (StackedPiece | null)[];
   wall: StackedPiece | null;
   ruins: Texture | null;
 }
 
-type Manifest = Record<string, Partial<Record<'keep' | 'tower' | 'wall', StackedMeta>> & { ruins?: { width: number; height: number } }>;
+type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall';
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number } }>;
 
 let manifest: Promise<Manifest> | null = null;
 const sets = new Map<string, Promise<PaintedCastle | null>>();
@@ -55,7 +57,7 @@ async function texture(path: string): Promise<Texture | null> {
   }
 }
 
-async function stacked(hero: string, piece: 'keep' | 'tower' | 'wall', meta: StackedMeta | undefined): Promise<StackedPiece | null> {
+async function stacked(hero: string, piece: Piece, meta: StackedMeta | undefined): Promise<StackedPiece | null> {
   if (!meta) return null;
   const [crown, shaft, base] = await Promise.all(['crown', 'shaft', 'base'].map((band) => texture(`castles/${hero}/${piece}-${band}.webp`)));
   if (!crown || !shaft || !base) return null;
@@ -70,13 +72,15 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
     set = loadManifest().then(async (m) => {
       const entry = m[hero];
       if (!entry?.keep) return null;
-      const [keep, tower, wall, ruins] = await Promise.all([
+      const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
         stacked(hero, 'keep', entry.keep),
+        stacked(hero, 'tower1', entry.tower1),
+        stacked(hero, 'tower2', entry.tower2),
         stacked(hero, 'tower', entry.tower),
         stacked(hero, 'wall', entry.wall),
         entry.ruins ? texture(`castles/${hero}/ruins.webp`) : Promise.resolve(null),
       ]);
-      return keep ? { keep, tower, wall, ruins } : null;
+      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins } : null;
     });
     sets.set(hero, set);
   }
@@ -129,13 +133,14 @@ export class Stack {
 
     const baseH = m.base * k;
     const shown = Math.min(baseH, Math.max(0, h));
-    // Crop the base to its foot when the body is shorter than the base.
+    // A body shorter than the base shows the base's top, sunk into the ground,
+    // so it still meets the crown cleanly (windows and door are never cut in half from above).
     const rows = Math.max(1, Math.round(shown / k));
     if (rows !== this.cropKey) {
       this.cropKey = rows;
       const f = this.baseCrop.frame;
       f.x = 0;
-      f.y = m.base - rows;
+      f.y = 0;
       f.width = m.width;
       f.height = rows;
       this.baseCrop.updateUvs();
@@ -163,6 +168,11 @@ export class Stack {
 
     const apexX = (left + m.apex.x * k) * (mirror ? -1 : 1);
     return { crown: crownH, apexY: -(m.crown - m.apex.y) * k, apexX };
+  }
+
+  /** Height of the base band for a shaft `w` wide (scene px). */
+  baseHeight(w: number): number {
+    return (this.piece.meta.base * w) / this.piece.meta.shaftWidth;
   }
 
   destroy(): void {

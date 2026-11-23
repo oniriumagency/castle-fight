@@ -1,5 +1,5 @@
 /**
- * Painted castles: `art/castles/<hero>/{keep,tower,wall,ruins}.(png|jpg|webp)`
+ * Painted castles: `art/castles/<hero>/{keep,tower1,tower2,wall,ruins}.(png|jpg|webp)`
  * become the pieces the client stacks in `public/art/castles/<hero>/`.
  *
  * The paintings come on a flat magenta (#FF00FF) or chroma green (#00FF00)
@@ -18,7 +18,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 
-const STACKED = { keep: 420, tower: 300, wall: 360 };
+const STACKED = { keep: 420, tower1: 300, tower2: 300, tower: 300, wall: 360 };
 const RUINS_WIDTH = 640;
 
 async function mtime(path) {
@@ -224,7 +224,7 @@ export async function buildCastles(source, target) {
     const outDir = join(target, 'castles', hero);
     await mkdir(outDir, { recursive: true });
     for (const file of files) {
-      const m = /^(keep|tower|wall|ruins)\.(png|jpe?g|webp)$/i.exec(file);
+      const m = /^(keep|tower1|tower2|tower|wall|ruins)\.(png|jpe?g|webp)$/i.exec(file);
       if (!m) continue;
       const piece = m[1].toLowerCase();
       const input = join(root, hero, file);
