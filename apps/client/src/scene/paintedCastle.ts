@@ -42,6 +42,25 @@ export interface PaintedCastle {
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
 type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number } }>;
 
+let foot: Texture | null = null;
+
+/** Dark at the ground, gone a little way up: the shade where stone meets earth. */
+function footShade(): Texture {
+  if (foot) return foot;
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createLinearGradient(0, 0, 0, 64);
+  grad.addColorStop(0, 'rgba(10,8,6,0)');
+  grad.addColorStop(0.6, 'rgba(10,8,6,0.22)');
+  grad.addColorStop(1, 'rgba(10,8,6,0.6)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 64);
+  foot = Texture.from(c);
+  return foot;
+}
+
 let manifest: Promise<Manifest> | null = null;
 const sets = new Map<string, Promise<PaintedCastle | null>>();
 
@@ -143,6 +162,8 @@ export class Stack {
   private readonly crown: Sprite;
   private readonly shaft: TilingSprite;
   private readonly base: Sprite;
+  /** Shade gathering at the foot, where the stones meet the earth. */
+  private readonly foot = new Sprite(footShade());
   /** Windows, fires and crystals, added on top and made to flicker. */
   private readonly crownGlow: Sprite | null;
   private readonly baseGlow: Sprite | null;
@@ -154,11 +175,14 @@ export class Stack {
   constructor(readonly piece: StackedPiece) {
     this.crown = new Sprite(piece.crown);
     this.shaft = new TilingSprite({ texture: piece.shaft, width: 1, height: 1 });
-    this.baseCrop = new Texture({ source: piece.base.source, frame: new Rectangle(0, 0, piece.base.width, piece.base.height) });
+    // `dynamic`: the frame changes as the tower grows, and a Sprite only re-reads the size of a
+    // dynamic texture. Without it the base kept the size it had on its first frame (one row when
+    // the castle rose from the ground) and the tower floated with no base.
+    this.baseCrop = new Texture({ source: piece.base.source, frame: new Rectangle(0, 0, piece.base.width, piece.base.height), dynamic: true });
     this.base = new Sprite(this.baseCrop);
-    this.root.addChild(this.shaft, this.base, this.crown);
+    this.root.addChild(this.shaft, this.base, this.crown, this.foot);
     this.crownGlow = piece.crownGlow ? new Sprite(piece.crownGlow) : null;
-    this.baseGlowCrop = piece.baseGlow ? new Texture({ source: piece.baseGlow.source, frame: new Rectangle(0, 0, piece.baseGlow.width, piece.baseGlow.height) }) : null;
+    this.baseGlowCrop = piece.baseGlow ? new Texture({ source: piece.baseGlow.source, frame: new Rectangle(0, 0, piece.baseGlow.width, piece.baseGlow.height), dynamic: true }) : null;
     this.baseGlow = this.baseGlowCrop ? new Sprite(this.baseGlowCrop) : null;
     for (const g of [this.baseGlow, this.crownGlow]) {
       if (!g) continue;
@@ -208,6 +232,11 @@ export class Stack {
     this.base.position.set(left, -rows * k);
     this.base.width = W;
     this.base.height = rows * k;
+
+    this.foot.visible = this.base.visible;
+    this.foot.width = w * 1.25;
+    this.foot.height = Math.min(h, w * 0.4);
+    this.foot.position.set(-w * 0.625, -this.foot.height);
 
     const shaftH = Math.max(0, h - baseH);
     this.shaft.visible = shaftH > 0.5;

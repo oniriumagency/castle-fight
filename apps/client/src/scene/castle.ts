@@ -259,6 +259,8 @@ export class Castle extends Container {
   private painted: PaintedCastle | null = null;
   private wallStack: Stack | null = null;
   private ruinsSprite: Sprite | null = null;
+  /** Soft shadow pooled under a painted castle. */
+  private readonly groundShadow = new Sprite(glowTexture('0,0,0', 128));
   private kit: CastleKit | null = null;
   private scars: Scar[] = [];
   private scaffolds: Partial<Record<'keep' | 'wall', { stack: Stack; left: number }>> = {};
@@ -298,6 +300,7 @@ export class Castle extends Container {
     this.glows.blendMode = 'add';
     this.addChild(
       this.mound,
+      this.groundShadow,
       this.smoke,
       this.flagsBack,
       this.backLayer,
@@ -770,18 +773,15 @@ export class Castle extends Container {
         const rx = kw * (0.25 + hash(i * 1.7) * 0.4);
         g.ellipse(x, y, rx, rx * 0.16).fill({ color: i % 3 ? dark : mid, alpha: 0.18 + hash(i * 9.1) * 0.12 });
       }
-      for (let i = 0; i < 5; i++) g.ellipse(cx, l.groundY + 3 + i, w * (0.6 - i * 0.07), kw * (0.13 - i * 0.018)).fill({ color: 0x0c0a08, alpha: 0.1 });
-      const stone = (this.style.keepStone.base[0] << 16) | (this.style.keepStone.base[1] << 8) | this.style.keepStone.base[2];
-      for (let i = 0; i < 14; i++) {
-        const x = cx + (hash(i * 7.7 + 2) - 0.5) * w * 1.1;
-        const y = l.groundY + 2 + hash(i * 2.9) * kw * 0.1;
-        const r = kw * (0.025 + hash(i * 4.4) * 0.035);
-        g.ellipse(x, y + r * 0.5, r * 1.3, r * 0.35).fill({ color: 0x0c0a08, alpha: 0.3 });
-        g.roundRect(x - r, y - r * 0.8, r * 2, r * 1.3, r * 0.4).fill({ color: mix(stone, i % 2 ? 0x000000 : light, 0.25 + hash(i) * 0.25) });
-        g.rect(x - r * 0.8, y - r * 0.8, r * 1.6, r * 0.35).fill({ color: lighten(stone, 0.2), alpha: 0.5 });
-      }
+      this.groundShadow.visible = true;
+      this.groundShadow.anchor.set(0.5);
+      this.groundShadow.width = w * 1.35;
+      this.groundShadow.height = kw * 0.55;
+      this.groundShadow.alpha = 0.9;
+      this.groundShadow.position.set(cx, l.groundY + kw * 0.05);
       return;
     }
+    this.groundShadow.visible = false;
     g.ellipse(cx, l.groundY + 5, w * 0.6, l.keepWidth * 0.3).fill({ color: dark });
     g.ellipse(cx, l.groundY + 2, w * 0.53, l.keepWidth * 0.2).fill({ color: mid });
     g.ellipse(cx - this.facing * w * 0.12, l.groundY, w * 0.36, l.keepWidth * 0.1).fill({ color: light, alpha: 0.7 });

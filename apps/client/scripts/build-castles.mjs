@@ -191,6 +191,64 @@ function seamless(data, width, height) {
   return { data: out, height: outH };
 }
 
+/** A small seeded random, so a rebuild gives the same picture. */
+function seeded(text) {
+  let h = 2166136261;
+  for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A short shaft repeated up a tall tower shows the same stones over and over.
+ * Stack several copies into one longer tile and weather each differently:
+ * broad patches of grime, damp and sun-bleached stone, wrapping top to bottom
+ * so the long tile is still seamless.
+ */
+function weather(shaft, width, seed) {
+  const copies = Math.max(3, Math.ceil((width * 1.8) / shaft.height));
+  const H = shaft.height * copies;
+  const out = Buffer.alloc(width * H * 4);
+  for (let i = 0; i < copies; i++) shaft.data.copy(out, i * shaft.data.length);
+  const rand = seeded(seed);
+  const blobs = [];
+  for (let i = 0; i < copies * 5; i++) {
+    blobs.push({
+      x: rand() * width,
+      y: rand() * H,
+      rx: width * (0.12 + rand() * 0.3),
+      ry: width * (0.1 + rand() * 0.35),
+      // Mostly grime and damp (darker, a touch green or brown), some paler, sunned stone.
+      k: rand() < 0.65 ? -(0.04 + rand() * 0.08) : 0.025 + rand() * 0.04,
+      tint: rand() < 0.5 ? [0.98, 0.99, 0.97] : [1.02, 0.99, 0.96],
+    });
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (!out[i + 3]) continue;
+      let m = 1;
+      const t = [1, 1, 1];
+      for (const b of blobs) {
+        // Wrap vertically: the tile repeats, so a patch at its bottom continues at its top.
+        let dy = Math.abs(y - b.y);
+        dy = Math.min(dy, H - dy) / b.ry;
+        const dx = (x - b.x) / b.rx;
+        const d = dx * dx + dy * dy;
+        if (d >= 1) continue;
+        const f = (1 - d) * (1 - d);
+        m += b.k * f;
+        if (b.k < 0) for (let c = 0; c < 3; c++) t[c] += (b.tint[c] - 1) * f;
+      }
+      for (let c = 0; c < 3; c++) out[i + c] = Math.max(0, Math.min(255, Math.round(out[i + c] * m * t[c])));
+    }
+  }
+  return { data: out, height: H };
+}
+
 /**
  * Light the painting gives off itself: windows, braziers, crystals, potions.
  * Bright, strongly coloured pixels are kept (sunlit stone is bright but not
@@ -260,7 +318,7 @@ async function stacked(input, outDir, piece, override) {
   for (let y = 0; y < b.base - b.crown; y++) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
-  const shaft = seamless(band, width, b.base - b.crown);
+  const shaft = weather(seamless(band, width, b.base - b.crown), width, input.split(/[\\/]/).slice(-2).join('/'));
   const crownGlow = await glowOf(slice(0, b.crown), width, b.crown);
   const baseGlow = await glowOf(slice(b.base, height), width, height - b.base);
   if (crownGlow) await webp(crownGlow, width, b.crown, join(outDir, `${piece}-crown-glow.webp`));
