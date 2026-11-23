@@ -4,7 +4,7 @@ import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
 import { glowTexture } from './textures';
 import { drawTombstone } from './tombstone';
-import { paintedCastle, Stack, type PaintedCastle, type StackedPiece } from './paintedCastle';
+import { castleKit, paintedCastle, Stack, type CastleKit, type PaintedCastle, type ScarKind, type StackedPiece } from './paintedCastle';
 
 /**
  * One castle, drawn in the style of its hero (see `castleStyles.ts`).
@@ -183,6 +183,24 @@ class Tower {
 // The castle
 // ---------------------------------------------------------------------------
 
+/** A painted wound on the Keep or the Wall, pinned to its stones (it goes when that height is lost or rebuilt). */
+interface Scar {
+  part: 'keep' | 'wall';
+  sprite: Sprite;
+  /** Across the body (-0.5..0.5 of its width) and up from the ground (Keep widths). */
+  fx: number;
+  yk: number;
+  /** Width, as a share of the body's width. */
+  size: number;
+  flip: number;
+  age: number;
+}
+
+/** Most wounds shown at once on each part (the oldest heal first). */
+const MAX_SCARS = { keep: 7, wall: 4 };
+/** How long the masons' scaffold stands after building (ms). */
+const SCAFFOLD_MS = 1900;
+
 interface Puff {
   sprite: Sprite;
   life: number;
@@ -205,6 +223,10 @@ export class Castle extends Container {
   private readonly backLayer = new Container();
   private readonly keepLayer = new Container();
   private readonly cracks = new Graphics();
+  private readonly scarsKeep = new Container();
+  private readonly scarsWall = new Container();
+  private readonly scaffoldKeep = new Container();
+  private readonly scaffoldWall = new Container();
   private readonly wallLayer = new Container();
   private readonly wallBody: TilingSprite;
   private readonly wallShade: Sprite;
@@ -237,6 +259,9 @@ export class Castle extends Container {
   private painted: PaintedCastle | null = null;
   private wallStack: Stack | null = null;
   private ruinsSprite: Sprite | null = null;
+  private kit: CastleKit | null = null;
+  private scars: Scar[] = [];
+  private scaffolds: Partial<Record<'keep' | 'wall', { stack: Stack; left: number }>> = {};
   private towers: Tower[] = [];
   private puffs: Puff[] = [];
   private puffTimer = 0;
@@ -279,7 +304,11 @@ export class Castle extends Container {
       this.animBack,
       this.keepLayer,
       this.cracks,
+      this.scarsKeep,
+      this.scaffoldKeep,
       this.wallLayer,
+      this.scarsWall,
+      this.scaffoldWall,
       this.rubble,
       this.grave,
       this.anim,
@@ -293,6 +322,9 @@ export class Castle extends Container {
     this.grave.visible = SHOW_GRAVESTONES;
     this.buildTowers();
     this.loadPainted();
+    void castleKit().then((k) => {
+      if (!this.destroyed) this.kit = k;
+    });
   }
 
   /** Swaps in the hero's painted castle if there is one (the drawn one stands until it loads). */
@@ -301,6 +333,7 @@ export class Castle extends Container {
     void paintedCastle(hero).then((set) => {
       if (hero !== this.hero || set === this.painted || this.destroyed) return;
       this.painted = set;
+      this.clearScars();
       this.buildTowers();
       if (this.layoutValue) this.setLayout(this.layoutValue);
     });
@@ -383,6 +416,102 @@ export class Castle extends Container {
     if (this.shieldCharges <= 0 && charges > 0) this.shieldRise = 0;
     this.shieldCharges = charges;
     this.drawShield();
+  }
+
+  /**
+   * A blow leaves its mark on the painted stones: cracks, a broken hole or
+   * scorch, high on the part that was struck. Rebuilding mends them.
+   */
+  scar(part: 'keep' | 'wall', kind: ScarKind): void {
+    const frames = this.kit?.decals[kind];
+    const b = this.bodies();
+    if (!frames?.length || !this.painted || !b) return;
+    const body = b[part];
+    const kw = b.groundY - b.keep.top >= 0 ? this.keepWidth : 40;
+    const h = b.groundY - body.top;
+    const size = (kind === 'holes' ? 0.42 : kind === 'scorch' ? 0.55 : 0.58) * (0.85 + Math.random() * 0.3) * (part === 'wall' ? 0.8 : 1);
+    if (h < body.w * size * 0.9) return;
+    const sprite = new Sprite(frames[Math.floor(Math.random() * frames.length)]!);
+    sprite.anchor.set(0.5);
+    sprite.rotation = (Math.random() - 0.5) * 0.6;
+    sprite.alpha = 0;
+    // Scorch climbs from where it burns; holes and cracks land in the upper half, where blows strike.
+    const margin = (body.w * size) / 2;
+    const y = margin + (h - margin * 2) * (kind === 'scorch' ? 0.3 + Math.random() * 0.6 : 0.4 + Math.random() * 0.55);
+    const scar: Scar = { part, sprite, fx: (Math.random() - 0.5) * 0.4, yk: y / kw, size, flip: Math.random() < 0.5 ? -1 : 1, age: 0 };
+    (part === 'keep' ? this.scarsKeep : this.scarsWall).addChild(sprite);
+    this.scars.push(scar);
+    const mine = this.scars.filter((s) => s.part === part);
+    if (mine.length > MAX_SCARS[part]) this.dropScar(mine[0]!);
+    this.layoutScars();
+  }
+
+  /** Masons mend the newest wounds of a part. */
+  mend(part: 'keep' | 'wall', count: number): void {
+    for (let i = 0; i < count; i++) {
+      const last = [...this.scars].reverse().find((s) => s.part === part);
+      if (!last) return;
+      this.dropScar(last);
+    }
+  }
+
+  /** The masons' scaffold stands against a part while it is built, then comes down. */
+  raiseScaffold(part: 'keep' | 'wall'): void {
+    const piece = this.kit?.scaffold;
+    if (!piece || !this.painted) return;
+    let s = this.scaffolds[part];
+    if (!s) {
+      s = { stack: new Stack(piece), left: 0 };
+      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(s.stack.root);
+      this.scaffolds[part] = s;
+    }
+    s.left = SCAFFOLD_MS;
+    this.layoutScaffold(part);
+  }
+
+  private layoutScaffold(part: 'keep' | 'wall'): void {
+    const s = this.scaffolds[part];
+    const b = this.bodies();
+    if (!s || !b) return;
+    const body = b[part];
+    const w = body.w * (part === 'keep' ? 0.82 : 0.7);
+    const h = b.groundY - body.top;
+    // The crane's platform sits near the top course; the crown (crane and pulley) rises above it.
+    const crown = (s.stack.piece.meta.crown * w) / s.stack.piece.meta.shaftWidth;
+    s.stack.layout(body.x + this.facing * body.w * 0.12, b.groundY + 2, w, Math.max(0, h - crown * 0.62), this.facing < 0, true);
+    const t = s.left / SCAFFOLD_MS;
+    s.stack.root.alpha = Math.min(1, (1 - t) * 6, t * 4);
+    s.stack.root.visible = s.left > 0 && h > body.w * 0.3;
+  }
+
+  private dropScar(s: Scar): void {
+    this.scars.splice(this.scars.indexOf(s), 1);
+    s.sprite.destroy();
+  }
+
+  private clearScars(): void {
+    for (const s of this.scars) s.sprite.destroy();
+    this.scars = [];
+  }
+
+  /** Pins every wound to its part; one whose stones are gone is gone with them. */
+  private layoutScars(): void {
+    const b = this.bodies();
+    if (!b) return;
+    const kw = this.keepWidth;
+    for (const s of [...this.scars]) {
+      const body = b[s.part];
+      const y = b.groundY - s.yk * kw;
+      const w = body.w * s.size;
+      // Lost with the courses that were knocked off.
+      if (y - w * 0.3 < body.top) {
+        this.dropScar(s);
+        continue;
+      }
+      const tex = s.sprite.texture;
+      s.sprite.scale.set((w / tex.width) * s.flip, w / tex.width);
+      s.sprite.position.set(body.x + s.fx * body.w, y);
+    }
   }
 
   /** The sky's light on the castle, so it sits in the same dusk, eclipse or storm as the land. */
@@ -528,6 +657,14 @@ export class Castle extends Container {
       this.quake = 0;
     }
     this.x = x;
+    for (const s of this.scars) if (s.age < 1) s.sprite.alpha = s.age = Math.min(1, s.age + dt / 220);
+    for (const part of ['keep', 'wall'] as const) {
+      const sc = this.scaffolds[part];
+      if (sc && sc.left > 0) {
+        sc.left = Math.max(0, sc.left - dt);
+        this.layoutScaffold(part);
+      }
+    }
     if (!calm) this.phase += dt * 0.004;
     this.drawAnim(dt, calm);
     if (this.graveRise >= 0 && this.graveRise < 1) {
@@ -681,7 +818,19 @@ export class Castle extends Container {
     }
 
     this.drawWall(l);
-    this.drawCracks(l, dmg);
+    if (fallen) this.clearScars();
+    // A painted castle wears painted wounds; seed a few if it is already hurt (a game joined late).
+    if (this.painted && this.kit && !fallen) {
+      if (dmg >= 1 && !this.scars.some((s) => s.part === 'keep')) {
+        this.scar('keep', 'cracks');
+        if (dmg >= 2) this.scar('keep', 'holes');
+      }
+      this.cracks.clear();
+      this.crackKey = '';
+    } else {
+      this.drawCracks(l, dmg);
+    }
+    this.layoutScars();
     this.drawRubble(l, fallen);
     if (this.graveRise >= 0) this.drawGrave();
     if (this.shieldCharges > 0) this.drawShield();

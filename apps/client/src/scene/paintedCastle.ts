@@ -39,7 +39,7 @@ export interface PaintedCastle {
   ruins: Texture | null;
 }
 
-type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall';
+type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
 type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number } }>;
 
 let manifest: Promise<Manifest> | null = null;
@@ -93,6 +93,35 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
     sets.set(hero, set);
   }
   return set;
+}
+
+export type ScarKind = 'cracks' | 'holes' | 'scorch';
+
+/** What every painted castle shares: damage decals and the masons' scaffold. */
+export interface CastleKit {
+  decals: Record<ScarKind, Texture[]>;
+  scaffold: StackedPiece | null;
+}
+
+let kit: Promise<CastleKit | null> | null = null;
+
+/** The shared decals and scaffold (null when none are painted). */
+export function castleKit(): Promise<CastleKit | null> {
+  kit ??= loadManifest().then(async (m) => {
+    const common = (m as unknown as Record<string, { decals?: Record<string, { kind: ScarKind; frames: number[][] }>; scaffold?: StackedMeta }>)._comun;
+    if (!common) return null;
+    const decals: Record<ScarKind, Texture[]> = { cracks: [], holes: [], scorch: [] };
+    await Promise.all(
+      Object.entries(common.decals ?? {}).map(async ([name, sheet]) => {
+        const t = await texture(`castles/_comun/${name}.webp`);
+        if (!t) return;
+        for (const [x, y, w, h] of sheet.frames) decals[sheet.kind]?.push(new Texture({ source: t.source, frame: new Rectangle(x, y, w, h) }));
+      }),
+    );
+    const scaffold = await stacked('_comun', 'scaffold', common.scaffold);
+    return { decals, scaffold };
+  });
+  return kit;
 }
 
 /** Where the crown of a laid-out stack ends up, relative to the top of its body. */

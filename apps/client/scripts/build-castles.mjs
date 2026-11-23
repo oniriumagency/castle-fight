@@ -295,6 +295,117 @@ async function stacked(input, outDir, piece, override) {
   return { glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
+/**
+ * Damage decals: 2x2 sprite sheets of cracks, holes and scorch painted on
+ * magenta, shared by every castle. Cracks and holes keep their dark strokes
+ * and let their pale stone fade out, so they sit on any hero's masonry.
+ * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
+ */
+const DECALS = { cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
+
+async function decalSheet(input, outDir, name, kind) {
+  const { data, info } = await sharp(input).resize({ width: 1024, height: 1024, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  keyOut(data, info);
+  const fade = DECALS[kind];
+  if (fade) {
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      data[i + 3] = Math.round(data[i + 3] * Math.max(0, Math.min(1, (fade.dark - lum) / fade.range)) ** fade.power);
+    }
+  }
+  const { width, height } = info;
+  const frames = [];
+  const half = width / 2;
+  for (let q = 0; q < 4; q++) {
+    const x0 = (q % 2) * half;
+    const y0 = Math.floor(q / 2) * half;
+    let l = half, r = -1, t = half, b = -1;
+    for (let y = 0; y < half; y++) {
+      for (let x = 0; x < half; x++) {
+        if (data[((y0 + y) * width + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    if (r > l && b > t) frames.push([x0 + l, y0 + t, r - l + 1, b - t + 1]);
+  }
+  await webp(data, width, height, join(outDir, `${name}.webp`));
+  return { kind, frames };
+}
+
+/**
+ * The masons' scaffold shown while a part is built: cut like a tower, with
+ * one bay of the lattice (beam to beam) as the shaft so it repeats cleanly.
+ */
+async function scaffold(input, outDir) {
+  const { data, info } = await load(input, 420);
+  const { width, height } = info;
+  const rows = spans(data, width, height);
+  // The posts: the columns opaque down most of the height.
+  const cols = new Array(width).fill(0);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (data[(y * width + x) * 4 + 3] > 128) cols[x]++;
+  const posts = cols.map((c, x) => (c > height * 0.6 ? x : -1)).filter((x) => x >= 0);
+  const left = posts[0];
+  const right = posts[posts.length - 1];
+  // Beams: rows solid from post to post.
+  const solid = [];
+  for (let y = 0; y < height; y++) {
+    let n = 0;
+    for (let x = left; x <= right; x++) if (data[(y * width + x) * 4 + 3] > 128) n++;
+    solid.push(n > (right - left + 1) * 0.9);
+  }
+  const beams = [];
+  for (let y = 0; y < height; y++) {
+    if (!solid[y]) continue;
+    let e = y;
+    while (e + 1 < height && solid[e + 1]) e++;
+    beams.push(Math.round((y + e) / 2));
+    y = e;
+  }
+  // The bay that starts nearest the middle, with beams below it (the base keeps the ladder).
+  let best = null;
+  for (let i = 0; i + 2 < beams.length; i++) {
+    const d = Math.abs(beams[i] / height - 0.42);
+    if (!best || d < best.d) best = { d, a: beams[i], b: beams[i + 1] };
+  }
+  if (!best) throw new Error('scaffold: no lattice bay found');
+  const slice = (y0, y1) => {
+    const buf = Buffer.alloc(width * (y1 - y0) * 4);
+    data.copy(buf, 0, y0 * width * 4, y1 * width * 4);
+    return buf;
+  };
+  await webp(slice(0, best.a), width, best.a, join(outDir, 'scaffold-crown.webp'));
+  await webp(slice(best.a, best.b), width, best.b - best.a, join(outDir, 'scaffold-shaft.webp'));
+  await webp(slice(best.b, height), width, height - best.b, join(outDir, 'scaffold-base.webp'));
+  const top = rows.findIndex(Boolean);
+  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top } };
+}
+
+async function shared(dir, outDir, manifest, old) {
+  const files = await readdir(dir).catch(() => []);
+  let built = 0;
+  await mkdir(outDir, { recursive: true });
+  for (const file of files) {
+    const m = /^((cracks|holes|scorch)(-[a-z0-9]+)?|scaffold)\.(png|jpe?g|webp)$/i.exec(file);
+    if (!m) continue;
+    const name = m[1].toLowerCase();
+    const input = join(dir, file);
+    const probe = join(outDir, name === 'scaffold' ? 'scaffold-shaft.webp' : `${name}.webp`);
+    const key = name === 'scaffold' ? 'scaffold' : name;
+    const into = name === 'scaffold' ? manifest : (manifest.decals ??= {});
+    const was = name === 'scaffold' ? old.scaffold : old.decals?.[name];
+    if (was && (await mtime(probe)) >= (await mtime(input))) {
+      into[key] = was;
+      continue;
+    }
+    into[key] = name === 'scaffold' ? await scaffold(input, outDir) : await decalSheet(input, outDir, name, m[2].toLowerCase());
+    built++;
+  }
+  return built;
+}
+
 async function ruins(input, outDir) {
   const { data, info } = await load(input, RUINS_WIDTH);
   await webp(data, info.width, info.height, join(outDir, 'ruins.webp'));
@@ -309,8 +420,11 @@ export async function buildCastles(source, target) {
   const old = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{}'));
   const manifest = {};
   let built = 0;
+  const common = {};
+  built += await shared(join(root, '_comun'), join(target, 'castles', '_comun'), common, old._comun ?? {});
+  if (Object.keys(common).length) manifest._comun = common;
   for (const dir of heroes) {
-    if (!dir.isDirectory()) continue;
+    if (!dir.isDirectory() || dir.name.startsWith('_')) continue;
     const hero = dir.name;
     const files = await readdir(join(root, hero));
     const outDir = join(target, 'castles', hero);

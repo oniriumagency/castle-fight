@@ -1,3 +1,4 @@
+import type { ScarKind } from './paintedCastle';
 import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { consoleBrowser, density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
@@ -688,6 +689,19 @@ export class Battlefield {
         area: { w: width * 0.4, h: 6 },
       });
     }
+  }
+
+  /** A painted wound (cracks, a hole, scorch) on a castle's Keep or Wall. */
+  scar(player: PlayerId, part: 'keep' | 'wall', kind: ScarKind): void {
+    this.castles[player]?.scar(part, kind);
+  }
+
+  /** Masons at work: the scaffold goes up against the part and its newest wounds are mended. */
+  mend(player: PlayerId, part: 'keep' | 'wall', amount: number): void {
+    const c = this.castles[player];
+    if (!c) return;
+    c.mend(part, 1 + Math.floor(amount / 6));
+    if (!settings.get().reducedMotion) c.raiseScaffold(part);
   }
 
   /** Chunks of a castle's own stone break off a part and tumble down its face, with dust at its foot. */
