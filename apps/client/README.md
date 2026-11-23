@@ -9,6 +9,8 @@ pnpm --filter @cardcraft-castles/client build
 
 `dev` y `build` ejecutan antes `scripts/build-art.mjs`, que convierte las ilustraciones de `art/` (JPG 1200×896) a WebP de 720 px en `public/art/` (ignorado por git). Solo reconvierte las que han cambiado.
 
+Los castillos pintados están en `art/castles/<héroe>/` (`keep`, `tower`, `wall` y `ruins`, con los prompts en `design/castle-prompts.md`). `scripts/build-castles.mjs` recorta el fondo magenta o verde, corta cada torre y muralla en corona, fuste y base (el fuste se repite sin costura para llegar a cualquier altura), busca el mástil para la bandera y escribe `public/art/castles/manifest.json`. Los cortes se pueden ajustar en `art/castles/slices.json`. `scene/paintedCastle.ts` apila las piezas, y un héroe sin `keep` sigue con el castillo dibujado por código. Si falta `tower`, las torres de atrás usan la torre del homenaje más pequeña.
+
 ## Capas
 
 | Capa | Qué contiene |

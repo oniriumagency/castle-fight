@@ -175,6 +175,77 @@ export function rubbleTexture(): Texture {
   return Texture.from(c);
 }
 
+/**
+ * Chunks of masonry for falling debris: an irregular block lit from above,
+ * with a bright top face, a shaded side, a chipped edge and a crack, in
+ * neutral greys so a castle's stone colour tints it. A few shapes so a heap
+ * never looks repeated.
+ */
+export function debrisTextures(): Texture[] {
+  const out: Texture[] = [];
+  const rnd = rand(913);
+  for (let v = 0; v < 5; v++) {
+    const size = 32;
+    const [c, g] = canvas(size, size);
+    const n = 5 + Math.floor(rnd() * 3);
+    const pts: [number, number][] = [];
+    const wide = v === 4 ? 1.35 : 1;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rnd() * 0.5;
+      const r = size * (0.3 + rnd() * 0.14);
+      pts.push([size / 2 + Math.cos(a) * r * wide, size / 2 + Math.sin(a) * r * 0.8]);
+    }
+    const path = (): void => {
+      g.beginPath();
+      pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.closePath();
+    };
+    path();
+    const grad = g.createLinearGradient(0, 4, 0, size - 4);
+    grad.addColorStop(0, '#f2f2f2');
+    grad.addColorStop(0.45, '#c8c8c8');
+    grad.addColorStop(1, '#9a9a9a');
+    g.fillStyle = grad;
+    g.fill();
+    // The shaded side face.
+    g.save();
+    path();
+    g.clip();
+    g.fillStyle = 'rgba(20,16,24,0.3)';
+    g.beginPath();
+    g.moveTo(size * 0.55 + rnd() * 4, 0);
+    g.lineTo(size, 0);
+    g.lineTo(size, size);
+    g.lineTo(size * 0.4 + rnd() * 4, size);
+    g.closePath();
+    g.fill();
+    // A crack and a few pits.
+    g.strokeStyle = 'rgba(20,16,24,0.55)';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    let x = size * (0.3 + rnd() * 0.2);
+    let y = size * 0.3;
+    g.moveTo(x, y);
+    for (let i = 0; i < 3; i++) {
+      x += (rnd() - 0.4) * 6;
+      y += 4 + rnd() * 3;
+      g.lineTo(x, y);
+    }
+    g.stroke();
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle = `rgba(20,16,24,${0.15 + rnd() * 0.2})`;
+      g.fillRect(size * (0.2 + rnd() * 0.6), size * (0.25 + rnd() * 0.5), 1.5 + rnd() * 2, 1.5 + rnd() * 2);
+    }
+    g.restore();
+    path();
+    g.strokeStyle = 'rgba(16,12,18,0.4)';
+    g.lineWidth = 1.4;
+    g.stroke();
+    out.push(Texture.from(c));
+  }
+  return out;
+}
+
 export { rand as seededRandom };
 
 /** A thin soft ring for shockwaves and shield ripples. */

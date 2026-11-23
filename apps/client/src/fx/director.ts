@@ -100,11 +100,11 @@ function attackStyle(e: Damage): ProjectileStyle | 'lightning' | 'flames' {
 }
 
 /** Dust, debris, sparks and a shockwave where a hit lands. */
-function impact(field: Battlefield, at: Point, lost: number, color: number, style: string): void {
+function impact(field: Battlefield, at: Point, lost: number, color: number, style: string, stones?: number[]): void {
   const big = lost >= 12;
   field.flare(at.x, at.y, color, 140 + lost * 8, 380, 0.8);
   field.ring(at.x, at.y, color, 50 + lost * 5, 520, 0.8);
-  field.burst(at.x, at.y, { count: 8 + lost * 1.6, texture: 'rubble', speed: 4 + lost * 0.15, spread: Math.PI * 1.3, gravity: 0.35, size: 10, life: 1400 });
+  field.burst(at.x, at.y, { count: 6 + lost, texture: 'rubble', color: stones, speed: 4 + lost * 0.15, spread: Math.PI * 1.3, gravity: 0.35, size: 11, life: 2200 });
   field.burst(at.x, at.y, { count: 10 + lost, texture: 'spark', color: [0xffe7b0, color], speed: 5 + lost * 0.1, gravity: 0.12, size: 20, life: 520 });
   field.burst(at.x, at.y, { count: 3 + Math.round(lost / 4), texture: 'smoke', color: 0x9c8a72, speed: 1.4, gravity: -0.01, size: 44 + lost * 1.5, life: 1500, alpha: 0.5 });
   if (style === 'bolt' || style === 'lightning') {
@@ -276,7 +276,11 @@ export const fx = {
     if (style !== 'flames') {
       audio.play(big ? 'hitBig' : e.kind === 'piercing' ? 'pierce' : 'hit', Math.min(1, lost / 14), { pan: p });
       if (e.kind === 'piercing' && big) audio.play('pierce', 0.5, { pan: p, gain: 0.7 });
-      impact(field, at, lost, color, style);
+      impact(field, at, lost, color, style, field.stoneColors(target));
+      if (!fell) {
+        if (e.wallLoss > 0) field.crumble(target, 'wall', e.wallLoss);
+        if (e.keepLoss > 0) field.crumble(target, 'keep', e.keepLoss);
+      }
       field.shake(Math.min(20, 3 + lost * 0.75));
       field.hitCastle(target, e.kind === 'piercing' ? 0xd0a0ff : 0xff9a7a, Math.min(1.5, lost / 10));
       if (big) {
@@ -284,15 +288,13 @@ export const fx = {
         audio.duck(0.55, 900);
       }
     } else if (lost > 0) {
-      field.burst(at.x, at.y, { count: 6 + lost, texture: 'rubble', speed: 3, gravity: 0.35, size: 8, life: 1100 });
+      field.burst(at.x, at.y, { count: 6 + lost, texture: 'rubble', color: field.stoneColors(target), speed: 3, gravity: 0.35, size: 8, life: 1600 });
       field.hitCastle(target, 0xff7a30, 0.3);
     }
     if (lost > 0) ctx.float(`−${lost}`, at.x, at.y - 10, 'damage');
     if (fell) {
       audio.play('keepFall', 0.5, { pan: p, delay: 200 });
-      const base = field.anchor(target, 'base');
-      field.burst(base.x, base.y - 20, { count: 12, texture: 'smoke', color: 0x8a7a66, speed: 2.6, spread: Math.PI, gravity: -0.02, size: 80, life: 2600, alpha: 0.5, area: { w: 80, h: 30 } });
-      field.burst(base.x, base.y - 60, { count: 40, texture: 'rubble', speed: 5, spread: Math.PI * 1.2, gravity: 0.35, size: 12, life: 1800, area: { w: 60, h: 120 } });
+      field.collapse(target);
       field.shake(24);
     }
     await field.animateCastle(target, heights.keep, heights.wall, ms(fell ? 900 : 420));
@@ -302,8 +304,7 @@ export const fx = {
     const side = ctx.side(seat);
     const at = ctx.field.anchor(side, target);
     audio.play('crumble', 0.5, { pan: pan(ctx, seat) });
-    ctx.field.burst(at.x, at.y, { count: 8 + amount * 2, texture: 'rubble', speed: 3, gravity: 0.35, size: 9, life: 1300 });
-    ctx.field.burst(at.x, at.y + 20, { count: 5, texture: 'smoke', color: 0x8c7a62, speed: 1.2, gravity: -0.01, size: 60, life: 1600, alpha: 0.6, area: { w: 30, h: 60 } });
+    ctx.field.crumble(side, target, amount);
     ctx.field.hitCastle(side, 0xd0b090, 0.6);
     ctx.float(`−${amount}`, at.x, at.y - 10, 'damage');
     await ctx.field.animateCastle(side, heights.keep, heights.wall, ms(500));
@@ -319,6 +320,7 @@ export const fx = {
     const base = field.anchor(side, 'base');
     const before = field.anchor(side, target);
     const grow = field.animateCastle(side, heights.keep, heights.wall, ms(620 + Math.min(400, amount * 15)));
+    field.placeBlocks(side, target, 2 + amount / 3);
     // Dust where the masons work, then motes of gold up the new courses.
     const x = target === 'keep' ? base.x : before.x;
     field.burst(x, base.y - 6, { count: 4 + Math.round(amount / 4), texture: 'smoke', color: 0xb8a080, speed: 1.6, spread: Math.PI * 0.8, gravity: -0.01, size: 44, life: 1200, alpha: 0.55, area: { w: 60, h: 8 } });

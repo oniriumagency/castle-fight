@@ -4,6 +4,7 @@ import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
 import { glowTexture } from './textures';
 import { drawTombstone } from './tombstone';
+import { paintedCastle, Stack, type PaintedCastle, type StackedPiece } from './paintedCastle';
 
 /**
  * One castle, drawn in the style of its hero (see `castleStyles.ts`).
@@ -91,6 +92,12 @@ class Tower {
   /** Roof apex above the body top (negative y offset), and where a flag pole stands. */
   apex = 0;
   broken = false;
+  /** Horizontal offset of the apex from the centre (painted towers: the flagpole). */
+  apexX = 0;
+  /** The painting this tower is made of, or null when it is drawn. */
+  readonly painted: Stack | null;
+  /** Painted towers are mirrored on the right-hand castle. */
+  mirror = false;
   private key = '';
 
   constructor(
@@ -98,11 +105,18 @@ class Tower {
     readonly isKeep: boolean,
     readonly index: number,
     stone: Texture,
+    piece: StackedPiece | null = null,
   ) {
     this.body = new TilingSprite({ texture: stone, width: 10, height: 10 });
     this.shade = new Sprite(shadeTexture(shape.round));
     this.foot = new Sprite(footTexture());
-    this.root.addChild(this.body, this.shade, this.foot, this.details, this.decor, this.top);
+    this.painted = piece ? new Stack(piece) : null;
+    if (this.painted) {
+      this.body.visible = this.shade.visible = this.foot.visible = false;
+      this.root.addChild(this.painted.root, this.details, this.decor, this.top);
+    } else {
+      this.root.addChild(this.body, this.shade, this.foot, this.details, this.decor, this.top);
+    }
   }
 
   get topY(): number {
@@ -137,6 +151,14 @@ class Tower {
     this.foot.height = footH;
     this.top.position.set(this.cx, y);
     this.decor.position.set(this.cx, y);
+    if (this.painted) {
+      const fit = this.painted.layout(this.cx, this.groundY, this.w, h, this.mirror, !broken);
+      if (!broken) {
+        this.crown = fit.crown;
+        this.apex = fit.apexY;
+        this.apexX = fit.apexX;
+      }
+    }
     const key = `${Math.round(h / unit)}|${broken}|${this.w}|${unit}`;
     if (key !== this.key) {
       this.key = key;
@@ -149,6 +171,7 @@ class Tower {
   }
 
   destroy(): void {
+    this.painted?.destroy();
     this.root.destroy({ children: true });
   }
 }
@@ -205,6 +228,10 @@ export class Castle extends Container {
   private sweepPhase = 0;
 
   private keepTower!: Tower;
+  /** The hero's painted castle once loaded (null: drawn). */
+  private painted: PaintedCastle | null = null;
+  private wallStack: Stack | null = null;
+  private ruinsSprite: Sprite | null = null;
   private towers: Tower[] = [];
   private puffs: Puff[] = [];
   private puffTimer = 0;
@@ -255,6 +282,18 @@ export class Castle extends Container {
     );
     this.shieldSweep.blendMode = 'add';
     this.buildTowers();
+    this.loadPainted();
+  }
+
+  /** Swaps in the hero's painted castle if there is one (the drawn one stands until it loads). */
+  private loadPainted(): void {
+    const hero = this.hero;
+    void paintedCastle(hero).then((set) => {
+      if (hero !== this.hero || set === this.painted || this.destroyed) return;
+      this.painted = set;
+      this.buildTowers();
+      if (this.layoutValue) this.setLayout(this.layoutValue);
+    });
   }
 
   get keep(): number {
@@ -286,7 +325,9 @@ export class Castle extends Container {
       this.style = style;
       const tex = styleTextures(style);
       this.wallBody.texture = tex.wallStone;
+      this.painted = null;
       this.buildTowers();
+      this.loadPainted();
     } else {
       this.invalidate();
     }
@@ -421,6 +462,24 @@ export class Castle extends Container {
     return { x: this.wallCx(), y: l.groundY - this.wallPx() };
   }
 
+  /** Colours of this castle's falling stones: its masonry (a few shades), trim and roof. */
+  debrisColors(): number[] {
+    const s = this.style;
+    const stone = (s.keepStone.base[0] << 16) | (s.keepStone.base[1] << 8) | s.keepStone.base[2];
+    return [stone, darken(stone, 0.18), lighten(stone, 0.08), stone, s.trim, s.roof];
+  }
+
+  /** Top of the Keep's body and of the Wall in scene px, and their widths (for build and collapse effects). */
+  bodies(): { keep: { x: number; top: number; w: number }; wall: { x: number; top: number; w: number }; groundY: number } | null {
+    const l = this.layoutValue;
+    if (!l) return null;
+    return {
+      keep: { x: l.x, top: l.groundY - this.keepPx(), w: l.keepWidth },
+      wall: { x: this.wallCx(), top: l.groundY - this.wallPx(), w: this.wallW() },
+      groundY: l.groundY,
+    };
+  }
+
   /** Scene positions of the top of every standing tower, Keep first (for flames, sparks and smoke). */
   towerTops(): { x: number; y: number; width: number }[] {
     if (!this.layoutValue) return [];
@@ -473,12 +532,27 @@ export class Castle extends Container {
     this.puffs = [];
     const s = this.style;
     const tex = styleTextures(s);
-    this.keepTower = new Tower({ roof: s.keep.roof, parapet: s.keep.parapet, round: !!s.keep.round, pennant: false }, true, -1, tex.keepStone);
+    const p = this.painted;
+    this.wallStack?.destroy();
+    this.wallStack = p?.wall ? new Stack(p.wall) : null;
+    if (this.wallStack) this.wallLayer.addChildAt(this.wallStack.root, 0);
+    this.ruinsSprite?.destroy();
+    this.ruinsSprite = p?.ruins ? new Sprite(p.ruins) : null;
+    if (this.ruinsSprite) {
+      this.ruinsSprite.anchor.set(0.5, 1);
+      this.ruinsSprite.visible = false;
+      this.addChildAt(this.ruinsSprite, this.getChildIndex(this.rubble));
+    }
+    this.keepTower = new Tower({ roof: s.keep.roof, parapet: s.keep.parapet, round: !!s.keep.round, pennant: false }, true, -1, tex.keepStone, p?.keep ?? null);
+    this.keepTower.mirror = this.facing < 0;
     this.keepLayer.addChild(this.keepTower.root);
     // Furthest towers first so nearer ones overlap them.
     const specs = s.towers.map((spec, i) => ({ spec, i })).sort((a, b) => b.spec.offset - a.spec.offset);
     this.towers = specs.map(({ spec, i }) => {
-      const t = new Tower({ roof: spec.roof, parapet: spec.parapet, round: !!spec.round, pennant: !!spec.pennant }, false, i, tex.keepStone);
+      // A painted castle without its own back tower uses its Keep, smaller.
+      const piece = p ? (p.tower ?? p.keep) : null;
+      const t = new Tower({ roof: spec.roof, parapet: spec.parapet, round: !!spec.round, pennant: !!spec.pennant }, false, i, tex.keepStone, piece);
+      t.mirror = this.facing < 0;
       // Towers further back sit in the haze: a touch darker and bluer.
       const depth = Math.min(1, spec.offset / 1.4);
       t.root.tint = mix(0xffffff, 0x9aa2c0, 0.12 + depth * 0.22);
@@ -586,6 +660,17 @@ export class Castle extends Container {
     const decor = t.decor.clear();
     const gy = t.groundY;
     const left = t.cx - w / 2;
+
+    // A painted tower brings its own stone, windows and crown: only a break is drawn.
+    if (t.painted) {
+      if (t.broken) {
+        const crown = this.drawBrokenTop(top, t, unit);
+        t.crown = crown.height;
+        t.apex = crown.apex;
+        t.apexX = 0;
+      }
+      return;
+    }
 
     // Plinth: a slightly wider base course.
     const plinth = Math.min(h, w * 0.14);
@@ -1064,6 +1149,24 @@ export class Castle extends Container {
     const x = cx - w / 2;
     const y = l.groundY - wh;
     const standing = wh > 0.5;
+    if (this.wallStack) {
+      this.wallBody.visible = this.wallShade.visible = this.wallTop.visible = false;
+      this.wallStack.layout(cx, l.groundY, w, wh, this.facing < 0, true);
+      const key = `p|${standing}|${w}`;
+      if (key === this.wallKey) return;
+      this.wallKey = key;
+      const g = this.wallDetails.clear();
+      this.wallTop.clear();
+      // Just the foundation stones when it is down.
+      if (!standing) {
+        for (let i = 0; i < 7; i++) {
+          const sx = x + (w * (i + 0.5)) / 7;
+          const r = w * 0.06;
+          g.roundRect(sx - r, l.groundY - r * 0.9, r * 2, r * 0.9, 1.5).fill({ color: mix(s.trim, 0x000000, 0.35 + hash(i) * 0.2) });
+        }
+      }
+      return;
+    }
     this.wallBody.visible = this.wallShade.visible = this.wallTop.visible = standing;
     this.wallBody.position.set(x, y);
     this.wallBody.width = w;
@@ -1219,6 +1322,16 @@ export class Castle extends Container {
 
   private drawRubble(l: CastleLayout, fallen: boolean): void {
     const g = this.rubble.clear();
+    if (this.ruinsSprite) {
+      this.ruinsSprite.visible = fallen;
+      if (!fallen) return;
+      const w = l.keepWidth * 2.3;
+      this.ruinsSprite.width = w;
+      this.ruinsSprite.height = (w / this.ruinsSprite.texture.width) * this.ruinsSprite.texture.height;
+      this.ruinsSprite.scale.x *= this.facing < 0 ? -1 : 1;
+      this.ruinsSprite.position.set(l.x - this.facing * l.keepWidth * 0.1, l.groundY + l.keepWidth * 0.04);
+      return;
+    }
     if (!fallen) return;
     const s = this.style;
     const stoneColor = (s.keepStone.base[0] << 16) | (s.keepStone.base[1] << 8) | s.keepStone.base[2];
@@ -1455,8 +1568,7 @@ export class Castle extends Container {
     sp.alpha = alpha;
   }
 
-  private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number): void {
-    const dir = this.facing;
+  private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number = this.facing): void {
     const pts: number[] = [];
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
@@ -1484,8 +1596,23 @@ export class Castle extends Container {
     const fallen = !k.root.visible;
     let glowIndex = 0;
 
+    const painted = !!k.painted;
+    // Ruins smoulder: thin dark smoke and a few embers glowing in the rubble.
+    if (fallen) {
+      if (!calm) this.emitPuff(dt, l.x + (Math.random() - 0.5) * l.keepWidth * 0.8, l.groundY - l.keepWidth * 0.25, Math.random() > 0.5 ? 0x4a443e : 0x5c544a);
+      for (let i = 0; i < 3; i++) {
+        const flick = 0.5 + Math.sin(p * (5 + i * 2.3) + i * 4) * 0.3 + Math.sin(p * 13 + i) * 0.2;
+        this.glowAt(glowIndex++, l.x + (hash(i * 5.3) - 0.5) * l.keepWidth * 1.2, l.groundY - l.keepWidth * (0.05 + hash(i * 2.2) * 0.15), l.keepWidth * 0.5, 0xff7a2a, 0.35 * flick);
+      }
+    }
+    // A painted Keep has its own flagpole: the flag flies from its tip.
+    if (painted && !fallen && !k.broken && s.signature !== 'orb') {
+      // A pole off to one side flies its flag outward, clear of the roof.
+      const dir = k.apexX < -k.w * 0.12 ? -1 : k.apexX > k.w * 0.12 ? 1 : this.facing;
+      this.drawFlag(g, k.cx + k.apexX, k.topY + k.apex + 1, k.w * 0.62, k.w * 0.24, this.bannerColor, false, p, dir);
+    }
     // Keep flag (the Sorceress has her orb instead).
-    if (!fallen && !k.broken && s.signature !== 'orb') {
+    if (!painted && !fallen && !k.broken && s.signature !== 'orb') {
       const poleTop = k.topY + k.apex - k.w * 0.55;
       const poleBase = k.topY + k.apex + (s.keep.roof === 'flat' ? 0 : k.w * 0.1);
       g.rect(k.cx - 1, poleTop, 2, poleBase - poleTop).fill({ color: 0x2a2018 });
@@ -1495,10 +1622,35 @@ export class Castle extends Container {
     // Pennants on the back towers.
     for (const t of this.towers) {
       if (!t.shape.pennant || t.broken || t.h < 2) continue;
+      if (t.painted) {
+        const dir = t.apexX < -t.w * 0.12 ? -1 : t.apexX > t.w * 0.12 ? 1 : this.facing;
+        this.drawFlag(g, t.cx + t.apexX, t.topY + t.apex + 1, t.w * 0.7, t.w * 0.2, this.bannerColor, true, p + t.index * 1.7, dir);
+        continue;
+      }
       const top = t.topY + t.apex;
       const pole = t.w * 0.45;
       g.rect(t.cx - 0.75, top - pole, 1.5, pole).fill({ color: 0x2a2018 });
       this.drawFlag(g, t.cx, top - pole + 1, t.w * 0.7, t.w * 0.2, this.bannerColor, true, p + t.index * 1.7);
+    }
+
+    // Painted castles carry their signature in the painting: only its light moves.
+    if (painted) {
+      if (!fallen && !k.broken) {
+        const ax = k.cx + k.apexX;
+        const ay = k.topY + k.apex;
+        if (s.signature === 'orb') this.glowAt(glowIndex++, ax, ay + k.w * 0.2, k.w * 1.6 * (1 + Math.sin(p * 2.3) * 0.08), s.windowCore, 0.5);
+        if (s.signature === 'braziers') {
+          for (const side of [-1, 1]) {
+            const f = 1 + Math.sin(p * 7 + side * 2) * 0.15 + Math.sin(p * 13 + side) * 0.08;
+            this.glowAt(glowIndex++, k.cx + side * k.w * 0.5, k.topY - k.crown * 0.55, k.w * 0.9 * f, 0xff8a30, 0.4);
+          }
+        }
+        // The windows breathe, warm or magical.
+        this.glowAt(glowIndex++, k.cx, k.topY + k.h * 0.45, k.w * 1.5, s.windowCore, 0.08 + Math.sin(p * 1.1) * 0.04);
+        if (s.signature === 'smoke' && !calm) this.emitPuff(dt, ax, ay);
+      }
+      this.tickPuffs(dt, l, p);
+      return;
     }
 
     switch (s.signature) {
@@ -1603,22 +1755,30 @@ export class Castle extends Container {
         // Green-tinged smoke from the chimney and glowing round windows.
         const chim = this.towers.find((tw) => tw.index === 0);
         if (!chim || chim.broken || calm) break;
-        this.puffTimer -= dt;
-        if (this.puffTimer <= 0) {
-          this.puffTimer = 260 + Math.random() * 200;
-          const sprite = new Sprite(glow());
-          sprite.anchor.set(0.5);
-          sprite.tint = Math.random() > 0.5 ? 0x9fd8a8 : 0xb8c8b0;
-          this.smoke.addChild(sprite);
-          this.puffs.push({ sprite, life: 0, max: 2400 + Math.random() * 800, vx: (Math.random() - 0.2) * 0.01 * -this.facing, vy: -0.025 - Math.random() * 0.01 });
-          sprite.position.set(chim.cx, chim.topY + chim.apex);
-        }
+        this.emitPuff(dt, chim.cx, chim.topY + chim.apex);
         this.glowAt(glowIndex++, chim.cx, chim.topY + chim.apex - chim.w * 0.3, chim.w * 2.2, 0x6fffa0, 0.12 + Math.sin(p * 1.7) * 0.04);
         break;
       }
     }
 
-    // Smoke puffs drift up and fade (they keep going even if the chimney falls).
+    this.tickPuffs(dt, l, p);
+  }
+
+  /** A puff of chimney smoke now and then. */
+  private emitPuff(dt: number, x: number, y: number, tint?: number): void {
+    this.puffTimer -= dt;
+    if (this.puffTimer > 0) return;
+    this.puffTimer = 260 + Math.random() * 200;
+    const sprite = new Sprite(glow());
+    sprite.anchor.set(0.5);
+    sprite.tint = tint ?? (Math.random() > 0.5 ? 0x9fd8a8 : 0xb8c8b0);
+    this.smoke.addChild(sprite);
+    this.puffs.push({ sprite, life: 0, max: 2400 + Math.random() * 800, vx: (Math.random() - 0.2) * 0.01 * -this.facing, vy: -0.025 - Math.random() * 0.01 });
+    sprite.position.set(x, y);
+  }
+
+  /** Smoke puffs drift up and fade (they keep going even if the chimney falls). */
+  private tickPuffs(dt: number, l: CastleLayout, p: number): void {
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const puff = this.puffs[i];
       puff.life += dt;
