@@ -606,6 +606,11 @@ export class Castle extends Container {
     const near = this.wallCx() + this.facing * this.wallW() * 0.75;
     const cx = (far + near) / 2;
     const w = Math.abs(near - far);
+    // Painted towers stand on their own patch of grass: only a soft contact shadow under them.
+    if (this.painted) {
+      for (let i = 0; i < 4; i++) g.ellipse(cx, l.groundY + 2, w * (0.62 - i * 0.07), l.keepWidth * (0.16 - i * 0.025)).fill({ color: 0x0c0a08, alpha: 0.12 });
+      return;
+    }
     g.ellipse(cx, l.groundY + 5, w * 0.6, l.keepWidth * 0.3).fill({ color: dark });
     g.ellipse(cx, l.groundY + 2, w * 0.53, l.keepWidth * 0.2).fill({ color: mid });
     g.ellipse(cx - this.facing * w * 0.12, l.groundY, w * 0.36, l.keepWidth * 0.1).fill({ color: light, alpha: 0.7 });

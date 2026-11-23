@@ -50,8 +50,8 @@ function keyOut(data, info) {
     data[i + 3] = Math.round(alpha * data[i + 3]);
     // Spill: pull the key colour out of the soft edge.
     if (magenta) {
-      data[i] = Math.min(r, g + 26);
-      data[i + 2] = Math.min(b, g + 26);
+      data[i] = Math.min(r, g + 12);
+      data[i + 2] = Math.min(b, g + 12);
     } else {
       data[i + 1] = Math.min(g, Math.max(r, b) + 16);
     }
@@ -112,13 +112,63 @@ function findBands(rows, height, override) {
   };
   while (crown < mid0 && !clean(crown, crown + slack * 2)) crown++;
   while (base > mid1 && !clean(base - slack * 2, base)) base--;
-  // Leave a little of the straight shaft to the crown and the base, so their edges blend.
-  const pad = Math.round((base - crown) * 0.04);
-  crown += pad;
-  base -= pad;
   if (override?.crown !== undefined) crown = Math.round(override.crown * height);
   if (override?.base !== undefined) base = Math.round(override.base * height);
-  return { crown, base, shaftLeft: left, shaftWidth: width };
+  return { crown, base, shaftLeft: left, shaftWidth: width, fixed: override?.crown !== undefined && override?.base !== undefined };
+}
+
+/**
+ * The straight part of a tower often still has windows, string courses or a
+ * balcony, and repeating those shows. Only the plainest stretch repeats: a
+ * band about as tall as the shaft is wide where every row looks like the
+ * median row (brightness, colour, no glowing windows). Everything above it
+ * is the crown and everything below it the base.
+ */
+function plainBand(data, width, b, share = 0.7) {
+  const x0 = Math.round(b.shaftLeft + b.shaftWidth * 0.1);
+  const x1 = Math.round(b.shaftLeft + b.shaftWidth * 0.9);
+  const feats = [];
+  for (let y = b.crown; y < b.base; y++) {
+    let lum = 0;
+    let sat = 0;
+    const ls = [];
+    for (let x = x0; x < x1; x++) {
+      const i = (y * width + x) * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const bl = data[i + 2];
+      const l = 0.3 * r + 0.59 * g + 0.11 * bl;
+      lum += l;
+      sat += Math.max(r, g, bl) - Math.min(r, g, bl);
+      ls.push(l);
+    }
+    ls.sort((a, c) => a - c);
+    const n = x1 - x0;
+    feats.push([lum / n, sat / n, ls[Math.floor(n * 0.95)], ls[Math.floor(n * 0.05)]]);
+  }
+  const len = Math.min(feats.length, Math.max(24, Math.round(b.shaftWidth * share)));
+  if (feats.length <= len) return {};
+  const score = feats.map(() => 0);
+  for (let k = 0; k < 4; k++) {
+    const col = feats.map((f) => f[k]);
+    const med = median(col);
+    const mad = median(col.map((v) => Math.abs(v - med))) || 1;
+    col.forEach((v, i) => (score[i] += Math.min(6, Math.abs(v - med) / mad)));
+  }
+  // Rows near a string course or a window score high; a small pull toward the middle breaks ties.
+  const mid = (feats.length - len) / 2;
+  let best = 0;
+  let bestScore = Infinity;
+  let sum = score.slice(0, len).reduce((a, c) => a + c, 0);
+  for (let y = 0; y + len <= feats.length; y++) {
+    if (y > 0) sum += score[y + len - 1] - score[y - 1];
+    const total = sum / len + (Math.abs(y - mid) / feats.length) * 0.6;
+    if (total < bestScore) {
+      bestScore = total;
+      best = y;
+    }
+  }
+  return { crown: b.crown + best, base: b.crown + best + len };
 }
 
 /** Cross-fades the bottom of a vertical tile into its top so it repeats without a seam. */
@@ -160,6 +210,8 @@ async function stacked(input, outDir, piece, override) {
   const { width, height } = info;
   const rows = spans(data, width, height);
   const b = findBands(rows, height, override);
+  // A wall is wide: a short band keeps its string courses out of the repeat.
+  if (!b.fixed) Object.assign(b, plainBand(data, width, b, piece === 'wall' ? 0.2 : 0.7));
   const slice = (y0, y1) => {
     const buf = Buffer.alloc(width * (y1 - y0) * 4);
     data.copy(buf, 0, y0 * width * 4, y1 * width * 4);
