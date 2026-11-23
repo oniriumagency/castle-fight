@@ -9,6 +9,7 @@ import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { buildCastles } from './build-castles.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, '../../../art');
@@ -147,4 +148,5 @@ for (const folder of FOLDERS) {
     }
   }
 }
+built += await buildCastles(source, target);
 console.log(`art: ${built} converted, ${skipped} up to date -> ${relative(process.cwd(), target)}`);

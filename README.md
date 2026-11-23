@@ -8,7 +8,7 @@ Duelo de cartas 1 contra 1 por turnos, en HTML5 y con multijugador online. Cada 
 | --- | --- |
 | `design/cards.json` | Reglas base, 71 cartas, 6 héroes y 6 eventos, con textos en español e inglés. |
 | `design/art-prompts.md` | Prompts de las 83 ilustraciones. |
-| `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`), con el nombre de archivo indicado en cada prompt. |
+| `art/` | Ilustraciones finales (`cards/`, `heroes/`, `events/`, `castles/`), con el nombre de archivo indicado en cada prompt. |
 | `packages/engine` | Motor de reglas puro y determinista, sin dependencias. Lo usan el servidor, el cliente, la IA y las simulaciones. [Documentación](packages/engine/README.md). |
 | `packages/ai` | IA rival con tres dificultades, que corre en el navegador sin servidor, y simulaciones de equilibrio IA contra IA. [Documentación](packages/ai/README.md). |
 | `packages/campaign` | Modo Campaña: mapa de reinos y territorios, progreso guardado, mazos rivales, dificultad y diálogos. [Documentación](packages/campaign/README.md). |
