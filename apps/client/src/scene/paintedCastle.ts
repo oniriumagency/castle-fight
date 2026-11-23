@@ -18,6 +18,8 @@ export interface StackedMeta {
   shaftWidth: number;
   /** Highest point (flagpole tip or spire), in source px from the crown's top-left. */
   apex: { x: number; y: number };
+  /** Which bands give off light of their own (a `-glow` copy exists). */
+  glow?: { crown: boolean; base: boolean };
 }
 
 export interface StackedPiece {
@@ -25,6 +27,8 @@ export interface StackedPiece {
   crown: Texture;
   shaft: Texture;
   base: Texture;
+  crownGlow: Texture | null;
+  baseGlow: Texture | null;
 }
 
 export interface PaintedCastle {
@@ -61,7 +65,11 @@ async function stacked(hero: string, piece: Piece, meta: StackedMeta | undefined
   if (!meta) return null;
   const [crown, shaft, base] = await Promise.all(['crown', 'shaft', 'base'].map((band) => texture(`castles/${hero}/${piece}-${band}.webp`)));
   if (!crown || !shaft || !base) return null;
-  return { meta, crown, shaft, base };
+  const [crownGlow, baseGlow] = await Promise.all([
+    meta.glow?.crown ? texture(`castles/${hero}/${piece}-crown-glow.webp`) : Promise.resolve(null),
+    meta.glow?.base ? texture(`castles/${hero}/${piece}-base-glow.webp`) : Promise.resolve(null),
+  ]);
+  return { meta, crown, shaft, base, crownGlow, baseGlow };
 }
 
 /** The painted castle of a hero, or null while it is not painted (needs at least the Keep). */
@@ -106,6 +114,10 @@ export class Stack {
   private readonly crown: Sprite;
   private readonly shaft: TilingSprite;
   private readonly base: Sprite;
+  /** Windows, fires and crystals, added on top and made to flicker. */
+  private readonly crownGlow: Sprite | null;
+  private readonly baseGlow: Sprite | null;
+  private readonly baseGlowCrop: Texture | null;
   /** The base cropped to its lower part when the body is shorter than it. */
   private readonly baseCrop: Texture;
   private cropKey = -1;
@@ -116,6 +128,14 @@ export class Stack {
     this.baseCrop = new Texture({ source: piece.base.source, frame: new Rectangle(0, 0, piece.base.width, piece.base.height) });
     this.base = new Sprite(this.baseCrop);
     this.root.addChild(this.shaft, this.base, this.crown);
+    this.crownGlow = piece.crownGlow ? new Sprite(piece.crownGlow) : null;
+    this.baseGlowCrop = piece.baseGlow ? new Texture({ source: piece.baseGlow.source, frame: new Rectangle(0, 0, piece.baseGlow.width, piece.baseGlow.height) }) : null;
+    this.baseGlow = this.baseGlowCrop ? new Sprite(this.baseGlowCrop) : null;
+    for (const g of [this.baseGlow, this.crownGlow]) {
+      if (!g) continue;
+      g.blendMode = 'add';
+      this.root.addChild(g);
+    }
   }
 
   /**
@@ -145,6 +165,15 @@ export class Stack {
       f.height = rows;
       this.baseCrop.updateUvs();
       this.baseCrop.update();
+      if (this.baseGlowCrop) {
+        const g = this.baseGlowCrop.frame;
+        g.x = 0;
+        g.y = 0;
+        g.width = m.width;
+        g.height = Math.min(rows, this.piece.baseGlow!.height);
+        this.baseGlowCrop.updateUvs();
+        this.baseGlowCrop.update();
+      }
     }
     this.base.visible = h > 0.5;
     this.base.position.set(left, -rows * k);
@@ -160,14 +189,34 @@ export class Stack {
     // Keep the courses anchored to the base so the stones do not slide as it grows.
     this.shaft.tilePosition.set(0, shaftH);
 
+    if (this.baseGlow) {
+      this.baseGlow.visible = this.base.visible;
+      this.baseGlow.position.copyFrom(this.base.position);
+      this.baseGlow.width = W;
+      this.baseGlow.height = rows * k;
+    }
+
     const crownH = m.crown * k;
     this.crown.visible = crown && h > 0.5;
     this.crown.position.set(left, -h - crownH);
     this.crown.width = W;
     this.crown.height = crownH;
 
+    if (this.crownGlow) {
+      this.crownGlow.visible = this.crown.visible;
+      this.crownGlow.position.copyFrom(this.crown.position);
+      this.crownGlow.width = W;
+      this.crownGlow.height = crownH;
+    }
+
     const apexX = (left + m.apex.x * k) * (mirror ? -1 : 1);
     return { crown: crownH, apexY: -(m.crown - m.apex.y) * k, apexX };
+  }
+
+  /** How bright the painting's own lights burn (0 out, 1 as painted, more for a bloom). */
+  setGlow(crown: number, base: number): void {
+    if (this.crownGlow) this.crownGlow.alpha = crown;
+    if (this.baseGlow) this.baseGlow.alpha = base;
   }
 
   /** Height of the base band for a shaft `w` wide (scene px). */
@@ -177,6 +226,7 @@ export class Stack {
 
   destroy(): void {
     this.baseCrop.destroy(false);
+    this.baseGlowCrop?.destroy(false);
     this.root.destroy({ children: true });
   }
 }

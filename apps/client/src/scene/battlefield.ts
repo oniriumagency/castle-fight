@@ -350,6 +350,7 @@ export class Battlefield {
       this.painted.texture = land;
       this.painted.visible = true;
       this.painted.tint = this.paintedFloor.tint = paintTint(this.mood);
+      for (const castle of this.castles) castle.setAmbient(this.painted.tint as number);
       for (const layer of [this.far, this.mid, this.near, this.ground]) layer.visible = false;
       // A whole backdrop brings its own sky.
       if (!terrain && !sky) {
@@ -583,6 +584,7 @@ export class Battlefield {
         };
         this.applyTints();
         this.painted.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
+        for (const castle of this.castles) castle.setAmbient(this.painted.tint as number);
         this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
       .then(() => {

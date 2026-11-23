@@ -249,6 +249,8 @@ export class Castle extends Container {
   private crackKey = '';
   private frozen = false;
   private hitColor = 0xffffff;
+  /** Light of the sky and the battle event on the castle (a multiply tint). */
+  private ambient = 0xffffff;
   private hitLeft = 0;
   private kick = 0;
   private kickPhase = 0;
@@ -383,6 +385,12 @@ export class Castle extends Container {
     this.drawShield();
   }
 
+  /** The sky's light on the castle, so it sits in the same dusk, eclipse or storm as the land. */
+  setAmbient(color: number): void {
+    this.ambient = color;
+    if (this.hitLeft <= 0) this.tint = color;
+  }
+
   /** Flash of colour and a small recoil when struck. */
   hit(color: number, power = 1): void {
     this.hitColor = color;
@@ -501,7 +509,8 @@ export class Castle extends Container {
       this.hitLeft = Math.max(0, this.hitLeft - dt);
       const k = this.hitLeft / 260;
       const c = this.hitColor;
-      const ch = (shift: number): number => Math.round(255 + (((c >> shift) & 255) - 255) * k) << shift;
+      const a = this.ambient;
+      const ch = (shift: number): number => Math.round(((255 + (((c >> shift) & 255) - 255) * k) * ((a >> shift) & 255)) / 255) << shift;
       this.tint = ch(16) | ch(8) | ch(0);
     }
     let x = 0;
@@ -616,7 +625,24 @@ export class Castle extends Container {
     const w = Math.abs(near - far);
     // Painted towers stand on their own patch of grass: only a soft contact shadow under them.
     if (this.painted) {
-      for (let i = 0; i < 4; i++) g.ellipse(cx, l.groundY + 2, w * (0.62 - i * 0.07), l.keepWidth * (0.16 - i * 0.025)).fill({ color: 0x0c0a08, alpha: 0.12 });
+      // Trodden earth and spilled stones under the castle, then a soft shadow cast toward the viewer.
+      const kw = l.keepWidth;
+      for (let i = 0; i < 18; i++) {
+        const x = cx + (hash(i * 3.3 + this.facing) - 0.5) * w * 1.05;
+        const y = l.groundY + 3 + (hash(i * 5.1) - 0.3) * kw * 0.12;
+        const rx = kw * (0.25 + hash(i * 1.7) * 0.4);
+        g.ellipse(x, y, rx, rx * 0.16).fill({ color: i % 3 ? dark : mid, alpha: 0.18 + hash(i * 9.1) * 0.12 });
+      }
+      for (let i = 0; i < 5; i++) g.ellipse(cx, l.groundY + 3 + i, w * (0.6 - i * 0.07), kw * (0.13 - i * 0.018)).fill({ color: 0x0c0a08, alpha: 0.1 });
+      const stone = (this.style.keepStone.base[0] << 16) | (this.style.keepStone.base[1] << 8) | this.style.keepStone.base[2];
+      for (let i = 0; i < 14; i++) {
+        const x = cx + (hash(i * 7.7 + 2) - 0.5) * w * 1.1;
+        const y = l.groundY + 2 + hash(i * 2.9) * kw * 0.1;
+        const r = kw * (0.025 + hash(i * 4.4) * 0.035);
+        g.ellipse(x, y + r * 0.5, r * 1.3, r * 0.35).fill({ color: 0x0c0a08, alpha: 0.3 });
+        g.roundRect(x - r, y - r * 0.8, r * 2, r * 1.3, r * 0.4).fill({ color: mix(stone, i % 2 ? 0x000000 : light, 0.25 + hash(i) * 0.25) });
+        g.rect(x - r * 0.8, y - r * 0.8, r * 1.6, r * 0.35).fill({ color: lighten(stone, 0.2), alpha: 0.5 });
+      }
       return;
     }
     g.ellipse(cx, l.groundY + 5, w * 0.6, l.keepWidth * 0.3).fill({ color: dark });
@@ -1703,6 +1729,16 @@ export class Castle extends Container {
 
     // Painted castles carry their signature in the painting: only its light moves.
     if (painted) {
+      // The painting's own lights flicker like candles and fires, and go out as the castle is wrecked.
+      const dmg = this.damage();
+      const dim = dmg === 0 ? 1 : dmg === 1 ? 0.7 : dmg === 2 ? 0.38 : 0;
+      [k, ...this.towers].forEach((t, i) => {
+        if (!t.painted) return;
+        const f = calm ? 1 : 0.8 + Math.sin(p * 6.3 + i * 2.1) * 0.1 + Math.sin(p * 15.7 + i * 1.3) * 0.07 + Math.sin(p * 2.1 + i) * 0.05;
+        const lit = (t.broken ? 0.12 : dim) * f;
+        t.painted.setGlow(lit * 1.2, lit * 1.05);
+      });
+      this.wallStack?.setGlow(dim * (calm ? 1 : 0.85 + Math.sin(p * 5.1) * 0.1), dim);
       if (!fallen && !k.broken) {
         const ax = k.cx + k.apexX;
         const ay = k.topY + k.apex;

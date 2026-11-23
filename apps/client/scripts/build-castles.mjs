@@ -191,6 +191,42 @@ function seamless(data, width, height) {
   return { data: out, height: outH };
 }
 
+/**
+ * Light the painting gives off itself: windows, braziers, crystals, potions.
+ * Bright, strongly coloured pixels are kept (sunlit stone is bright but not
+ * saturated enough), blurred a little into a glow the game adds on top and
+ * makes flicker. Returns null when a band has no light of its own.
+ */
+async function glowOf(buf, width, height) {
+  // Brightness of the neighbourhood: a lit window stands out from the stone around it.
+  const lumBuf = Buffer.alloc(width * height);
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
+  const around = await sharp(lumBuf, { raw: { width, height, channels: 1 } }).blur(Math.max(3, width / 40)).raw().toBuffer();
+  const out = Buffer.alloc(buf.length);
+  let lit = 0;
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) {
+    if (buf[i + 3] < 128) continue;
+    const r = buf[i];
+    const g = buf[i + 1];
+    const b = buf[i + 2];
+    const lum = lumBuf[j];
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const pop = lum - around[j];
+    const k =
+      Math.min(1, Math.max(0, (pop - 22) / 34)) *
+      Math.min(1, Math.max(0, (sat - 80) / 60)) *
+      Math.min(1, Math.max(0, (lum - 100) / 60));
+    if (k <= 0) continue;
+    lit++;
+    out[i] = r;
+    out[i + 1] = g;
+    out[i + 2] = b;
+    out[i + 3] = Math.round(k * 255);
+  }
+  if (lit < 12) return null;
+  return sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+}
+
 const webp = (data, width, height, file) => sharp(data, { raw: { width, height, channels: 4 } }).webp({ quality: 86, alphaQuality: 92 }).toFile(file);
 
 async function load(input, width) {
@@ -225,6 +261,10 @@ async function stacked(input, outDir, piece, override) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
   const shaft = seamless(band, width, b.base - b.crown);
+  const crownGlow = await glowOf(slice(0, b.crown), width, b.crown);
+  const baseGlow = await glowOf(slice(b.base, height), width, height - b.base);
+  if (crownGlow) await webp(crownGlow, width, b.crown, join(outDir, `${piece}-crown-glow.webp`));
+  if (baseGlow) await webp(baseGlow, width, height - b.base, join(outDir, `${piece}-base-glow.webp`));
   await webp(slice(0, b.crown), width, b.crown, join(outDir, `${piece}-crown.webp`));
   await webp(shaft.data, width, shaft.height, join(outDir, `${piece}-shaft.webp`));
   await webp(slice(b.base, height), width, height - b.base, join(outDir, `${piece}-base.webp`));
@@ -252,7 +292,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 async function ruins(input, outDir) {
