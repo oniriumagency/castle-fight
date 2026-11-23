@@ -40,6 +40,8 @@ export interface CastleLayout {
 
 /** The drawn gravestone on a fallen castle; off until there is a painted one. */
 const SHOW_GRAVESTONES = false;
+/** The wind blows the way the clouds drift (left to right): every flag streams that way, on both castles. */
+const WIND = 1;
 
 // ---------------------------------------------------------------------------
 // Colour helpers
@@ -1877,7 +1879,7 @@ export class Castle extends Container {
     g.circle(x, y - h * 0.08, Math.max(1.2, h * 0.09)).fill({ color: trim });
   }
 
-  private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number = this.facing): void {
+  private drawFlag(g: Graphics, x: number, y: number, len: number, h: number, color: number, pennant: boolean, phase: number, dir: number = WIND): void {
     const pts: number[] = [];
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
@@ -1918,7 +1920,7 @@ export class Castle extends Container {
     // A painted Keep has its own flagpole: the flag flies from its tip.
     if (painted && !fallen && !k.broken && s.signature !== 'orb') {
       // A pole off to one side flies its flag outward, clear of the roof.
-      const dir = k.apexX < -k.w * 0.12 ? -1 : k.apexX > k.w * 0.12 ? 1 : this.facing;
+      const dir = WIND;
       this.drawCloth(flags, k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.7, k.w * 0.3, this.bannerColor, false, p, dir);
     }
     // Keep flag (the Sorceress has her orb instead).
@@ -1933,7 +1935,7 @@ export class Castle extends Container {
     for (const t of this.towers) {
       if (!t.shape.pennant || t.broken || t.h < 2) continue;
       if (t.painted) {
-        const dir = t.apexX < -t.w * 0.12 ? -1 : t.apexX > t.w * 0.12 ? 1 : this.facing;
+        const dir = WIND;
         this.drawCloth(flags, t.cx + t.apexX, t.topY + t.apex + t.w * 0.05, t.w * 0.8, t.w * 0.26, this.bannerColor, true, p + t.index * 1.7, dir);
         continue;
       }
