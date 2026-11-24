@@ -171,6 +171,93 @@ function plainBand(data, width, b, share = 0.7) {
   return { crown: b.crown + best, base: b.crown + best + len };
 }
 
+/**
+ * The painting is lit from above, so a band cut from it is a touch brighter at
+ * one end than the other. Repeated, that slope shows as stripes, and against
+ * the crown and the base as a step of light (the sharper the darker the sky:
+ * an eclipse or a storm tints the castle and the eye reads the steps as cuts).
+ * Returns, for every row of the band, the per-channel gain that brings its
+ * broad light to the band's average (the stones, mortar and the left-to-right
+ * shading are left as painted).
+ */
+function rowGains(data, width, height, b, wrap = false, reach = Math.max(height * 0.3, b.shaftWidth * 0.2)) {
+  const x0 = Math.round(b.shaftLeft + b.shaftWidth * 0.1);
+  const x1 = Math.round(b.shaftLeft + b.shaftWidth * 0.9);
+  const means = [];
+  for (let y = 0; y < height; y++) {
+    const m = [0, 0, 0];
+    let n = 0;
+    for (let x = x0; x < x1; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < 200) continue;
+      for (let c = 0; c < 3; c++) m[c] += data[i + c];
+      n++;
+    }
+    means.push(n ? m.map((v) => v / n) : null);
+  }
+  const fill = means.find(Boolean) ?? [128, 128, 128];
+  for (let y = 0; y < height; y++) means[y] ??= means[y - 1] ?? fill;
+  // Broad light only: averaged over several courses of stone, so mortar lines do not count.
+  const r = Math.max(4, Math.round(reach / 2));
+  const smooth = means.map((_, y) => {
+    const s = [0, 0, 0];
+    let n = 0;
+    for (let d = -r; d <= r; d++) {
+      const row = means[wrap ? (((y + d) % height) + height) % height : Math.min(height - 1, Math.max(0, y + d))];
+      for (let c = 0; c < 3; c++) s[c] += row[c];
+      n++;
+    }
+    return s.map((v) => v / n);
+  });
+  const avg = [0, 1, 2].map((c) => smooth.reduce((a, row) => a + row[c], 0) / height);
+  return smooth.map((row) => row.map((v, c) => Math.min(1.6, Math.max(0.6, (avg[c] + 4) / (v + 4)))));
+}
+
+/** Multiplies every row of a band by its gain (`k` of the way: 0 leaves it, 1 applies it all). */
+function applyGains(data, width, gains, k = () => 1) {
+  for (let y = 0; y < gains.length; y++) {
+    const t = k(y);
+    const g = gains[y].map((v) => 1 + (v - 1) * t);
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      for (let c = 0; c < 3; c++) data[i + c] = Math.min(255, Math.round(data[i + c] * g[c]));
+    }
+  }
+}
+
+const smoothstep = (t) => t * t * (3 - 2 * t);
+
+/** Hue in degrees (0..360). */
+function hue(r, g, b) {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (!d) return 0;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+/** The plain stone's colour: its usual hue and how saturated it gets (95th percentile). */
+function stoneOf(data, width, height, b) {
+  const sats = [];
+  const hues = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = b.shaftLeft; x < b.shaftLeft + b.shaftWidth; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < 200) continue;
+      const r = data[i];
+      const g = data[i + 1];
+      const bl = data[i + 2];
+      sats.push(Math.max(r, g, bl) - Math.min(r, g, bl));
+      hues.push(hue(r, g, bl));
+    }
+  }
+  const p95 = (xs) => [...xs].sort((a, c) => a - c)[Math.floor(xs.length * 0.95)] ?? 0;
+  // The circular mean hue of the stone.
+  const sx = hues.reduce((a, h) => a + Math.cos((h * Math.PI) / 180), 0);
+  const sy = hues.reduce((a, h) => a + Math.sin((h * Math.PI) / 180), 0);
+  return { sat: p95(sats), hue: ((Math.atan2(sy, sx) * 180) / Math.PI + 360) % 360 };
+}
+
 /** Cross-fades the bottom of a vertical tile into its top so it repeats without a seam. */
 function seamless(data, width, height) {
   const band = Math.max(2, Math.round(height * 0.14));
@@ -219,10 +306,11 @@ function weather(shaft, width, seed) {
     blobs.push({
       x: rand() * width,
       y: rand() * H,
-      rx: width * (0.12 + rand() * 0.3),
-      ry: width * (0.1 + rand() * 0.35),
+      // Patches, not bands: a blob as wide as the tower reads as a stripe across it, a cut.
+      rx: width * (0.08 + rand() * 0.16),
+      ry: width * (0.08 + rand() * 0.2),
       // Mostly grime and damp (darker, a touch green or brown), some paler, sunned stone.
-      k: rand() < 0.65 ? -(0.04 + rand() * 0.08) : 0.025 + rand() * 0.04,
+      k: rand() < 0.65 ? -(0.03 + rand() * 0.06) : 0.02 + rand() * 0.03,
       tint: rand() < 0.5 ? [0.98, 0.99, 0.97] : [1.02, 0.99, 0.96],
     });
   }
@@ -249,13 +337,22 @@ function weather(shaft, width, seed) {
   return { data: out, height: H };
 }
 
+/** Evens out what light still varies row to row across the whole long tile (it wraps, so does the averaging). */
+function evenTile(shaft, width, b) {
+  applyGains(shaft.data, width, rowGains(shaft.data, width, shaft.height, b, true, b.shaftWidth * 0.25));
+  return shaft;
+}
+
 /**
  * Light the painting gives off itself: windows, braziers, crystals, potions.
  * Bright, strongly coloured pixels are kept (sunlit stone is bright but not
  * saturated enough), blurred a little into a glow the game adds on top and
  * makes flicker. Returns null when a band has no light of its own.
+ * `stone`: the plain masonry's hue and how saturated it gets (the shaft's), so
+ * warm sunlit sandstone or brick is never taken for a light: it would glow on
+ * the crown and base but not on the shaft, a band of light ending at the cut.
  */
-async function glowOf(buf, width, height) {
+async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
   // Brightness of the neighbourhood: a lit window stands out from the stone around it.
   const lumBuf = Buffer.alloc(width * height);
   for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
@@ -270,9 +367,13 @@ async function glowOf(buf, width, height) {
     const lum = lumBuf[j];
     const sat = Math.max(r, g, b) - Math.min(r, g, b);
     const pop = lum - around[j];
+    // A colour like the stone's must be more vivid than any stone; another colour (a green
+    // potion, a blue crystal) only vivid.
+    const dh = Math.abs(((hue(r, g, b) - stone.hue + 540) % 360) - 180);
+    const floor = dh < 35 ? Math.max(80, stone.sat + 20) : 80;
     const k =
       Math.min(1, Math.max(0, (pop - 22) / 34)) *
-      Math.min(1, Math.max(0, (sat - 80) / 60)) *
+      Math.min(1, Math.max(0, (sat - floor) / 60)) *
       Math.min(1, Math.max(0, (lum - 100) / 60));
     if (k <= 0) continue;
     lit++;
@@ -318,11 +419,42 @@ async function stacked(input, outDir, piece, override) {
   for (let y = 0; y < b.base - b.crown; y++) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
-  const shaft = weather(seamless(band, width, b.base - b.crown), width, input.split(/[\\/]/).slice(-2).join('/'));
+  const len = b.base - b.crown;
+  const gains = rowGains(band, width, len, b);
+  const stone = stoneOf(band, width, len, b);
   // The side the shaft is lit from, so ornaments can be turned to match it.
-  const light = lightSign(lightSide(band, width, 0, 0, width, b.base - b.crown), 6);
-  const crownGlow = await glowOf(slice(0, b.crown), width, b.crown);
-  const baseGlow = await glowOf(slice(b.base, height), width, height - b.base);
+  const light = lightSign(lightSide(band, width, 0, 0, width, len), 6);
+  // The painting is often lit warmer at the top than the plain stretch the shaft is cut from, so
+  // the crown and base would meet the evened-out shaft with a step of light. Ease the light of the
+  // crown's lower part and the base's upper part toward the shaft's, over most of a shaft width.
+  const ease = Math.round(b.shaftWidth * 0.9);
+  const crownEase = Math.min(b.crown, ease);
+  const gc = gains[0];
+  applyGains(data.subarray((b.crown - crownEase) * width * 4, b.crown * width * 4), width, new Array(crownEase).fill(gc), (y) => smoothstep((y + 0.5) / crownEase));
+  const baseEase = Math.min(height - b.base, ease);
+  const gb = gains[len - 1];
+  applyGains(data.subarray(b.base * width * 4, (b.base + baseEase) * width * 4), width, new Array(baseEase).fill(gb), (y) => 1 - smoothstep((y + 0.5) / baseEase));
+  applyGains(band, width, gains);
+  // The skirts: the painting just under the crown and just over the base, laid over the ends of the
+  // repeating shaft and fading into it. The shaft repeats from the base up, so wherever it is cut
+  // under the crown its stones would not meet the crown's; the skirt carries the crown's own stones
+  // down and hands over to the shaft gradually, and the same at the base.
+  const skirt = Math.max(4, Math.min(Math.floor(len / 2), Math.round(b.shaftWidth * 0.32)));
+  const skirtTop = Buffer.from(band.subarray(0, width * skirt * 4));
+  const skirtBottom = Buffer.from(band.subarray(width * (len - skirt) * 4));
+  for (let y = 0; y < skirt; y++) {
+    const fade = 1 - smoothstep((y + 0.5) / skirt);
+    for (let x = 0; x < width; x++) {
+      skirtTop[(y * width + x) * 4 + 3] = Math.round(skirtTop[(y * width + x) * 4 + 3] * fade);
+      const j = ((skirt - 1 - y) * width + x) * 4 + 3;
+      skirtBottom[j] = Math.round(skirtBottom[j] * fade);
+    }
+  }
+  await webp(skirtTop, width, skirt, join(outDir, `${piece}-skirt-top.webp`));
+  await webp(skirtBottom, width, skirt, join(outDir, `${piece}-skirt-bottom.webp`));
+  const shaft = evenTile(weather(seamless(band, width, len), width, input.split(/[\\/]/).slice(-2).join('/')), width, b);
+  const crownGlow = await glowOf(slice(0, b.crown), width, b.crown, stone);
+  const baseGlow = await glowOf(slice(b.base, height), width, height - b.base, stone);
   if (crownGlow) await webp(crownGlow, width, b.crown, join(outDir, `${piece}-crown-glow.webp`));
   if (baseGlow) await webp(baseGlow, width, height - b.base, join(outDir, `${piece}-base-glow.webp`));
   await webp(slice(0, b.crown), width, b.crown, join(outDir, `${piece}-crown.webp`));
@@ -352,7 +484,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 /**
@@ -694,7 +826,8 @@ export async function buildCastles(source, target) {
       const probe = join(outDir, piece === 'ruins' ? 'ruins.webp' : `${piece}-shaft.webp`);
       const stale = Math.max(await mtime(input), await mtime(join(root, 'slices.json')));
       manifest[hero] ??= {};
-      if (old[hero]?.[piece] && (piece === 'ruins' || old[hero][piece].light !== undefined) && (await mtime(probe)) >= stale) {
+      // Pieces cut before the skirts or the light side existed are cut again.
+      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined)) && (await mtime(probe)) >= stale) {
         manifest[hero][piece] = old[hero][piece];
         continue;
       }

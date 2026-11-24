@@ -18,6 +18,12 @@ export interface StackedMeta {
   shaftWidth: number;
   /** Highest point (flagpole tip or spire), in source px from the crown's top-left. */
   apex: { x: number; y: number };
+  /**
+   * Height (source px) of the skirts: the painting just under the crown and just
+   * over the base, laid over the ends of the shaft and fading into it so the cuts
+   * do not show. Absent on pieces cut without them.
+   */
+  skirt?: number;
   /** Which bands give off light of their own (a `-glow` copy exists). */
   glow?: { crown: boolean; base: boolean };
   /** The scaffold's planks: top and bottom edge of each, in source px from the crown's top. */
@@ -33,6 +39,9 @@ export interface StackedPiece {
   base: Texture;
   crownGlow: Texture | null;
   baseGlow: Texture | null;
+  /** Fades from the crown down into the shaft, and from the shaft down into the base. */
+  skirtTop: Texture | null;
+  skirtBottom: Texture | null;
 }
 
 export interface PaintedCastle {
@@ -94,7 +103,10 @@ async function stacked(hero: string, piece: Piece, meta: StackedMeta | undefined
     meta.glow?.crown ? texture(`castles/${hero}/${piece}-crown-glow.webp`) : Promise.resolve(null),
     meta.glow?.base ? texture(`castles/${hero}/${piece}-base-glow.webp`) : Promise.resolve(null),
   ]);
-  return { meta, crown, shaft, base, crownGlow, baseGlow };
+  const [skirtTop, skirtBottom] = meta.skirt
+    ? await Promise.all(['top', 'bottom'].map((end) => texture(`castles/${hero}/${piece}-skirt-${end}.webp`)))
+    : [null, null];
+  return { meta, crown, shaft, base, crownGlow, baseGlow, skirtTop, skirtBottom };
 }
 
 /** The painted castle of a hero, or null while it is not painted (needs at least the Keep). */
@@ -204,6 +216,9 @@ export class Stack {
   private readonly crown: Sprite;
   private readonly shaft: TilingSprite;
   private readonly base: Sprite;
+  /** Where the shaft meets the crown and the base: the painting carried over the cut, fading out. */
+  private readonly skirtTop: Sprite | null;
+  private readonly skirtBottom: Sprite | null;
   /** Shade gathering at the foot, where the stones meet the earth. */
   private readonly foot = new Sprite(footShade());
   /** Windows, fires and crystals, added on top and made to flicker. */
@@ -231,7 +246,12 @@ export class Stack {
     // the castle rose from the ground) and the tower floated with no base.
     this.baseCrop = new Texture({ source: piece.base.source, frame: new Rectangle(0, 0, piece.base.width, piece.base.height), dynamic: true });
     this.base = new Sprite(this.baseCrop);
-    this.root.addChild(this.shaft, this.base, this.crown, this.foot);
+    const skirts = piece.skirtTop && piece.skirtBottom;
+    this.skirtTop = skirts ? new Sprite(piece.skirtTop!) : null;
+    this.skirtBottom = skirts ? new Sprite(piece.skirtBottom!) : null;
+    this.root.addChild(this.shaft);
+    if (this.skirtTop && this.skirtBottom) this.root.addChild(this.skirtBottom, this.skirtTop);
+    this.root.addChild(this.base, this.crown, this.foot);
     this.root.addChild(this.ornamentLayer);
     this.crownGlow = piece.crownGlow ? new Sprite(piece.crownGlow) : null;
     this.baseGlowCrop = piece.baseGlow ? new Texture({ source: piece.baseGlow.source, frame: new Rectangle(0, 0, piece.baseGlow.width, piece.baseGlow.height), dynamic: true }) : null;
@@ -299,6 +319,20 @@ export class Stack {
     this.shaft.tileScale.set(k);
     // Keep the courses anchored to the base so the stones do not slide as it grows.
     this.shaft.tilePosition.set(0, shaftH);
+
+    if (this.skirtTop && this.skirtBottom) {
+      // Each skirt as tall as painted, or squeezed to half the shaft when it is short, so both still
+      // fade out completely before they meet.
+      const sh = Math.min(this.skirtTop.texture.height * k, shaftH / 2);
+      for (const s of [this.skirtTop, this.skirtBottom]) {
+        s.visible = this.shaft.visible && sh > 0.5;
+        s.x = left;
+        s.width = W;
+        s.height = Math.max(1, sh);
+      }
+      this.skirtTop.y = -h;
+      this.skirtBottom.y = -baseH - sh;
+    }
 
     if (this.baseGlow) {
       this.baseGlow.visible = this.base.visible;
