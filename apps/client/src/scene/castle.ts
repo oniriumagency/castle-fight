@@ -40,8 +40,8 @@ export interface CastleLayout {
 
 /** The drawn gravestone on a fallen castle; off until there is a painted one. */
 const SHOW_GRAVESTONES = false;
-/** The wind blows the way the clouds drift (left to right): every flag streams that way, on both castles. */
-const WIND = 1;
+/** The wind blows the way the clouds drift (right to left): every flag streams that way, on both castles. */
+export const WIND = -1;
 
 // ---------------------------------------------------------------------------
 // Colour helpers

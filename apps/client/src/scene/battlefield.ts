@@ -1,10 +1,10 @@
-import { Application, Assets, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import { DEFAULT_RULES, type PlayerId } from '@cardcraft-castles/engine';
 import { consoleBrowser, density, effectsLow, particleBudget, reportSlowFrames } from '../app/quality';
 import { settings } from '../app/settings';
 import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
-import { Castle } from './castle';
+import { Castle, WIND } from './castle';
 import type { ScarKind } from './paintedCastle';
 import {
   KEEP_STONE,
@@ -141,6 +141,13 @@ function liteScenery(): boolean {
 }
 const scenery = (name: string, ext: string, lite: boolean): string => `scenery/${name}${lite ? '-lite' : ''}.${ext}`;
 const TERRAIN_GROUND = 0.72;
+/**
+ * On a short, wide screen (a phone on its side) the painting below its ground
+ * line is too shallow to reach the bottom edge, behind the hand. That meadow is
+ * stretched taller, up to this much, so the castles keep standing on the
+ * painted ground line instead of the whole painting sliding down under them.
+ */
+const MAX_FORE_STRETCH = 2;
 /** The sky is drawn this much wider than the screen, and sways across the extra. */
 const SKY_OVERSCAN = 0.12;
 /** One full sway, left and back, in milliseconds. */
@@ -238,6 +245,8 @@ export class Battlefield {
   /** The drawn sun glow; a painted sky has its own light, so it is off. */
   private paintedLight = false;
   private readonly painted = new Sprite();
+  /** The painting below its ground line, stretched down to the bottom edge when it falls short. */
+  private readonly paintedFore = new Sprite();
   /** Under the painted land, in case the screen is taller than its foreground. */
   private readonly paintedFloor = new Graphics();
   private paintedTint = { from: 0xffffff, to: 0xffffff, skyFrom: 0xffffff, skyTo: 0xffffff };
@@ -314,9 +323,10 @@ export class Battlefield {
     this.castles[2].visible = false;
 
     this.painted.visible = false;
+    this.paintedFore.visible = false;
     this.paintedSky.visible = false;
     this.skyTile.visible = false;
-    this.world.addChild(this.skyA, this.skyB, this.skyFloor, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
+    this.world.addChild(this.skyA, this.skyB, this.skyFloor, this.paintedSky, this.skyTile, this.paintedFloor, this.painted, this.paintedFore, this.sun, ...this.clouds, this.far, this.mid, this.near, this.ground);
     const [c0, c1, c2] = this.castles as [Castle, Castle, Castle];
     this.world.addChild(c2.sceneryBack, c0.sceneryBack, c1.sceneryBack, c2, c0, c1, c2.sceneryFront, c0.sceneryFront, c1.sceneryFront, this.fxLayer, this.bolts, this.weather);
     app.stage.addChild(this.world, this.flashOverlay);
@@ -351,7 +361,10 @@ export class Battlefield {
     if (land) {
       this.painted.texture = land;
       this.painted.visible = true;
-      this.painted.tint = this.paintedFloor.tint = paintTint(this.mood);
+      const f = land.frame;
+      const cut = Math.round(f.height * TERRAIN_GROUND);
+      this.paintedFore.texture = new Texture({ source: land.source, frame: new Rectangle(f.x, f.y + cut, f.width, f.height - cut) });
+      this.painted.tint = this.paintedFore.tint = this.paintedFloor.tint = paintTint(this.mood);
       for (const castle of this.castles) castle.setAmbient(this.painted.tint as number);
       for (const layer of [this.far, this.mid, this.near, this.ground]) layer.visible = false;
       // A whole backdrop brings its own sky.
@@ -405,19 +418,29 @@ export class Battlefield {
     }
     const tex = this.painted.texture;
     if (!this.painted.visible || !tex.width) return;
-    const groundPx = tex.height * TERRAIN_GROUND;
-    // Wide enough for the screen and tall enough to reach the top; a short
-    // screen below the ground is filled with the floor colour, not by zooming in.
+    const groundPx = Math.round(tex.height * TERRAIN_GROUND);
+    // Wide enough for the screen and tall enough to reach the top, its ground
+    // line on the castles' ground.
     const scale = Math.max(this.width / tex.width, this.groundY / groundPx);
-    // On a screen taller than the painting below its ground line, the painting
-    // moves down (the meadow is flat, so the castles still stand on it) as long
-    // as its top stays above the screen; only then is the floor colour needed.
-    const y = Math.min(0, Math.max(this.groundY - groundPx * scale, this.height - tex.height * scale));
-    const bottom = y + tex.height * scale;
+    let y = this.groundY - groundPx * scale;
+    // Below the ground line the painting may fall short of the bottom edge (a
+    // phone on its side: wide, so the scale is set by the width). Its meadow is
+    // stretched down first, so the castles stay on the painted ground; only past
+    // that does the whole painting move down, while its top stays above the
+    // screen, and then the floor colour fills the rest.
+    const forePx = tex.height - groundPx;
+    const need = this.height - this.groundY;
+    const stretch = Math.min(MAX_FORE_STRETCH, Math.max(1, need / (forePx * scale)));
+    y = Math.min(0, y + Math.max(0, need - forePx * scale * stretch));
+    const left = (this.width - tex.width * scale) / 2;
+    this.painted.scale.set(scale);
+    this.painted.position.set(left, y);
+    this.paintedFore.visible = stretch > 1;
+    this.paintedFore.scale.set(scale, scale * stretch);
+    this.paintedFore.position.set(left, y + groundPx * scale);
+    const bottom = y + groundPx * scale + forePx * scale * stretch;
     this.paintedFloor.clear();
     if (bottom < this.height) this.paintedFloor.rect(0, bottom - 2, this.width, this.height - bottom + 2).fill({ color: 0x2c2f1e });
-    this.painted.scale.set(scale);
-    this.painted.position.set((this.width - tex.width * scale) / 2, y);
   }
 
   /** Two castles for a duel, three for a free-for-all (the third stands in the middle). */
@@ -585,7 +608,7 @@ export class Battlefield {
           ground: lerpColor(from.ground, to.ground, t),
         };
         this.applyTints();
-        this.painted.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
+        this.painted.tint = this.paintedFore.tint = this.paintedFloor.tint = lerpColor(this.paintedTint.from, this.paintedTint.to, t);
         for (const castle of this.castles) castle.setAmbient(this.painted.tint as number);
         this.paintedSky.tint = this.skyTile.tint = this.skyFloor.tint = lerpColor(this.paintedTint.skyFrom, this.paintedTint.skyTo, t);
       }, ease.inOutCubic)
@@ -1173,10 +1196,11 @@ export class Battlefield {
       const swing = Math.sin((this.skySway.time / SKY_SWAY_MS) * Math.PI * 2) * 0.45;
       this.paintedSky.x = this.skySway.x + swing * this.skySway.room;
     }
-    // Clouds drift.
+    // Clouds drift with the wind the flags stream in.
     for (const [i, cloud] of this.clouds.entries()) {
-      cloud.x += (0.06 + i * 0.02) * step;
+      cloud.x += WIND * (0.06 + i * 0.02) * step;
       if (cloud.x - cloud.width / 2 > this.width) cloud.x = -cloud.width / 2;
+      else if (cloud.x + cloud.width / 2 < 0) cloud.x = this.width + cloud.width / 2;
     }
     // Particles.
     for (let i = this.particles.length - 1; i >= 0; i--) {
