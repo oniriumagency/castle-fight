@@ -20,6 +20,8 @@ export interface StackedMeta {
   apex: { x: number; y: number };
   /** Which bands give off light of their own (a `-glow` copy exists). */
   glow?: { crown: boolean; base: boolean };
+  /** The side the shaft is lit from: -1 left, 1 right, 0 unclear. */
+  light?: number;
 }
 
 export interface StackedPiece {
@@ -42,7 +44,7 @@ export interface PaintedCastle {
 }
 
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind] | null)[] }[] }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind, number?] | null)[] }[] }>;
 
 let foot: Texture | null = null;
 
@@ -105,7 +107,7 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
         (entry.ornaments ?? []).map(async (o) => {
           const t = await texture(`castles/${hero}/${o.name}.webp`);
           if (!t) return [];
-          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4] }] : []));
+          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4], light: f[5] ?? 0 }] : []));
         }),
       );
       const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
@@ -133,6 +135,8 @@ export type OrnamentKind = 'win' | 'deco' | 'hang' | 'edgeR' | 'edgeL' | 'bal' |
 export interface Ornament {
   tex: Texture;
   kind: OrnamentKind;
+  /** The side it was painted lit from: -1 left, 1 right, 0 unclear. */
+  light: number;
 }
 
 /** How often each kind is picked: mostly windows, with the rest for variety. */
@@ -340,11 +344,16 @@ export class Stack {
     const o = pool.find((p) => (pick -= KIND_WEIGHT[p.kind]) < 0) ?? pool[0];
     if (!o) return null;
     const root = new Container();
-    const sprite = (tex: Texture, width: number, maxH: number): Sprite => {
+    // The ornaments were painted lit from either side; one lit against its tower is turned round,
+    // so the sun falls on both from the same side.
+    const towerLight = this.piece.meta.light ?? 0;
+    const turned = (orn: Ornament): boolean => towerLight !== 0 && orn.light !== 0 && orn.light !== towerLight;
+    const sprite = (orn: Ornament, width: number, maxH: number): Sprite => {
+      const tex = orn.tex;
       const sp = new Sprite(tex);
       sp.anchor.set(0.5);
       const k = Math.min(width / tex.width, maxH / tex.height);
-      sp.scale.set(k);
+      sp.scale.set(turned(orn) ? -k : k, k);
       root.addChild(sp);
       return sp;
     };
@@ -354,9 +363,10 @@ export class Stack {
     switch (o.kind) {
       case 'edgeR':
       case 'edgeL': {
-        const sp = sprite(o.tex, 0.55, 0.5);
-        // The fixing overlaps the edge a little; the rest sticks out into the air.
-        const side = o.kind === 'edgeR' ? 1 : -1;
+        const sp = sprite(o, 0.55, 0.5);
+        // The fixing overlaps the edge a little; the rest sticks out into the air. Turned round, it
+        // sticks out of the other edge.
+        const side = (o.kind === 'edgeR' ? 1 : -1) * (turned(o) ? -1 : 1);
         sp.x = side * (0.5 + sp.width * 0.2);
         top = -sp.height / 2;
         bottom = sp.height / 2;
@@ -364,8 +374,8 @@ export class Stack {
       }
       case 'bal': {
         const win = windows[Math.floor(r(4) * windows.length)]!;
-        const w = sprite(win.tex, 0.42, 0.62);
-        const b = sprite(o.tex, 0.82, 0.5);
+        const w = sprite(win, 0.42, 0.62);
+        const b = sprite(o, 0.82, 0.5);
         w.position.set(jitter, -w.height * 0.2);
         b.position.set(jitter, w.y + w.height / 2 + b.height * 0.1);
         top = w.y - w.height / 2;
@@ -374,7 +384,7 @@ export class Stack {
       }
       default: {
         const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
-        const sp = sprite(o.tex, width, maxH);
+        const sp = sprite(o, width, maxH);
         sp.x = jitter;
         top = -sp.height / 2;
         bottom = sp.height / 2;
