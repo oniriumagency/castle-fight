@@ -319,6 +319,8 @@ async function stacked(input, outDir, piece, override) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
   const shaft = weather(seamless(band, width, b.base - b.crown), width, input.split(/[\\/]/).slice(-2).join('/'));
+  // The side the shaft is lit from, so ornaments can be turned to match it.
+  const light = lightSign(lightSide(band, width, 0, 0, width, b.base - b.crown), 6);
   const crownGlow = await glowOf(slice(0, b.crown), width, b.crown);
   const baseGlow = await glowOf(slice(b.base, height), width, height - b.base);
   if (crownGlow) await webp(crownGlow, width, b.crown, join(outDir, `${piece}-crown-glow.webp`));
@@ -350,7 +352,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 /**
@@ -359,7 +361,7 @@ async function stacked(input, outDir, piece, override) {
  * and let their pale stone fade out, so they sit on any hero's masonry.
  * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
  */
-const DECALS = { props: null, ornaments: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
+const DECALS = { props: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
 
 async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
   const { data, info } = await sharp(input).resize({ width: size, height: size, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -403,6 +405,181 @@ async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
   }
   await webp(data, width, height, join(outDir, `${name}.webp`));
   return { kind, frames: grid === 2 ? frames.filter(Boolean) : frames };
+}
+
+/**
+ * Which side a painted thing is lit from: the mean brightness just inside its
+ * right outline minus just inside its left one, row by row (glowing windows
+ * and flames left out). Positive: lit from the right. Shape barely matters,
+ * since each row is compared with itself.
+ */
+function lightSide(data, width, x0, y0, w, h) {
+  let left = 0;
+  let right = 0;
+  let nl = 0;
+  let nr = 0;
+  const lumAt = (i) => 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+  const lit = (i) => {
+    const sat = Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+    return data[i + 3] > 128 && !(sat > 120 && lumAt(i) > 150);
+  };
+  let minX = w;
+  let maxX = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[((y0 + y) * width + x0 + x) * 4 + 3] <= 128) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+  }
+  const k = Math.max(3, Math.round((maxX - minX) * 0.08));
+  for (let y = 0; y < h; y++) {
+    const row = (y0 + y) * width + x0;
+    let l = -1;
+    let r = -1;
+    for (let x = 0; x < w; x++) {
+      if (data[(row + x) * 4 + 3] <= 128) continue;
+      if (l < 0) l = x;
+      r = x;
+    }
+    if (l < 0 || r - l < 3 * k) continue;
+    for (let x = l + 1; x < l + k; x++) {
+      const i = (row + x) * 4;
+      if (lit(i)) (left += lumAt(i)), nl++;
+    }
+    for (let x = r - k + 1; x < r; x++) {
+      const i = (row + x) * 4;
+      if (lit(i)) (right += lumAt(i)), nr++;
+    }
+  }
+  if (nl < 30 || nr < 30) return 0;
+  return right / nr - left / nl;
+}
+
+/** -1 lit from the left, 1 from the right, 0 when the difference is too faint to tell. */
+const lightSign = (v, faint = 10) => (Math.abs(v) < faint ? 0 : Math.sign(v));
+
+/** Average colour of the stones of a shaft (glowing windows left out). */
+async function stoneColour(file) {
+  try {
+    const { data } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const sum = [0, 0, 0];
+    let n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 200) continue;
+      for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+      n++;
+    }
+    return n ? sum.map((v) => v / n) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Bump when the ornament treatment changes, so cached sheets are redone. */
+const ORNAMENT_VERSION = 4;
+/** Ornament sheets are painted far finer than the walls they sit on: shrink them to about the walls' grain. */
+const ORNAMENT_SHEET = 576;
+
+/**
+ * Wall ornaments, a 3 x 3 sheet painted on magenta. Painted on their own,
+ * they come out crisper, more contrasted and more saturated than the castle,
+ * with hard dark outlines, and look stuck on. So they are brought to the
+ * wall's grain and light: shrunk and softened to the walls' resolution,
+ * their darks lifted and colours pulled a little toward the stone (the same
+ * air and light falls on both), and each gets a soft shadow on the wall, cast
+ * away from its own light. The side each is lit from is recorded, so the
+ * game can turn it to match its tower.
+ */
+async function ornamentSheet(input, outDir, name, kinds, stone) {
+  const big = 1152;
+  const raw = await sharp(input).resize({ width: big, height: big, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  keyOut(raw.data, raw.info);
+  const cell = big / 3;
+  const light = [];
+  for (let q = 0; q < 9; q++) light.push(lightSign(lightSide(raw.data, big, (q % 3) * cell, Math.floor(q / 3) * cell, cell, cell)));
+
+  // Grade: lift the darks, pull toward the stone's colour, ease the saturation. Glowing bits keep their fire.
+  const ref = stone ?? [150, 140, 125];
+  const refLum = 0.3 * ref[0] + 0.59 * ref[1] + 0.11 * ref[2];
+  const d = raw.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const glow = Math.min(1, Math.max(0, (sat - 110) / 50)) * Math.min(1, Math.max(0, (lum - 140) / 60));
+    const k = 1 - glow;
+    // Contrast eased around the stone's own brightness, so outlines read like paint, not ink.
+    const lum2 = refLum + (lum - refLum) * (1 - 0.22 * k);
+    const out = [r, g, b].map((c, j) => {
+      let v = lum + (c - lum) * (1 - 0.18 * k); // a little less saturated
+      v *= lum > 1 ? lum2 / lum : 1;
+      v += (ref[j] * (lum2 / Math.max(1, refLum)) - v) * 0.16 * k; // the stone's colour cast
+      return v;
+    });
+    // Darkest strokes lifted toward the stone's shadow tone.
+    const floor = refLum * 0.28 * k;
+    for (let j = 0; j < 3; j++) d[i + j] = Math.max(0, Math.min(255, Math.round(Math.max(out[j], floor * (ref[j] / Math.max(1, refLum))))));
+  }
+
+  // Down to the walls' grain, through a slightly smaller size for a painterly softness (alpha is premultiplied by sharp).
+  const size = ORNAMENT_SHEET;
+  const soft = await sharp(d, { raw: raw.info }).resize({ width: Math.round(size * 0.8), height: Math.round(size * 0.8), kernel: 'lanczos3' }).raw().toBuffer();
+  const img = await sharp(soft, { raw: { width: Math.round(size * 0.8), height: Math.round(size * 0.8), channels: 4 } })
+    .resize({ width: size, height: size, kernel: 'cubic' })
+    .raw()
+    .toBuffer();
+
+  // Shadow cast on the wall, down and away from the ornament's light; none for things sticking out into the air.
+  const alpha = Buffer.alloc(size * size);
+  for (let i = 0, j = 0; j < alpha.length; i += 4, j++) alpha[j] = img[i + 3];
+  const blurred = await sharp(alpha, { raw: { width: size, height: size, channels: 1 } }).blur(size / 220).extractChannel(0).raw().toBuffer();
+  const cellPx = size / 3;
+  const out = Buffer.alloc(img.length);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const q = Math.floor(y / cellPx) * 3 + Math.floor(x / cellPx);
+      const kind = kinds[q];
+      const i = (y * size + x) * 4;
+      let sh = 0;
+      if (kind !== 'edgeR' && kind !== 'edgeL' && kind !== 'x') {
+        const dx = Math.round(-light[q] * size * 0.006);
+        const dy = Math.round(size * 0.008);
+        const sx = x - dx;
+        const sy = y - dy;
+        // Stay inside the cell: a neighbour's shadow must not leak in.
+        if (sx >= 0 && sy >= 0 && sx < size && sy < size && Math.floor(sy / cellPx) * 3 + Math.floor(sx / cellPx) === q) sh = (blurred[sy * size + sx] / 255) * 0.42;
+      }
+      const a = img[i + 3] / 255;
+      const outA = a + sh * (1 - a);
+      if (outA <= 0) continue;
+      for (let c = 0; c < 3; c++) out[i + c] = Math.round((img[i + c] * a) / outA);
+      out[i + 3] = Math.round(outA * 255);
+    }
+  }
+
+  const frames = [];
+  const cpx = Math.floor(cellPx);
+  for (let q = 0; q < 9; q++) {
+    const x0 = (q % 3) * cpx;
+    const y0 = Math.floor(q / 3) * cpx;
+    let l = cpx, r = -1, t = cpx, b = -1;
+    for (let y = 0; y < cpx; y++) {
+      for (let x = 0; x < cpx; x++) {
+        if (out[((y0 + y) * size + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    frames.push(r > l && b > t && kinds[q] !== 'x' ? [x0 + l, y0 + t, r - l + 1, b - t + 1, kinds[q] ?? 'deco', light[q]] : null);
+  }
+  await webp(out, size, size, join(outDir, `${name}.webp`));
+  return { name, v: ORNAMENT_VERSION, frames };
 }
 
 /**
@@ -509,24 +686,6 @@ export async function buildCastles(source, target) {
     const files = await readdir(join(root, hero));
     const outDir = join(target, 'castles', hero);
     await mkdir(outDir, { recursive: true });
-    // Wall ornaments: 3 x 3 sheets of windows, banners, lanterns and ivy laid over the shafts.
-    for (const file of files.sort()) {
-      const m = /^(ornaments(-[a-z0-9]+)?)\.(png|jpe?g|webp)$/i.exec(file);
-      if (!m) continue;
-      const name = m[1].toLowerCase();
-      const input = join(root, hero, file);
-      manifest[hero] ??= {};
-      const list = (manifest[hero].ornaments ??= []);
-      const was = old[hero]?.ornaments?.find((o) => o.name === name);
-      if (was && (await mtime(join(outDir, `${name}.webp`))) >= Math.max(await mtime(input), await mtime(join(root, 'ornaments.json')))) {
-        list.push(was);
-        continue;
-      }
-      const sheet = await decalSheet(input, outDir, name, 'ornaments', 3, 1152);
-      const kinds = ornamentKinds[`${hero}/${name}`] ?? [];
-      list.push({ name, frames: sheet.frames.map((f, i) => (f && kinds[i] !== 'x' ? [...f, kinds[i] ?? 'deco'] : null)) });
-      built++;
-    }
     for (const file of files) {
       const m = /^(keep|tower1|tower2|tower|wall|ruins)\.(png|jpe?g|webp)$/i.exec(file);
       if (!m) continue;
@@ -535,11 +694,34 @@ export async function buildCastles(source, target) {
       const probe = join(outDir, piece === 'ruins' ? 'ruins.webp' : `${piece}-shaft.webp`);
       const stale = Math.max(await mtime(input), await mtime(join(root, 'slices.json')));
       manifest[hero] ??= {};
-      if (old[hero]?.[piece] && (await mtime(probe)) >= stale) {
+      if (old[hero]?.[piece] && (piece === 'ruins' || old[hero][piece].light !== undefined) && (await mtime(probe)) >= stale) {
         manifest[hero][piece] = old[hero][piece];
         continue;
       }
       manifest[hero][piece] = piece === 'ruins' ? await ruins(input, outDir) : await stacked(input, outDir, piece, slices[`${hero}/${piece}`]);
+      built++;
+    }
+    // A shaft lit straight on takes the side most of the castle is lit from, so its ornaments agree with the rest.
+    const pieces = Object.values(manifest[hero] ?? {}).filter((p) => p && typeof p.light === 'number');
+    const most = Math.sign(pieces.reduce((n, p) => n + p.light, 0));
+    for (const p of pieces) if (p.light === 0) p.light = most;
+    // Wall ornaments: 3 x 3 sheets of windows, banners, lanterns and ivy laid over the shafts,
+    // brought to the colour of the hero's stone (so after the pieces, whose shafts give it).
+    const stone = await stoneColour(join(outDir, 'keep-shaft.webp'));
+    for (const file of files.sort()) {
+      const m = /^(ornaments(-[a-z0-9]+)?)\.(png|jpe?g|webp)$/i.exec(file);
+      if (!m) continue;
+      const name = m[1].toLowerCase();
+      const input = join(root, hero, file);
+      manifest[hero] ??= {};
+      const list = (manifest[hero].ornaments ??= []);
+      const was = old[hero]?.ornaments?.find((o) => o.name === name);
+      const stale = Math.max(await mtime(input), await mtime(join(root, 'ornaments.json')), await mtime(join(outDir, 'keep-shaft.webp')));
+      if (was?.v === ORNAMENT_VERSION && (await mtime(join(outDir, `${name}.webp`))) >= stale) {
+        list.push(was);
+        continue;
+      }
+      list.push(await ornamentSheet(input, outDir, name, ornamentKinds[`${hero}/${name}`] ?? [], stone));
       built++;
     }
   }
