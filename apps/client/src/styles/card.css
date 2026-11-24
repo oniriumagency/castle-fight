@@ -431,6 +431,12 @@
   text-shadow: 0 0 calc(6 * var(--u)) rgb(79 216 255 / 70%);
   letter-spacing: 0.02em;
 }
+/* The Combo clause once its amount is already in the number: a quiet note, not a second bonus. */
+.combo-done {
+  color: #0b7fae;
+  font-style: italic;
+  white-space: nowrap;
+}
 
 /* Placeholder while a card's illustration does not exist yet: the school
    colour and its emblem, so it never reads as a broken black picture. */
@@ -525,5 +531,9 @@
 
 .card .combo-buff {
   color: #0b7fae;
+}
+/* With the Combo lit, its "+X" glows like the word Combo, so both read as one thing. */
+.card.combo .combo-buff {
+  text-shadow: 0 0 calc(6 * var(--u)) rgb(79 216 255 / 70%);
 }
 
