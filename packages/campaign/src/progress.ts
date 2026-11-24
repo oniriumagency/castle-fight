@@ -26,7 +26,7 @@ export type CampaignDifficulty = 'historia' | 'normal' | 'dificil';
 export const CAMPAIGN_DIFFICULTIES: readonly CampaignDifficulty[] = ['historia', 'normal', 'dificil'];
 
 export interface CampaignSave {
-  v: 1;
+  v: typeof CAMPAIGN_VERSION;
   difficulty: CampaignDifficulty;
   /** Territories the player holds, in the order they were taken (Valdepiedra first). */
   conquered: string[];
@@ -46,14 +46,53 @@ export interface CampaignSave {
   losses: number;
   finished: boolean;
   startedAt: number;
+  /**
+   * Progress this version of the game does not know (a territory, card or hero
+   * that was removed or renamed without a `RENAMED` entry). It is kept aside
+   * instead of being thrown away, and comes back on its own as soon as the id
+   * exists again or a rename is added. Absent when there is nothing to keep.
+   */
+  retired?: RetiredProgress;
 }
+
+export interface RetiredProgress {
+  conquered: string[];
+  unlocked: string[];
+  allies: string[];
+  held: Record<string, string[]>;
+}
+
+/**
+ * Version of the save format. Bump it only when the shape of `CampaignSave`
+ * changes in a way `parseCampaign` cannot read by itself, and add the step
+ * from the previous version to `MIGRATIONS`: every save ever written must
+ * keep loading after an update.
+ */
+export const CAMPAIGN_VERSION = 1;
+
+/**
+ * Upgrades a save from version `n` to `n + 1`, by key `n`. Saves are run
+ * through every step from their own version to `CAMPAIGN_VERSION`.
+ */
+const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {};
+
+/**
+ * Ids renamed since the campaign shipped, old to new. When a territory, card
+ * or hero changes its id, add it here so the progress saved under the old one
+ * carries over to the new one instead of being set aside.
+ */
+export const RENAMED: { territories: Record<string, string>; cards: Record<string, string>; heroes: Record<string, string> } = {
+  territories: {},
+  cards: {},
+  heroes: {},
+};
 
 /** Minimum deck size a defeat can leave the player with. */
 export const MIN_DECK = 48;
 
 export function newCampaign(difficulty: CampaignDifficulty = 'normal', now = Date.now()): CampaignSave {
   return {
-    v: 1,
+    v: CAMPAIGN_VERSION,
     difficulty,
     conquered: ['valdepiedra'],
     unlocked: STARTING_CARDS.slice(),
@@ -69,39 +108,98 @@ export function newCampaign(difficulty: CampaignDifficulty = 'normal', now = Dat
   };
 }
 
-/** A save read back from storage, or null when it does not make sense (corrupt or from an unknown version). */
-export function parseCampaign(raw: unknown): CampaignSave | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const s = raw as Partial<CampaignSave>;
-  if (s.v !== 1) return null;
-  const strings = (x: unknown): x is string[] => Array.isArray(x) && x.every((v) => typeof v === 'string');
-  if (!strings(s.conquered) || !strings(s.unlocked) || !strings(s.allies) || !strings(s.seen)) return null;
-  if (!CAMPAIGN_DIFFICULTIES.includes(s.difficulty as CampaignDifficulty)) return null;
-  const held: Record<string, CardId[]> = {};
-  for (const [territory, cards] of Object.entries(s.held ?? {})) {
-    if (isTerritoryId(territory) && strings(cards)) held[territory] = cards.filter(isCardId);
+const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
+const unique = <T>(xs: T[]): T[] => [...new Set(xs)];
+
+/** Splits ids into those this version knows (renames applied) and those it does not. */
+function sortIds<T extends string>(ids: string[], renamed: Record<string, string>, known: (id: string) => id is T): { ok: T[]; unknown: string[] } {
+  const ok: T[] = [];
+  const unknown: string[] = [];
+  for (const raw of ids) {
+    const id = renamed[raw] ?? raw;
+    if (known(id)) ok.push(id);
+    else unknown.push(raw);
   }
-  const allies = s.allies.filter(isHeroId);
-  if (!allies.includes(STARTING_HERO)) allies.unshift(STARTING_HERO);
+  return { ok, unknown };
+}
+
+/** Whether a save was written by a newer version of the game than this one (it is never read nor overwritten here). */
+export function isFutureCampaign(raw: unknown): boolean {
+  return !!raw && typeof raw === 'object' && typeof (raw as { v?: unknown }).v === 'number' && (raw as { v: number }).v > CAMPAIGN_VERSION;
+}
+
+/**
+ * A save read back from storage, brought up to the current version, or null
+ * when it is not a campaign at all (or comes from a newer version of the game).
+ * Anything this version does not recognise is set aside in `retired`, never lost.
+ */
+export function parseCampaign(raw: unknown): CampaignSave | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  let s = raw as Record<string, unknown>;
+  let v = typeof s.v === 'number' ? s.v : 1;
+  if (!Number.isInteger(v) || v < 1 || v > CAMPAIGN_VERSION) return null;
+  for (; v < CAMPAIGN_VERSION; v++) {
+    const step = MIGRATIONS[v];
+    if (!step) return null;
+    s = step(s);
+  }
+  if (!Array.isArray(s.conquered)) return null;
+
+  const old = (s.retired ?? {}) as Partial<Record<keyof RetiredProgress, unknown>>;
+  const isTerritory = (id: string): id is string => isTerritoryId(id);
+  const conquered = sortIds(unique([...strings(s.conquered), ...strings(old.conquered)]), RENAMED.territories, isTerritory);
+  if (!conquered.ok.includes('valdepiedra')) conquered.ok.unshift('valdepiedra');
+  const unlocked = sortIds(unique([...strings(s.unlocked), ...strings(old.unlocked)]), RENAMED.cards, isCardId);
+  const allies = sortIds(unique([...strings(s.allies), ...strings(old.allies)]), RENAMED.heroes, isHeroId);
+  if (!allies.ok.includes(STARTING_HERO)) allies.ok.unshift(STARTING_HERO);
+
+  const held: Record<string, CardId[]> = {};
+  const retiredHeld: Record<string, string[]> = {};
+  const heldSources = [s.held, old.held].filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x));
+  for (const source of heldSources) {
+    for (const [rawTerritory, rawCards] of Object.entries(source)) {
+      const territory = RENAMED.territories[rawTerritory] ?? rawTerritory;
+      const cards = sortIds(strings(rawCards), RENAMED.cards, isCardId);
+      if (isTerritoryId(territory)) {
+        if (cards.ok.length) held[territory] = [...(held[territory] ?? []), ...cards.ok];
+        if (cards.unknown.length) retiredHeld[territory] = [...(retiredHeld[territory] ?? []), ...cards.unknown];
+      } else {
+        const all = strings(rawCards);
+        if (all.length) retiredHeld[rawTerritory] = [...(retiredHeld[rawTerritory] ?? []), ...all];
+      }
+    }
+  }
+
+  const rename = (id: unknown, map: Record<string, string>): string => (typeof id === 'string' ? (map[id] ?? id) : '');
+  const hero = rename(s.hero, RENAMED.heroes);
+  const p = s.pending as Record<string, unknown> | null | undefined;
+  const pendingTerritory = rename(p?.territory, RENAMED.territories);
+  const pendingHero = rename(p?.hero, RENAMED.heroes);
   const pending =
-    s.pending && typeof s.pending === 'object' && isTerritoryId(s.pending.territory) && isHeroId(s.pending.hero) && typeof s.pending.id === 'string'
-      ? { id: s.pending.id, territory: s.pending.territory, hero: s.pending.hero }
+    p && typeof p === 'object' && isTerritoryId(pendingTerritory) && isHeroId(pendingHero) && typeof p.id === 'string'
+      ? { id: p.id, territory: pendingTerritory, hero: pendingHero }
       : null;
-  return {
-    v: 1,
-    difficulty: s.difficulty as CampaignDifficulty,
-    conquered: s.conquered.filter(isTerritoryId),
-    unlocked: s.unlocked.filter(isCardId),
+
+  const save: CampaignSave = {
+    v: CAMPAIGN_VERSION,
+    // A difficulty this version does not know plays as normal rather than losing the campaign.
+    difficulty: CAMPAIGN_DIFFICULTIES.includes(s.difficulty as CampaignDifficulty) ? (s.difficulty as CampaignDifficulty) : 'normal',
+    conquered: conquered.ok,
+    unlocked: unlocked.ok,
     held,
-    allies,
-    hero: typeof s.hero === 'string' && allies.includes(s.hero) ? s.hero : STARTING_HERO,
-    seen: s.seen.slice(),
+    allies: allies.ok,
+    hero: allies.ok.includes(hero as HeroId) ? (hero as HeroId) : STARTING_HERO,
+    seen: unique(strings(s.seen)),
     pending,
     wins: Number(s.wins) || 0,
     losses: Number(s.losses) || 0,
     finished: !!s.finished,
     startedAt: Number(s.startedAt) || Date.now(),
   };
+  if (conquered.unknown.length || unlocked.unknown.length || allies.unknown.length || Object.keys(retiredHeld).length) {
+    save.retired = { conquered: conquered.unknown, unlocked: unlocked.unknown, allies: allies.unknown, held: retiredHeld };
+  }
+  return save;
 }
 
 // ---------------------------------------------------------------------------
