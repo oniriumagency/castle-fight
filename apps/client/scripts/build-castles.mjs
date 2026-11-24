@@ -427,11 +427,14 @@ async function scaffold(input, outDir) {
     solid.push(n > (right - left + 1) * 0.9);
   }
   const beams = [];
+  // Each plank's top and bottom edge too: the scaffold goes up (and comes down) plank by plank.
+  const planks = [];
   for (let y = 0; y < height; y++) {
     if (!solid[y]) continue;
     let e = y;
     while (e + 1 < height && solid[e + 1]) e++;
     beams.push(Math.round((y + e) / 2));
+    planks.push([y, e + 1]);
     y = e;
   }
   // The bay that starts nearest the middle, with beams below it (the base keeps the ladder).
@@ -450,7 +453,7 @@ async function scaffold(input, outDir) {
   await webp(slice(best.a, best.b), width, best.b - best.a, join(outDir, 'scaffold-shaft.webp'));
   await webp(slice(best.b, height), width, height - best.b, join(outDir, 'scaffold-base.webp'));
   const top = rows.findIndex(Boolean);
-  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top } };
+  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top }, planks };
 }
 
 async function shared(dir, outDir, manifest, old) {
@@ -468,7 +471,8 @@ async function shared(dir, outDir, manifest, old) {
     const group = name === 'scaffold' ? null : m[2] ? 'decals' : 'props';
     const into = group ? (manifest[group] ??= {}) : manifest;
     const was = group ? old[group]?.[name] : old.scaffold;
-    if (was && (await mtime(probe)) >= (await mtime(input))) {
+    // A scaffold cut before planks were measured is cut again.
+    if (was && (group || was.planks) && (await mtime(probe)) >= (await mtime(input))) {
       into[key] = was;
       continue;
     }
