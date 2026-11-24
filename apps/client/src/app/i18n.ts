@@ -387,6 +387,7 @@ const STRINGS = {
   logPlayed: { es: '{who} juega {card}', en: '{who} plays {card}' },
   logPlayedCombo: { es: '{who} juega {card} con Combo ({bonus})', en: '{who} plays {card} with Combo ({bonus})' },
   comboDamage: { es: '{n} de daño', en: '{n} damage' },
+  comboIncluded: { es: '✓ ya sumado', en: '✓ already added' },
   boosted: { es: 'Potenciada', en: 'Boosted' },
   buffDamage: { es: 'Daño extra en cada ataque', en: 'Extra damage on each attack' },
   buffBuild: { es: 'Castillo extra al construir', en: 'Extra Castle when building' },
