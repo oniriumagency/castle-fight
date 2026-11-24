@@ -14,6 +14,9 @@ import {
   neighboursOf,
   newCampaign,
   parseCampaign,
+  RENAMED,
+  isFutureCampaign,
+  CAMPAIGN_VERSION,
   playerDeck,
   rivalDeck,
   rivalTier,
@@ -126,6 +129,38 @@ describe('progress', () => {
     expect(parseCampaign(JSON.parse(JSON.stringify(save)))).toEqual(save);
     expect(parseCampaign({ v: 2 })).toBeNull();
     expect(parseCampaign(null)).toBeNull();
+  });
+
+  it('keeps old saves through updates: lenient fields, unknown ids set aside and brought back', () => {
+    const save = win(newCampaign('dificil'), 'alambiques-a');
+    // A save written before `seen` existed, with no version, and a difficulty this build does not know.
+    const { seen: _seen, v: _v, ...bare } = save;
+    const loose = parseCampaign({ ...bare, difficulty: 'pesadilla' })!;
+    expect(loose.conquered).toEqual(save.conquered);
+    expect(loose.difficulty).toBe('normal');
+    expect(loose.seen).toEqual([]);
+    // A territory, card and hero this build does not have: kept aside, not dropped.
+    const odd = { ...save, conquered: [...save.conquered, 'isla-perdida'], unlocked: [...save.unlocked, 'carta-retirada'], allies: [...save.allies, 'bardo'], held: { 'isla-perdida': ['carta-retirada'] } };
+    const parsed = parseCampaign(JSON.parse(JSON.stringify(odd)))!;
+    expect(parsed.conquered).toEqual(save.conquered);
+    expect(parsed.unlocked).toEqual(save.unlocked);
+    expect(parsed.retired).toEqual({ conquered: ['isla-perdida'], unlocked: ['carta-retirada'], allies: ['bardo'], held: { 'isla-perdida': ['carta-retirada'] } });
+    // ...and it survives being saved and played on.
+    const again = parseCampaign(JSON.parse(JSON.stringify(win(parsed, 'alambiques-c'))))!;
+    expect(again.retired).toEqual(parsed.retired);
+    // Once a rename points the old id at a real one, the progress comes back.
+    RENAMED.territories['isla-perdida'] = 'bastion-a';
+    try {
+      const back = parseCampaign(JSON.parse(JSON.stringify(again)))!;
+      expect(back.conquered).toContain('bastion-a');
+      expect(back.retired?.conquered).toEqual([]);
+      expect(back.held['bastion-a']).toBeUndefined();
+      expect(back.retired?.held).toEqual({ 'bastion-a': ['carta-retirada'] });
+    } finally {
+      delete RENAMED.territories['isla-perdida'];
+    }
+    expect(isFutureCampaign({ ...save, v: CAMPAIGN_VERSION + 1 })).toBe(true);
+    expect(isFutureCampaign(save)).toBe(false);
   });
 });
 
