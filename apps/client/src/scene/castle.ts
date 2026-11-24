@@ -290,6 +290,9 @@ export class Castle extends Container {
   /** A while of shining light (an ultimate fired from this castle). */
   private radiance: { color: number; left: number; total: number } | null = null;
   private radianceFilter: ColorMatrixFilter | null = null;
+  /** Ice over every stone while a resource is frozen: a colour grade of the whole castle, so it
+   * follows the painting's own outline (crowns and bases included), not a box over part of it. */
+  private frostFilter: ColorMatrixFilter | null = null;
 
   constructor(facing: 1 | -1, _textures?: CastleTextures, bannerColor = 0xc8963e, hero: string | null = null) {
     super();
@@ -596,7 +599,7 @@ export class Castle extends Container {
   radiate(color: number, ms = 2800): void {
     this.radiance = { color, left: ms, total: ms };
     this.radianceFilter ??= new ColorMatrixFilter();
-    this.filters = [this.radianceFilter];
+    this.applyFilters();
     this.tickRadiance(0);
   }
 
@@ -608,7 +611,7 @@ export class Castle extends Container {
     r.left -= dt;
     if (r.left <= 0) {
       this.radiance = null;
-      this.filters = [];
+      this.applyFilters();
       return;
     }
     const t = 1 - r.left / r.total;
@@ -659,7 +662,19 @@ export class Castle extends Container {
   setFrost(on: boolean): void {
     if (on === this.frozen) return;
     this.frozen = on;
+    if (on && !this.frostFilter) {
+      this.frostFilter = new ColorMatrixFilter();
+      // Cooled and paled toward ice: part of each colour, part of its brightness, a lift of blue-white.
+      this.frostFilter.matrix = [0.575, 0.148, 0.028, 0, 0.05, 0.09, 0.727, 0.033, 0, 0.09, 0.105, 0.207, 0.639, 0, 0.15, 0, 0, 0, 1, 0];
+    }
+    this.applyFilters();
     this.drawFrost();
+  }
+
+  /** The castle's colour grades: frost and the radiance of an ultimate, as they are on. */
+  private applyFilters(): void {
+    const list = [this.frozen ? this.frostFilter : null, this.radiance ? this.radianceFilter : null].filter((f): f is ColorMatrixFilter => !!f);
+    this.filters = list.length ? list : [];
   }
 
   /** Scene position of the top of the Keep or the Wall (for projectiles and floating numbers). */
@@ -1795,15 +1810,12 @@ export class Castle extends Container {
     for (const t of [this.keepTower, ...this.towers]) {
       if (!t.root.visible || t.h < 1) continue;
       const x = t.cx - t.w / 2;
-      g.rect(x, t.topY, t.w, t.h).fill({ color: 0xbfeaff, alpha: 0.22 });
-      g.rect(x, t.topY, t.w, 2).fill({ color: 0xffffff, alpha: 0.7 });
       icicles(x, t.w, t.topY, t.isKeep ? 6 : 3);
     }
     const wh = this.wallPx();
     if (wh > 0.5) {
       const ww = this.wallW();
       const wx = this.wallCx() - ww / 2;
-      g.rect(wx, l.groundY - wh, ww, wh).fill({ color: 0xbfeaff, alpha: 0.22 });
       icicles(wx, ww, l.groundY - wh, 4);
     }
   }
