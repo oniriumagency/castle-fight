@@ -321,6 +321,14 @@ export class Battlefield {
       new Castle(-1, textures, 0x3f6fb0, 'guardian'),
     ];
     this.castles[2].visible = false;
+    // Sawdust and a wisp of dust where each plank of a scaffold goes up or comes down.
+    for (const c of this.castles) {
+      c.onPlank = (x, y, w, up) => {
+        const at = { x: x + this.world.x, y: y + this.world.y };
+        this.burst(at.x, at.y, { count: up ? 4 : 3, texture: 'rubble', color: [0xa87a48, 0x8a5e34, 0xc89a64], speed: up ? 0.9 : 1.4, angle: -Math.PI / 2, spread: Math.PI * 1.4, gravity: 0.22, size: 4, life: 900, area: { w: w * 0.8, h: 3 } });
+        this.burst(at.x, at.y, { count: 1, texture: 'smoke', color: 0xc8b090, speed: 0.3, gravity: -0.004, size: w * 0.5, life: 700, alpha: 0.22, area: { w: w * 0.7, h: 3 } });
+      };
+    }
 
     this.painted.visible = false;
     this.paintedFore.visible = false;
@@ -720,12 +728,26 @@ export class Battlefield {
     this.castles[player]?.scar(part, kind);
   }
 
-  /** Masons at work: the scaffold goes up against the part and its newest wounds are mended. */
+  /** Masons at work: the newest wounds of the part are mended. */
   mend(player: PlayerId, part: 'keep' | 'wall', amount: number): void {
+    this.castles[player]?.mend(part, 1 + Math.floor(amount / 6));
+  }
+
+  /**
+   * The masons' scaffold goes up against the part, plank by plank, to the
+   * height it is about to reach (`value` points). Resolves once the last plank
+   * is up (at once with no scaffold, or with reduced motion). `speed` scales it.
+   */
+  raiseScaffold(player: PlayerId, part: 'keep' | 'wall', value: number, speed = 1): Promise<void> {
     const c = this.castles[player];
-    if (!c) return;
-    c.mend(part, 1 + Math.floor(amount / 6));
-    if (!settings.get().reducedMotion) c.raiseScaffold(part);
+    if (!c || settings.get().reducedMotion) return Promise.resolve();
+    const ms = c.raiseScaffold(part, value, speed);
+    return ms > 0 ? this.tweens.run(ms, () => {}, (t) => t) : Promise.resolve();
+  }
+
+  /** The scaffold comes down plank by plank from the top (not awaited: the game moves on). */
+  lowerScaffold(player: PlayerId, part: 'keep' | 'wall'): void {
+    this.castles[player]?.lowerScaffold(part);
   }
 
   /** Chunks of a castle's own stone break off a part and tumble down its face, with dust at its foot. */

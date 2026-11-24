@@ -20,6 +20,8 @@ export interface StackedMeta {
   apex: { x: number; y: number };
   /** Which bands give off light of their own (a `-glow` copy exists). */
   glow?: { crown: boolean; base: boolean };
+  /** The scaffold's planks: top and bottom edge of each, in source px from the crown's top. */
+  planks?: [number, number][];
 }
 
 export interface StackedPiece {
@@ -214,6 +216,8 @@ export class Stack {
   /** Each slot's group, built at a shaft width of 1 and scaled; null: a bare stretch. */
   private readonly slots: ({ root: Container; half: number } | null)[] = [];
   private readonly ornamentLayer = new Container();
+  /** The last layout: scale, body height and base rows shown (for `courses`). */
+  private fit = { k: 1, h: 0, rows: 0 };
 
   constructor(readonly piece: StackedPiece) {
     this.crown = new Sprite(piece.crown);
@@ -272,6 +276,7 @@ export class Stack {
         this.baseGlowCrop.update();
       }
     }
+    this.fit = { k, h: Math.max(0, h), rows };
     this.base.visible = h > 0.5;
     this.base.position.set(left, -rows * k);
     this.base.width = W;
@@ -315,6 +320,43 @@ export class Stack {
 
     const apexX = (left + m.apex.x * k) * (mirror ? -1 : 1);
     return { crown: crownH, apexY: -(m.crown - m.apex.y) * k, apexX };
+  }
+
+  /**
+   * Heights above the ground (scene px, as last laid out) where each plank of
+   * a scaffold begins, lowest first, ending at the very top: cut there, the
+   * scaffold shows whole bays, each topped by its plank. Empty without planks.
+   */
+  courses(): number[] {
+    const m = this.piece.meta;
+    const planks = m.planks;
+    if (!planks?.length) return [];
+    const { k, h, rows } = this.fit;
+    const bay = m.shaft * k;
+    const baseH = Math.min(m.base, rows) * k;
+    const crownH = m.crown * k;
+    const cuts: number[] = [];
+    const baseTop = m.crown + m.shaft;
+    for (const [top, bottom] of planks) {
+      const mid = (top + bottom) / 2;
+      // In the base (cropped from its top when the body is short), or in the crown above the body.
+      if (mid > baseTop + 1) cuts.push(baseH - (top - baseTop) * k);
+      else if (mid < m.crown - 1) cuts.push(h + (m.crown - top) * k);
+    }
+    // The bays of the shaft, each starting where the plank between two bays does.
+    const seam = planks.find(([a, b]) => Math.abs((a + b) / 2 - baseTop) <= 2);
+    const lift = seam ? (baseTop - seam[0]) * k : 0;
+    for (let y = baseH + lift; y < h + lift - 1; y += bay) cuts.push(y);
+    if (h > baseH) cuts.push(h + lift);
+    const all = h + crownH;
+    // Planks closer than a third of a bay go up together.
+    const out: number[] = [];
+    for (const c of cuts.filter((c) => c > 0 && c < all).sort((a, b) => a - b)) {
+      if (!out.length || c - out[out.length - 1]! > bay * 0.34) out.push(c);
+    }
+    if (out.length && all - out[out.length - 1]! < bay * 0.34) out.pop();
+    out.push(all);
+    return out;
   }
 
   /**
