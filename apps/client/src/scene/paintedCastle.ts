@@ -18,8 +18,18 @@ export interface StackedMeta {
   shaftWidth: number;
   /** Highest point (flagpole tip or spire), in source px from the crown's top-left. */
   apex: { x: number; y: number };
+  /**
+   * Height (source px) of the skirts: the painting just under the crown and just
+   * over the base, laid over the ends of the shaft and fading into it so the cuts
+   * do not show. Absent on pieces cut without them.
+   */
+  skirt?: number;
   /** Which bands give off light of their own (a `-glow` copy exists). */
   glow?: { crown: boolean; base: boolean };
+  /** The scaffold's planks: top and bottom edge of each, in source px from the crown's top. */
+  planks?: [number, number][];
+  /** The side the shaft is lit from: -1 left, 1 right, 0 unclear. */
+  light?: number;
 }
 
 export interface StackedPiece {
@@ -29,6 +39,9 @@ export interface StackedPiece {
   base: Texture;
   crownGlow: Texture | null;
   baseGlow: Texture | null;
+  /** Fades from the crown down into the shaft, and from the shaft down into the base. */
+  skirtTop: Texture | null;
+  skirtBottom: Texture | null;
 }
 
 export interface PaintedCastle {
@@ -42,7 +55,7 @@ export interface PaintedCastle {
 }
 
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind] | null)[] }[] }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind, number?] | null)[] }[] }>;
 
 let foot: Texture | null = null;
 
@@ -90,7 +103,10 @@ async function stacked(hero: string, piece: Piece, meta: StackedMeta | undefined
     meta.glow?.crown ? texture(`castles/${hero}/${piece}-crown-glow.webp`) : Promise.resolve(null),
     meta.glow?.base ? texture(`castles/${hero}/${piece}-base-glow.webp`) : Promise.resolve(null),
   ]);
-  return { meta, crown, shaft, base, crownGlow, baseGlow };
+  const [skirtTop, skirtBottom] = meta.skirt
+    ? await Promise.all(['top', 'bottom'].map((end) => texture(`castles/${hero}/${piece}-skirt-${end}.webp`)))
+    : [null, null];
+  return { meta, crown, shaft, base, crownGlow, baseGlow, skirtTop, skirtBottom };
 }
 
 /** The painted castle of a hero, or null while it is not painted (needs at least the Keep). */
@@ -105,7 +121,7 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
         (entry.ornaments ?? []).map(async (o) => {
           const t = await texture(`castles/${hero}/${o.name}.webp`);
           if (!t) return [];
-          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4] }] : []));
+          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4], light: f[5] ?? 0 }] : []));
         }),
       );
       const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
@@ -133,6 +149,8 @@ export type OrnamentKind = 'win' | 'deco' | 'hang' | 'edgeR' | 'edgeL' | 'bal' |
 export interface Ornament {
   tex: Texture;
   kind: OrnamentKind;
+  /** The side it was painted lit from: -1 left, 1 right, 0 unclear. */
+  light: number;
 }
 
 /** How often each kind is picked: mostly windows, with the rest for variety. */
@@ -198,6 +216,9 @@ export class Stack {
   private readonly crown: Sprite;
   private readonly shaft: TilingSprite;
   private readonly base: Sprite;
+  /** Where the shaft meets the crown and the base: the painting carried over the cut, fading out. */
+  private readonly skirtTop: Sprite | null;
+  private readonly skirtBottom: Sprite | null;
   /** Shade gathering at the foot, where the stones meet the earth. */
   private readonly foot = new Sprite(footShade());
   /** Windows, fires and crystals, added on top and made to flicker. */
@@ -214,6 +235,8 @@ export class Stack {
   /** Each slot's group, built at a shaft width of 1 and scaled; null: a bare stretch. */
   private readonly slots: ({ root: Container; half: number } | null)[] = [];
   private readonly ornamentLayer = new Container();
+  /** The last layout: scale, body height and base rows shown (for `courses`). */
+  private fit = { k: 1, h: 0, rows: 0 };
 
   constructor(readonly piece: StackedPiece) {
     this.crown = new Sprite(piece.crown);
@@ -223,7 +246,12 @@ export class Stack {
     // the castle rose from the ground) and the tower floated with no base.
     this.baseCrop = new Texture({ source: piece.base.source, frame: new Rectangle(0, 0, piece.base.width, piece.base.height), dynamic: true });
     this.base = new Sprite(this.baseCrop);
-    this.root.addChild(this.shaft, this.base, this.crown, this.foot);
+    const skirts = piece.skirtTop && piece.skirtBottom;
+    this.skirtTop = skirts ? new Sprite(piece.skirtTop!) : null;
+    this.skirtBottom = skirts ? new Sprite(piece.skirtBottom!) : null;
+    this.root.addChild(this.shaft);
+    if (this.skirtTop && this.skirtBottom) this.root.addChild(this.skirtBottom, this.skirtTop);
+    this.root.addChild(this.base, this.crown, this.foot);
     this.root.addChild(this.ornamentLayer);
     this.crownGlow = piece.crownGlow ? new Sprite(piece.crownGlow) : null;
     this.baseGlowCrop = piece.baseGlow ? new Texture({ source: piece.baseGlow.source, frame: new Rectangle(0, 0, piece.baseGlow.width, piece.baseGlow.height), dynamic: true }) : null;
@@ -272,6 +300,7 @@ export class Stack {
         this.baseGlowCrop.update();
       }
     }
+    this.fit = { k, h: Math.max(0, h), rows };
     this.base.visible = h > 0.5;
     this.base.position.set(left, -rows * k);
     this.base.width = W;
@@ -290,6 +319,20 @@ export class Stack {
     this.shaft.tileScale.set(k);
     // Keep the courses anchored to the base so the stones do not slide as it grows.
     this.shaft.tilePosition.set(0, shaftH);
+
+    if (this.skirtTop && this.skirtBottom) {
+      // Each skirt as tall as painted, or squeezed to half the shaft when it is short, so both still
+      // fade out completely before they meet.
+      const sh = Math.min(this.skirtTop.texture.height * k, shaftH / 2);
+      for (const s of [this.skirtTop, this.skirtBottom]) {
+        s.visible = this.shaft.visible && sh > 0.5;
+        s.x = left;
+        s.width = W;
+        s.height = Math.max(1, sh);
+      }
+      this.skirtTop.y = -h;
+      this.skirtBottom.y = -baseH - sh;
+    }
 
     if (this.baseGlow) {
       this.baseGlow.visible = this.base.visible;
@@ -318,6 +361,43 @@ export class Stack {
   }
 
   /**
+   * Heights above the ground (scene px, as last laid out) where each plank of
+   * a scaffold begins, lowest first, ending at the very top: cut there, the
+   * scaffold shows whole bays, each topped by its plank. Empty without planks.
+   */
+  courses(): number[] {
+    const m = this.piece.meta;
+    const planks = m.planks;
+    if (!planks?.length) return [];
+    const { k, h, rows } = this.fit;
+    const bay = m.shaft * k;
+    const baseH = Math.min(m.base, rows) * k;
+    const crownH = m.crown * k;
+    const cuts: number[] = [];
+    const baseTop = m.crown + m.shaft;
+    for (const [top, bottom] of planks) {
+      const mid = (top + bottom) / 2;
+      // In the base (cropped from its top when the body is short), or in the crown above the body.
+      if (mid > baseTop + 1) cuts.push(baseH - (top - baseTop) * k);
+      else if (mid < m.crown - 1) cuts.push(h + (m.crown - top) * k);
+    }
+    // The bays of the shaft, each starting where the plank between two bays does.
+    const seam = planks.find(([a, b]) => Math.abs((a + b) / 2 - baseTop) <= 2);
+    const lift = seam ? (baseTop - seam[0]) * k : 0;
+    for (let y = baseH + lift; y < h + lift - 1; y += bay) cuts.push(y);
+    if (h > baseH) cuts.push(h + lift);
+    const all = h + crownH;
+    // Planks closer than a third of a bay go up together.
+    const out: number[] = [];
+    for (const c of cuts.filter((c) => c > 0 && c < all).sort((a, b) => a - b)) {
+      if (!out.length || c - out[out.length - 1]! > bay * 0.34) out.push(c);
+    }
+    if (out.length && all - out[out.length - 1]! < bay * 0.34) out.pop();
+    out.push(all);
+    return out;
+  }
+
+  /**
    * Scatters these ornaments up the shaft (seeded, so the same tower always
    * wears the same ones). `density`: share of slots that get one.
    */
@@ -340,11 +420,16 @@ export class Stack {
     const o = pool.find((p) => (pick -= KIND_WEIGHT[p.kind]) < 0) ?? pool[0];
     if (!o) return null;
     const root = new Container();
-    const sprite = (tex: Texture, width: number, maxH: number): Sprite => {
+    // The ornaments were painted lit from either side; one lit against its tower is turned round,
+    // so the sun falls on both from the same side.
+    const towerLight = this.piece.meta.light ?? 0;
+    const turned = (orn: Ornament): boolean => towerLight !== 0 && orn.light !== 0 && orn.light !== towerLight;
+    const sprite = (orn: Ornament, width: number, maxH: number): Sprite => {
+      const tex = orn.tex;
       const sp = new Sprite(tex);
       sp.anchor.set(0.5);
       const k = Math.min(width / tex.width, maxH / tex.height);
-      sp.scale.set(k);
+      sp.scale.set(turned(orn) ? -k : k, k);
       root.addChild(sp);
       return sp;
     };
@@ -354,9 +439,10 @@ export class Stack {
     switch (o.kind) {
       case 'edgeR':
       case 'edgeL': {
-        const sp = sprite(o.tex, 0.55, 0.5);
-        // The fixing overlaps the edge a little; the rest sticks out into the air.
-        const side = o.kind === 'edgeR' ? 1 : -1;
+        const sp = sprite(o, 0.55, 0.5);
+        // The fixing overlaps the edge a little; the rest sticks out into the air. Turned round, it
+        // sticks out of the other edge.
+        const side = (o.kind === 'edgeR' ? 1 : -1) * (turned(o) ? -1 : 1);
         sp.x = side * (0.5 + sp.width * 0.2);
         top = -sp.height / 2;
         bottom = sp.height / 2;
@@ -364,8 +450,8 @@ export class Stack {
       }
       case 'bal': {
         const win = windows[Math.floor(r(4) * windows.length)]!;
-        const w = sprite(win.tex, 0.42, 0.62);
-        const b = sprite(o.tex, 0.82, 0.5);
+        const w = sprite(win, 0.42, 0.62);
+        const b = sprite(o, 0.82, 0.5);
         w.position.set(jitter, -w.height * 0.2);
         b.position.set(jitter, w.y + w.height / 2 + b.height * 0.1);
         top = w.y - w.height / 2;
@@ -374,7 +460,7 @@ export class Stack {
       }
       default: {
         const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
-        const sp = sprite(o.tex, width, maxH);
+        const sp = sprite(o, width, maxH);
         sp.x = jitter;
         top = -sp.height / 2;
         bottom = sp.height / 2;

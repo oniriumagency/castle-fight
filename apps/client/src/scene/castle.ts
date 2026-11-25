@@ -40,8 +40,8 @@ export interface CastleLayout {
 
 /** The drawn gravestone on a fallen castle; off until there is a painted one. */
 const SHOW_GRAVESTONES = false;
-/** The wind blows the way the clouds drift (left to right): every flag streams that way, on both castles. */
-const WIND = 1;
+/** The wind blows the way the clouds drift (right to left): every flag streams that way, on both castles. */
+export const WIND = -1;
 
 // ---------------------------------------------------------------------------
 // Colour helpers
@@ -200,8 +200,27 @@ interface Scar {
 
 /** Most wounds shown at once on each part (the oldest heal first). */
 const MAX_SCARS = { keep: 7, wall: 4 };
-/** How long the masons' scaffold stands after building (ms). */
-const SCAFFOLD_MS = 1900;
+/** How long each plank of the masons' scaffold takes to go up or come down (ms). */
+const PLANK_MS = 130;
+/** A scaffold left standing this long comes down by itself (ms). */
+const SCAFFOLD_HOLD_MS = 5000;
+
+interface Scaffold {
+  stack: Stack;
+  /** Shows only the planks put up so far. */
+  mask: Graphics;
+  /** The height it is built to (Keep or Wall points). */
+  value: number;
+  /** Heights above the ground where each plank begins, lowest first; the last is the very top. */
+  cuts: number[];
+  /** Planks standing (0: none). */
+  level: number;
+  /** +1 going up, -1 coming down, 0 standing. */
+  dir: -1 | 0 | 1;
+  /** Time into the current plank, or standing (ms). */
+  t: number;
+  plankMs: number;
+}
 
 interface Puff {
   sprite: Sprite;
@@ -268,7 +287,9 @@ export class Castle extends Container {
   readonly sceneryBack = new Container();
   readonly sceneryFront = new Container();
   private scars: Scar[] = [];
-  private scaffolds: Partial<Record<'keep' | 'wall', { stack: Stack; left: number }>> = {};
+  private scaffolds: Partial<Record<'keep' | 'wall', Scaffold>> = {};
+  /** Each time a plank of the scaffold is put up or taken down: where (scene px of the castle) and how wide. */
+  onPlank: ((x: number, y: number, w: number, up: boolean) => void) | null = null;
   private towers: Tower[] = [];
   private puffs: Puff[] = [];
   private puffTimer = 0;
@@ -290,6 +311,9 @@ export class Castle extends Container {
   /** A while of shining light (an ultimate fired from this castle). */
   private radiance: { color: number; left: number; total: number } | null = null;
   private radianceFilter: ColorMatrixFilter | null = null;
+  /** Ice over every stone while a resource is frozen: a colour grade of the whole castle, so it
+   * follows the painting's own outline (crowns and bases included), not a box over part of it. */
+  private frostFilter: ColorMatrixFilter | null = null;
 
   constructor(facing: 1 | -1, _textures?: CastleTextures, bannerColor = 0xc8963e, hero: string | null = null) {
     super();
@@ -518,33 +542,112 @@ export class Castle extends Container {
     }
   }
 
-  /** The masons' scaffold stands against a part while it is built, then comes down. */
-  raiseScaffold(part: 'keep' | 'wall'): void {
+  /**
+   * The masons put up their scaffold against a part, plank by plank from the
+   * ground up to the height it is about to reach (`value` points). Returns how
+   * long that takes (ms; 0 with no scaffold to show). `speed` scales it.
+   */
+  raiseScaffold(part: 'keep' | 'wall', value: number, speed = 1): number {
     const piece = this.kit?.scaffold;
-    if (!piece || !this.painted) return;
+    if (!piece || !this.painted || !this.layoutValue) return 0;
     let s = this.scaffolds[part];
     if (!s) {
-      s = { stack: new Stack(piece), left: 0 };
-      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(s.stack.root);
+      const mask = new Graphics();
+      s = { stack: new Stack(piece), mask, value, cuts: [], level: 0, dir: 0, t: 0, plankMs: PLANK_MS };
+      s.stack.root.mask = mask;
+      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(s.stack.root, mask);
       this.scaffolds[part] = s;
     }
-    s.left = SCAFFOLD_MS;
+    s.value = value;
+    s.plankMs = PLANK_MS * speed;
     this.layoutScaffold(part);
+    if (!s.cuts.length) {
+      s.level = 0;
+      s.dir = 0;
+      this.layoutScaffold(part);
+      return 0;
+    }
+    // Already partly up (built again before it came down): carry on from there.
+    if (s.dir < 0) s.t = 0;
+    s.level = Math.min(s.level, s.cuts.length);
+    s.dir = s.level < s.cuts.length ? 1 : 0;
+    if (s.dir === 0) s.t = 0;
+    return (s.cuts.length - s.level) * s.plankMs;
+  }
+
+  /** The masons take their scaffold down, plank by plank from the top. Returns how long that takes (ms). */
+  lowerScaffold(part: 'keep' | 'wall'): number {
+    const s = this.scaffolds[part];
+    if (!s || s.level <= 0) return 0;
+    if (s.dir > 0) s.level++; // the plank on its way up is taken down first
+    s.level = Math.min(s.level, s.cuts.length);
+    s.dir = -1;
+    s.t = 0;
+    return s.level * s.plankMs;
+  }
+
+  /** Height of the scaffold shown with `n` planks up. */
+  private plankHeight(s: Scaffold, n: number): number {
+    return n <= 0 ? 0 : (s.cuts[Math.min(n, s.cuts.length) - 1] ?? 0);
+  }
+
+  private tickScaffold(part: 'keep' | 'wall', dt: number): void {
+    const s = this.scaffolds[part];
+    if (!s) return;
+    if (s.dir === 0) {
+      if (s.level <= 0) return;
+      s.t += dt;
+      if (s.t > SCAFFOLD_HOLD_MS) this.lowerScaffold(part);
+    } else {
+      s.t += dt;
+      while (s.dir !== 0 && s.t >= s.plankMs) {
+        s.t -= s.plankMs;
+        s.level += s.dir;
+        this.plankLanded(part, s);
+        if (s.level >= s.cuts.length || s.level <= 0) {
+          s.level = Math.max(0, Math.min(s.level, s.cuts.length));
+          s.dir = 0;
+          s.t = 0;
+        }
+      }
+    }
+    this.layoutScaffold(part);
+  }
+
+  /** A plank is in place (or gone): the battlefield puffs a little sawdust there. */
+  private plankLanded(part: 'keep' | 'wall', s: Scaffold): void {
+    const b = this.bodies();
+    if (!b || !this.onPlank) return;
+    const up = s.dir > 0;
+    const y = b.groundY - this.plankHeight(s, up ? s.level : s.level + 1);
+    this.onPlank(b[part].x + this.facing * b[part].w * 0.12, y, b[part].w, up);
   }
 
   private layoutScaffold(part: 'keep' | 'wall'): void {
     const s = this.scaffolds[part];
     const b = this.bodies();
-    if (!s || !b) return;
+    const l = this.layoutValue;
+    if (!s || !b || !l) return;
     const body = b[part];
     const w = body.w * (part === 'keep' ? 0.82 : 0.7);
-    const h = b.groundY - body.top;
+    // Built to the height the part is about to reach, not the one it has now.
+    const h = Math.min(s.value, l.maxPoints) * l.unit;
     // The crane's platform sits near the top course; the crown (crane and pulley) rises above it.
     const crown = (s.stack.piece.meta.crown * w) / s.stack.piece.meta.shaftWidth;
-    s.stack.layout(body.x + this.facing * body.w * 0.12, b.groundY + 2, w, Math.max(0, h - crown * 0.62), this.facing < 0, true);
-    const t = s.left / SCAFFOLD_MS;
-    s.stack.root.alpha = Math.min(1, (1 - t) * 6, t * 4);
-    s.stack.root.visible = s.left > 0 && h > body.w * 0.3;
+    const cx = body.x + this.facing * body.w * 0.12;
+    s.stack.layout(cx, b.groundY + 2, w, Math.max(0, h - crown * 0.62), this.facing < 0, true);
+    s.cuts = h > body.w * 0.3 ? s.stack.courses().map((c) => c + 2) : [];
+    // Each plank slides up into place (or down out of sight) over the first part of its turn.
+    let shown = this.plankHeight(s, s.level);
+    if (s.dir !== 0) {
+      const next = this.plankHeight(s, s.level + s.dir);
+      const k = Math.min(1, s.t / (s.plankMs * 0.6));
+      shown += (next - shown) * (1 - (1 - k) ** 3);
+    }
+    const m = s.mask;
+    m.clear();
+    if (shown > 0.5) m.rect(cx - w * 2.2, b.groundY - shown, w * 4.4, shown + w).fill(0xffffff);
+    s.stack.root.visible = shown > 0.5;
   }
 
   private dropScar(s: Scar): void {
@@ -596,7 +699,7 @@ export class Castle extends Container {
   radiate(color: number, ms = 2800): void {
     this.radiance = { color, left: ms, total: ms };
     this.radianceFilter ??= new ColorMatrixFilter();
-    this.filters = [this.radianceFilter];
+    this.applyFilters();
     this.tickRadiance(0);
   }
 
@@ -608,7 +711,7 @@ export class Castle extends Container {
     r.left -= dt;
     if (r.left <= 0) {
       this.radiance = null;
-      this.filters = [];
+      this.applyFilters();
       return;
     }
     const t = 1 - r.left / r.total;
@@ -659,7 +762,19 @@ export class Castle extends Container {
   setFrost(on: boolean): void {
     if (on === this.frozen) return;
     this.frozen = on;
+    if (on && !this.frostFilter) {
+      this.frostFilter = new ColorMatrixFilter();
+      // Cooled and paled toward ice: part of each colour, part of its brightness, a lift of blue-white.
+      this.frostFilter.matrix = [0.575, 0.148, 0.028, 0, 0.05, 0.09, 0.727, 0.033, 0, 0.09, 0.105, 0.207, 0.639, 0, 0.15, 0, 0, 0, 1, 0];
+    }
+    this.applyFilters();
     this.drawFrost();
+  }
+
+  /** The castle's colour grades: frost and the radiance of an ultimate, as they are on. */
+  private applyFilters(): void {
+    const list = [this.frozen ? this.frostFilter : null, this.radiance ? this.radianceFilter : null].filter((f): f is ColorMatrixFilter => !!f);
+    this.filters = list.length ? list : [];
   }
 
   /** Scene position of the top of the Keep or the Wall (for projectiles and floating numbers). */
@@ -723,13 +838,8 @@ export class Castle extends Container {
     this.x = x;
     this.sceneryBack.visible = this.sceneryFront.visible = this.visible;
     for (const s of this.scars) if (s.age < 1) s.sprite.alpha = s.age = Math.min(1, s.age + dt / 220);
-    for (const part of ['keep', 'wall'] as const) {
-      const sc = this.scaffolds[part];
-      if (sc && sc.left > 0) {
-        sc.left = Math.max(0, sc.left - dt);
-        this.layoutScaffold(part);
-      }
-    }
+    this.tickScaffold('keep', dt);
+    this.tickScaffold('wall', dt);
     if (!calm) this.phase += dt * 0.004;
     this.drawAnim(dt, calm);
     if (this.graveRise >= 0 && this.graveRise < 1) {
@@ -1795,15 +1905,12 @@ export class Castle extends Container {
     for (const t of [this.keepTower, ...this.towers]) {
       if (!t.root.visible || t.h < 1) continue;
       const x = t.cx - t.w / 2;
-      g.rect(x, t.topY, t.w, t.h).fill({ color: 0xbfeaff, alpha: 0.22 });
-      g.rect(x, t.topY, t.w, 2).fill({ color: 0xffffff, alpha: 0.7 });
       icicles(x, t.w, t.topY, t.isKeep ? 6 : 3);
     }
     const wh = this.wallPx();
     if (wh > 0.5) {
       const ww = this.wallW();
       const wx = this.wallCx() - ww / 2;
-      g.rect(wx, l.groundY - wh, ww, wh).fill({ color: 0xbfeaff, alpha: 0.22 });
       icicles(wx, ww, l.groundY - wh, 4);
     }
   }

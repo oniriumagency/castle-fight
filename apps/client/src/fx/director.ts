@@ -320,6 +320,8 @@ export const fx = {
     const side = ctx.side(seat);
     if (legendaryNow()) holyFire(seat, ctx);
     const p = pan(ctx, seat);
+    // The scaffold goes up plank by plank to the new height first; then the castle rises inside it.
+    await field.raiseScaffold(side, target, heights[target], animScale());
     if (amount >= 15) audio.play('buildBig', 0.5, { pan: p });
     else audio.play('build', Math.min(1, amount / 14), { pan: p });
     const base = field.anchor(side, 'base');
@@ -338,6 +340,8 @@ export const fx = {
     field.burst(at.x, at.y, { count: 10, texture: 'spark', color: [0xffe7a0, 0xffffff], speed: 3, gravity: 0.05, size: 16, life: 500 });
     ctx.float(`+${amount}`, at.x, at.y - 18, 'build');
     await grow;
+    // Then it comes down, plank by plank from the top.
+    field.lowerScaffold(side, target);
   },
 
   /** `walls` and `keeps`: every seat's heights after the swap (only the seats in `seats` changed). */

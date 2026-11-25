@@ -171,6 +171,93 @@ function plainBand(data, width, b, share = 0.7) {
   return { crown: b.crown + best, base: b.crown + best + len };
 }
 
+/**
+ * The painting is lit from above, so a band cut from it is a touch brighter at
+ * one end than the other. Repeated, that slope shows as stripes, and against
+ * the crown and the base as a step of light (the sharper the darker the sky:
+ * an eclipse or a storm tints the castle and the eye reads the steps as cuts).
+ * Returns, for every row of the band, the per-channel gain that brings its
+ * broad light to the band's average (the stones, mortar and the left-to-right
+ * shading are left as painted).
+ */
+function rowGains(data, width, height, b, wrap = false, reach = Math.max(height * 0.3, b.shaftWidth * 0.2)) {
+  const x0 = Math.round(b.shaftLeft + b.shaftWidth * 0.1);
+  const x1 = Math.round(b.shaftLeft + b.shaftWidth * 0.9);
+  const means = [];
+  for (let y = 0; y < height; y++) {
+    const m = [0, 0, 0];
+    let n = 0;
+    for (let x = x0; x < x1; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < 200) continue;
+      for (let c = 0; c < 3; c++) m[c] += data[i + c];
+      n++;
+    }
+    means.push(n ? m.map((v) => v / n) : null);
+  }
+  const fill = means.find(Boolean) ?? [128, 128, 128];
+  for (let y = 0; y < height; y++) means[y] ??= means[y - 1] ?? fill;
+  // Broad light only: averaged over several courses of stone, so mortar lines do not count.
+  const r = Math.max(4, Math.round(reach / 2));
+  const smooth = means.map((_, y) => {
+    const s = [0, 0, 0];
+    let n = 0;
+    for (let d = -r; d <= r; d++) {
+      const row = means[wrap ? (((y + d) % height) + height) % height : Math.min(height - 1, Math.max(0, y + d))];
+      for (let c = 0; c < 3; c++) s[c] += row[c];
+      n++;
+    }
+    return s.map((v) => v / n);
+  });
+  const avg = [0, 1, 2].map((c) => smooth.reduce((a, row) => a + row[c], 0) / height);
+  return smooth.map((row) => row.map((v, c) => Math.min(1.6, Math.max(0.6, (avg[c] + 4) / (v + 4)))));
+}
+
+/** Multiplies every row of a band by its gain (`k` of the way: 0 leaves it, 1 applies it all). */
+function applyGains(data, width, gains, k = () => 1) {
+  for (let y = 0; y < gains.length; y++) {
+    const t = k(y);
+    const g = gains[y].map((v) => 1 + (v - 1) * t);
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      for (let c = 0; c < 3; c++) data[i + c] = Math.min(255, Math.round(data[i + c] * g[c]));
+    }
+  }
+}
+
+const smoothstep = (t) => t * t * (3 - 2 * t);
+
+/** Hue in degrees (0..360). */
+function hue(r, g, b) {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (!d) return 0;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+/** The plain stone's colour: its usual hue and how saturated it gets (95th percentile). */
+function stoneOf(data, width, height, b) {
+  const sats = [];
+  const hues = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = b.shaftLeft; x < b.shaftLeft + b.shaftWidth; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < 200) continue;
+      const r = data[i];
+      const g = data[i + 1];
+      const bl = data[i + 2];
+      sats.push(Math.max(r, g, bl) - Math.min(r, g, bl));
+      hues.push(hue(r, g, bl));
+    }
+  }
+  const p95 = (xs) => [...xs].sort((a, c) => a - c)[Math.floor(xs.length * 0.95)] ?? 0;
+  // The circular mean hue of the stone.
+  const sx = hues.reduce((a, h) => a + Math.cos((h * Math.PI) / 180), 0);
+  const sy = hues.reduce((a, h) => a + Math.sin((h * Math.PI) / 180), 0);
+  return { sat: p95(sats), hue: ((Math.atan2(sy, sx) * 180) / Math.PI + 360) % 360 };
+}
+
 /** Cross-fades the bottom of a vertical tile into its top so it repeats without a seam. */
 function seamless(data, width, height) {
   const band = Math.max(2, Math.round(height * 0.14));
@@ -219,10 +306,11 @@ function weather(shaft, width, seed) {
     blobs.push({
       x: rand() * width,
       y: rand() * H,
-      rx: width * (0.12 + rand() * 0.3),
-      ry: width * (0.1 + rand() * 0.35),
+      // Patches, not bands: a blob as wide as the tower reads as a stripe across it, a cut.
+      rx: width * (0.08 + rand() * 0.16),
+      ry: width * (0.08 + rand() * 0.2),
       // Mostly grime and damp (darker, a touch green or brown), some paler, sunned stone.
-      k: rand() < 0.65 ? -(0.04 + rand() * 0.08) : 0.025 + rand() * 0.04,
+      k: rand() < 0.65 ? -(0.03 + rand() * 0.06) : 0.02 + rand() * 0.03,
       tint: rand() < 0.5 ? [0.98, 0.99, 0.97] : [1.02, 0.99, 0.96],
     });
   }
@@ -249,13 +337,22 @@ function weather(shaft, width, seed) {
   return { data: out, height: H };
 }
 
+/** Evens out what light still varies row to row across the whole long tile (it wraps, so does the averaging). */
+function evenTile(shaft, width, b) {
+  applyGains(shaft.data, width, rowGains(shaft.data, width, shaft.height, b, true, b.shaftWidth * 0.25));
+  return shaft;
+}
+
 /**
  * Light the painting gives off itself: windows, braziers, crystals, potions.
  * Bright, strongly coloured pixels are kept (sunlit stone is bright but not
  * saturated enough), blurred a little into a glow the game adds on top and
  * makes flicker. Returns null when a band has no light of its own.
+ * `stone`: the plain masonry's hue and how saturated it gets (the shaft's), so
+ * warm sunlit sandstone or brick is never taken for a light: it would glow on
+ * the crown and base but not on the shaft, a band of light ending at the cut.
  */
-async function glowOf(buf, width, height) {
+async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
   // Brightness of the neighbourhood: a lit window stands out from the stone around it.
   const lumBuf = Buffer.alloc(width * height);
   for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
@@ -270,9 +367,13 @@ async function glowOf(buf, width, height) {
     const lum = lumBuf[j];
     const sat = Math.max(r, g, b) - Math.min(r, g, b);
     const pop = lum - around[j];
+    // A colour like the stone's must be more vivid than any stone; another colour (a green
+    // potion, a blue crystal) only vivid.
+    const dh = Math.abs(((hue(r, g, b) - stone.hue + 540) % 360) - 180);
+    const floor = dh < 35 ? Math.max(80, stone.sat + 20) : 80;
     const k =
       Math.min(1, Math.max(0, (pop - 22) / 34)) *
-      Math.min(1, Math.max(0, (sat - 80) / 60)) *
+      Math.min(1, Math.max(0, (sat - floor) / 60)) *
       Math.min(1, Math.max(0, (lum - 100) / 60));
     if (k <= 0) continue;
     lit++;
@@ -318,9 +419,42 @@ async function stacked(input, outDir, piece, override) {
   for (let y = 0; y < b.base - b.crown; y++) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
-  const shaft = weather(seamless(band, width, b.base - b.crown), width, input.split(/[\\/]/).slice(-2).join('/'));
-  const crownGlow = await glowOf(slice(0, b.crown), width, b.crown);
-  const baseGlow = await glowOf(slice(b.base, height), width, height - b.base);
+  const len = b.base - b.crown;
+  const gains = rowGains(band, width, len, b);
+  const stone = stoneOf(band, width, len, b);
+  // The side the shaft is lit from, so ornaments can be turned to match it.
+  const light = lightSign(lightSide(band, width, 0, 0, width, len), 6);
+  // The painting is often lit warmer at the top than the plain stretch the shaft is cut from, so
+  // the crown and base would meet the evened-out shaft with a step of light. Ease the light of the
+  // crown's lower part and the base's upper part toward the shaft's, over most of a shaft width.
+  const ease = Math.round(b.shaftWidth * 0.9);
+  const crownEase = Math.min(b.crown, ease);
+  const gc = gains[0];
+  applyGains(data.subarray((b.crown - crownEase) * width * 4, b.crown * width * 4), width, new Array(crownEase).fill(gc), (y) => smoothstep((y + 0.5) / crownEase));
+  const baseEase = Math.min(height - b.base, ease);
+  const gb = gains[len - 1];
+  applyGains(data.subarray(b.base * width * 4, (b.base + baseEase) * width * 4), width, new Array(baseEase).fill(gb), (y) => 1 - smoothstep((y + 0.5) / baseEase));
+  applyGains(band, width, gains);
+  // The skirts: the painting just under the crown and just over the base, laid over the ends of the
+  // repeating shaft and fading into it. The shaft repeats from the base up, so wherever it is cut
+  // under the crown its stones would not meet the crown's; the skirt carries the crown's own stones
+  // down and hands over to the shaft gradually, and the same at the base.
+  const skirt = Math.max(4, Math.min(Math.floor(len / 2), Math.round(b.shaftWidth * 0.32)));
+  const skirtTop = Buffer.from(band.subarray(0, width * skirt * 4));
+  const skirtBottom = Buffer.from(band.subarray(width * (len - skirt) * 4));
+  for (let y = 0; y < skirt; y++) {
+    const fade = 1 - smoothstep((y + 0.5) / skirt);
+    for (let x = 0; x < width; x++) {
+      skirtTop[(y * width + x) * 4 + 3] = Math.round(skirtTop[(y * width + x) * 4 + 3] * fade);
+      const j = ((skirt - 1 - y) * width + x) * 4 + 3;
+      skirtBottom[j] = Math.round(skirtBottom[j] * fade);
+    }
+  }
+  await webp(skirtTop, width, skirt, join(outDir, `${piece}-skirt-top.webp`));
+  await webp(skirtBottom, width, skirt, join(outDir, `${piece}-skirt-bottom.webp`));
+  const shaft = evenTile(weather(seamless(band, width, len), width, input.split(/[\\/]/).slice(-2).join('/')), width, b);
+  const crownGlow = await glowOf(slice(0, b.crown), width, b.crown, stone);
+  const baseGlow = await glowOf(slice(b.base, height), width, height - b.base, stone);
   if (crownGlow) await webp(crownGlow, width, b.crown, join(outDir, `${piece}-crown-glow.webp`));
   if (baseGlow) await webp(baseGlow, width, height - b.base, join(outDir, `${piece}-base-glow.webp`));
   await webp(slice(0, b.crown), width, b.crown, join(outDir, `${piece}-crown.webp`));
@@ -350,7 +484,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { glow: { crown: !!crownGlow, base: !!baseGlow }, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 /**
@@ -359,7 +493,7 @@ async function stacked(input, outDir, piece, override) {
  * and let their pale stone fade out, so they sit on any hero's masonry.
  * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
  */
-const DECALS = { props: null, ornaments: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
+const DECALS = { props: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
 
 async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
   const { data, info } = await sharp(input).resize({ width: size, height: size, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -406,6 +540,181 @@ async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
 }
 
 /**
+ * Which side a painted thing is lit from: the mean brightness just inside its
+ * right outline minus just inside its left one, row by row (glowing windows
+ * and flames left out). Positive: lit from the right. Shape barely matters,
+ * since each row is compared with itself.
+ */
+function lightSide(data, width, x0, y0, w, h) {
+  let left = 0;
+  let right = 0;
+  let nl = 0;
+  let nr = 0;
+  const lumAt = (i) => 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+  const lit = (i) => {
+    const sat = Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+    return data[i + 3] > 128 && !(sat > 120 && lumAt(i) > 150);
+  };
+  let minX = w;
+  let maxX = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[((y0 + y) * width + x0 + x) * 4 + 3] <= 128) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+  }
+  const k = Math.max(3, Math.round((maxX - minX) * 0.08));
+  for (let y = 0; y < h; y++) {
+    const row = (y0 + y) * width + x0;
+    let l = -1;
+    let r = -1;
+    for (let x = 0; x < w; x++) {
+      if (data[(row + x) * 4 + 3] <= 128) continue;
+      if (l < 0) l = x;
+      r = x;
+    }
+    if (l < 0 || r - l < 3 * k) continue;
+    for (let x = l + 1; x < l + k; x++) {
+      const i = (row + x) * 4;
+      if (lit(i)) (left += lumAt(i)), nl++;
+    }
+    for (let x = r - k + 1; x < r; x++) {
+      const i = (row + x) * 4;
+      if (lit(i)) (right += lumAt(i)), nr++;
+    }
+  }
+  if (nl < 30 || nr < 30) return 0;
+  return right / nr - left / nl;
+}
+
+/** -1 lit from the left, 1 from the right, 0 when the difference is too faint to tell. */
+const lightSign = (v, faint = 10) => (Math.abs(v) < faint ? 0 : Math.sign(v));
+
+/** Average colour of the stones of a shaft (glowing windows left out). */
+async function stoneColour(file) {
+  try {
+    const { data } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const sum = [0, 0, 0];
+    let n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 200) continue;
+      for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+      n++;
+    }
+    return n ? sum.map((v) => v / n) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Bump when the ornament treatment changes, so cached sheets are redone. */
+const ORNAMENT_VERSION = 4;
+/** Ornament sheets are painted far finer than the walls they sit on: shrink them to about the walls' grain. */
+const ORNAMENT_SHEET = 576;
+
+/**
+ * Wall ornaments, a 3 x 3 sheet painted on magenta. Painted on their own,
+ * they come out crisper, more contrasted and more saturated than the castle,
+ * with hard dark outlines, and look stuck on. So they are brought to the
+ * wall's grain and light: shrunk and softened to the walls' resolution,
+ * their darks lifted and colours pulled a little toward the stone (the same
+ * air and light falls on both), and each gets a soft shadow on the wall, cast
+ * away from its own light. The side each is lit from is recorded, so the
+ * game can turn it to match its tower.
+ */
+async function ornamentSheet(input, outDir, name, kinds, stone) {
+  const big = 1152;
+  const raw = await sharp(input).resize({ width: big, height: big, fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  keyOut(raw.data, raw.info);
+  const cell = big / 3;
+  const light = [];
+  for (let q = 0; q < 9; q++) light.push(lightSign(lightSide(raw.data, big, (q % 3) * cell, Math.floor(q / 3) * cell, cell, cell)));
+
+  // Grade: lift the darks, pull toward the stone's colour, ease the saturation. Glowing bits keep their fire.
+  const ref = stone ?? [150, 140, 125];
+  const refLum = 0.3 * ref[0] + 0.59 * ref[1] + 0.11 * ref[2];
+  const d = raw.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const glow = Math.min(1, Math.max(0, (sat - 110) / 50)) * Math.min(1, Math.max(0, (lum - 140) / 60));
+    const k = 1 - glow;
+    // Contrast eased around the stone's own brightness, so outlines read like paint, not ink.
+    const lum2 = refLum + (lum - refLum) * (1 - 0.22 * k);
+    const out = [r, g, b].map((c, j) => {
+      let v = lum + (c - lum) * (1 - 0.18 * k); // a little less saturated
+      v *= lum > 1 ? lum2 / lum : 1;
+      v += (ref[j] * (lum2 / Math.max(1, refLum)) - v) * 0.16 * k; // the stone's colour cast
+      return v;
+    });
+    // Darkest strokes lifted toward the stone's shadow tone.
+    const floor = refLum * 0.28 * k;
+    for (let j = 0; j < 3; j++) d[i + j] = Math.max(0, Math.min(255, Math.round(Math.max(out[j], floor * (ref[j] / Math.max(1, refLum))))));
+  }
+
+  // Down to the walls' grain, through a slightly smaller size for a painterly softness (alpha is premultiplied by sharp).
+  const size = ORNAMENT_SHEET;
+  const soft = await sharp(d, { raw: raw.info }).resize({ width: Math.round(size * 0.8), height: Math.round(size * 0.8), kernel: 'lanczos3' }).raw().toBuffer();
+  const img = await sharp(soft, { raw: { width: Math.round(size * 0.8), height: Math.round(size * 0.8), channels: 4 } })
+    .resize({ width: size, height: size, kernel: 'cubic' })
+    .raw()
+    .toBuffer();
+
+  // Shadow cast on the wall, down and away from the ornament's light; none for things sticking out into the air.
+  const alpha = Buffer.alloc(size * size);
+  for (let i = 0, j = 0; j < alpha.length; i += 4, j++) alpha[j] = img[i + 3];
+  const blurred = await sharp(alpha, { raw: { width: size, height: size, channels: 1 } }).blur(size / 220).extractChannel(0).raw().toBuffer();
+  const cellPx = size / 3;
+  const out = Buffer.alloc(img.length);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const q = Math.floor(y / cellPx) * 3 + Math.floor(x / cellPx);
+      const kind = kinds[q];
+      const i = (y * size + x) * 4;
+      let sh = 0;
+      if (kind !== 'edgeR' && kind !== 'edgeL' && kind !== 'x') {
+        const dx = Math.round(-light[q] * size * 0.006);
+        const dy = Math.round(size * 0.008);
+        const sx = x - dx;
+        const sy = y - dy;
+        // Stay inside the cell: a neighbour's shadow must not leak in.
+        if (sx >= 0 && sy >= 0 && sx < size && sy < size && Math.floor(sy / cellPx) * 3 + Math.floor(sx / cellPx) === q) sh = (blurred[sy * size + sx] / 255) * 0.42;
+      }
+      const a = img[i + 3] / 255;
+      const outA = a + sh * (1 - a);
+      if (outA <= 0) continue;
+      for (let c = 0; c < 3; c++) out[i + c] = Math.round((img[i + c] * a) / outA);
+      out[i + 3] = Math.round(outA * 255);
+    }
+  }
+
+  const frames = [];
+  const cpx = Math.floor(cellPx);
+  for (let q = 0; q < 9; q++) {
+    const x0 = (q % 3) * cpx;
+    const y0 = Math.floor(q / 3) * cpx;
+    let l = cpx, r = -1, t = cpx, b = -1;
+    for (let y = 0; y < cpx; y++) {
+      for (let x = 0; x < cpx; x++) {
+        if (out[((y0 + y) * size + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    frames.push(r > l && b > t && kinds[q] !== 'x' ? [x0 + l, y0 + t, r - l + 1, b - t + 1, kinds[q] ?? 'deco', light[q]] : null);
+  }
+  await webp(out, size, size, join(outDir, `${name}.webp`));
+  return { name, v: ORNAMENT_VERSION, frames };
+}
+
+/**
  * The masons' scaffold shown while a part is built: cut like a tower, with
  * one bay of the lattice (beam to beam) as the shaft so it repeats cleanly.
  */
@@ -427,11 +736,14 @@ async function scaffold(input, outDir) {
     solid.push(n > (right - left + 1) * 0.9);
   }
   const beams = [];
+  // Each plank's top and bottom edge too: the scaffold goes up (and comes down) plank by plank.
+  const planks = [];
   for (let y = 0; y < height; y++) {
     if (!solid[y]) continue;
     let e = y;
     while (e + 1 < height && solid[e + 1]) e++;
     beams.push(Math.round((y + e) / 2));
+    planks.push([y, e + 1]);
     y = e;
   }
   // The bay that starts nearest the middle, with beams below it (the base keeps the ladder).
@@ -450,7 +762,7 @@ async function scaffold(input, outDir) {
   await webp(slice(best.a, best.b), width, best.b - best.a, join(outDir, 'scaffold-shaft.webp'));
   await webp(slice(best.b, height), width, height - best.b, join(outDir, 'scaffold-base.webp'));
   const top = rows.findIndex(Boolean);
-  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top } };
+  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top }, planks };
 }
 
 async function shared(dir, outDir, manifest, old) {
@@ -468,7 +780,8 @@ async function shared(dir, outDir, manifest, old) {
     const group = name === 'scaffold' ? null : m[2] ? 'decals' : 'props';
     const into = group ? (manifest[group] ??= {}) : manifest;
     const was = group ? old[group]?.[name] : old.scaffold;
-    if (was && (await mtime(probe)) >= (await mtime(input))) {
+    // A scaffold cut before planks were measured is cut again.
+    if (was && (group || was.planks) && (await mtime(probe)) >= (await mtime(input))) {
       into[key] = was;
       continue;
     }
@@ -505,24 +818,6 @@ export async function buildCastles(source, target) {
     const files = await readdir(join(root, hero));
     const outDir = join(target, 'castles', hero);
     await mkdir(outDir, { recursive: true });
-    // Wall ornaments: 3 x 3 sheets of windows, banners, lanterns and ivy laid over the shafts.
-    for (const file of files.sort()) {
-      const m = /^(ornaments(-[a-z0-9]+)?)\.(png|jpe?g|webp)$/i.exec(file);
-      if (!m) continue;
-      const name = m[1].toLowerCase();
-      const input = join(root, hero, file);
-      manifest[hero] ??= {};
-      const list = (manifest[hero].ornaments ??= []);
-      const was = old[hero]?.ornaments?.find((o) => o.name === name);
-      if (was && (await mtime(join(outDir, `${name}.webp`))) >= Math.max(await mtime(input), await mtime(join(root, 'ornaments.json')))) {
-        list.push(was);
-        continue;
-      }
-      const sheet = await decalSheet(input, outDir, name, 'ornaments', 3, 1152);
-      const kinds = ornamentKinds[`${hero}/${name}`] ?? [];
-      list.push({ name, frames: sheet.frames.map((f, i) => (f && kinds[i] !== 'x' ? [...f, kinds[i] ?? 'deco'] : null)) });
-      built++;
-    }
     for (const file of files) {
       const m = /^(keep|tower1|tower2|tower|wall|ruins)\.(png|jpe?g|webp)$/i.exec(file);
       if (!m) continue;
@@ -531,11 +826,35 @@ export async function buildCastles(source, target) {
       const probe = join(outDir, piece === 'ruins' ? 'ruins.webp' : `${piece}-shaft.webp`);
       const stale = Math.max(await mtime(input), await mtime(join(root, 'slices.json')));
       manifest[hero] ??= {};
-      if (old[hero]?.[piece] && (await mtime(probe)) >= stale) {
+      // Pieces cut before the skirts or the light side existed are cut again.
+      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined)) && (await mtime(probe)) >= stale) {
         manifest[hero][piece] = old[hero][piece];
         continue;
       }
       manifest[hero][piece] = piece === 'ruins' ? await ruins(input, outDir) : await stacked(input, outDir, piece, slices[`${hero}/${piece}`]);
+      built++;
+    }
+    // A shaft lit straight on takes the side most of the castle is lit from, so its ornaments agree with the rest.
+    const pieces = Object.values(manifest[hero] ?? {}).filter((p) => p && typeof p.light === 'number');
+    const most = Math.sign(pieces.reduce((n, p) => n + p.light, 0));
+    for (const p of pieces) if (p.light === 0) p.light = most;
+    // Wall ornaments: 3 x 3 sheets of windows, banners, lanterns and ivy laid over the shafts,
+    // brought to the colour of the hero's stone (so after the pieces, whose shafts give it).
+    const stone = await stoneColour(join(outDir, 'keep-shaft.webp'));
+    for (const file of files.sort()) {
+      const m = /^(ornaments(-[a-z0-9]+)?)\.(png|jpe?g|webp)$/i.exec(file);
+      if (!m) continue;
+      const name = m[1].toLowerCase();
+      const input = join(root, hero, file);
+      manifest[hero] ??= {};
+      const list = (manifest[hero].ornaments ??= []);
+      const was = old[hero]?.ornaments?.find((o) => o.name === name);
+      const stale = Math.max(await mtime(input), await mtime(join(root, 'ornaments.json')), await mtime(join(outDir, 'keep-shaft.webp')));
+      if (was?.v === ORNAMENT_VERSION && (await mtime(join(outDir, `${name}.webp`))) >= stale) {
+        list.push(was);
+        continue;
+      }
+      list.push(await ornamentSheet(input, outDir, name, ornamentKinds[`${hero}/${name}`] ?? [], stone));
       built++;
     }
   }
