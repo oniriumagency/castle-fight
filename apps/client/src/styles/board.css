@@ -795,12 +795,6 @@
   z-index: 2;
 }
 
-.discard-pile.drop-hover {
-  filter: drop-shadow(0 0 14px #ff8a5a);
-  transform: scale(1.1);
-  transition: transform 0.15s;
-}
-
 .deck-pile.pulse {
   animation: pulse 0.6s ease;
 }
@@ -949,10 +943,6 @@
 
 .hand[data-drop='play'] .hand-card.dragging {
   box-shadow: 0 0 0 3px #ffe08a, 0 0 30px rgb(255 200 90 / 80%);
-}
-
-.hand[data-drop='discard'] .hand-card.dragging {
-  box-shadow: 0 0 0 3px #ff8a5a, 0 0 30px rgb(255 100 60 / 80%);
 }
 
 .board.short .hand {

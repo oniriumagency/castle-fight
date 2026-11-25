@@ -224,7 +224,6 @@ class BoardScreen implements Screen {
 
     this.deckPile.append(cardBack(), h('span.pile-count'));
     this.discardPile.append(h('div.pile-empty'), h('span.pile-count'));
-    this.hand.discardTarget = this.discardPile;
     // The last card played sits on the discard pile: hover it to read it, click or tap to inspect it.
     this.discardPile.addEventListener('pointerenter', (e) => {
       if (e.pointerType === 'mouse') this.showPilePreview();
@@ -288,7 +287,6 @@ class BoardScreen implements Screen {
     }
     this.hand.onSelect = (uid) => this.onSelect(uid);
     this.hand.onPlay = (uid) => this.tryPlay(uid);
-    this.hand.onDiscard = (uid) => this.tryDiscard(uid);
   }
 
   // ---------------------------------------------------------------------------

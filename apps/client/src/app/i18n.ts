@@ -343,7 +343,7 @@ const STRINGS = {
   readyButton: { es: '¡Listo!', en: 'Ready!' },
   readyButtonHint: { es: 'Terminar turno', en: 'End turn' },
   readyButtonTitle: { es: 'Terminar el turno (Espacio)', en: 'End your turn (Space)' },
-  dragHint: { es: 'Arrastra hacia arriba para jugar, o sobre el descarte para descartar', en: 'Drag up to play, or onto the discard pile to discard' },
+  dragHint: { es: 'Arrastra hacia arriba para jugar', en: 'Drag up to play' },
   waitingOpponent: { es: 'Esperando a {who}…', en: 'Waiting for {who}…' },
   thinking: { es: '{who} está pensando…', en: '{who} is thinking…' },
   menu: { es: 'Menú', en: 'Menu' },
