@@ -715,6 +715,162 @@ async function ornamentSheet(input, outDir, name, kinds, stone) {
 }
 
 /**
+ * Splits the scaffold painting into its separate timbers so the masons can put
+ * it up one board at a time: each band (from one plank's top edge to the next)
+ * gives its two post segments, the two boards of its cross brace, the plank on
+ * top and whatever else stands there (ladder, bucket, crane, stones).
+ */
+function scaffoldParts(data, width, height, posts, planks) {
+  const alpha = (x, y) => data[(y * width + x) * 4 + 3];
+  // The posts: runs of columns opaque down most of the height.
+  const runs = [];
+  for (const x of posts) {
+    const r = runs[runs.length - 1];
+    if (r && x <= r[1] + 2) r[1] = x;
+    else runs.push([x, x]);
+  }
+  const L = runs[0];
+  const R = runs[runs.length - 1];
+  const pad = 3;
+  const inPost = (x) => (x >= L[0] - pad && x <= L[1] + pad ? 0 : x >= R[0] - pad && x <= R[1] + pad ? 1 : -1);
+  // Each plank's reach: the opaque run along its middle row that holds the posts.
+  const beams = planks.map(([top, bottom]) => {
+    const y = Math.floor((top + bottom) / 2);
+    let x0 = L[0];
+    let x1 = R[1];
+    while (x0 > 0 && alpha(x0 - 1, y) > 96) x0--;
+    while (x1 < width - 1 && alpha(x1 + 1, y) > 96) x1++;
+    return { top: Math.max(0, top - 2), bottom: Math.min(height, bottom + 2), x0: x0 - 2, x1: x1 + 2 };
+  });
+  // Bands: from the top of the picture, then from each plank's top edge.
+  const tops = [0, ...beams.map((b) => b.top)];
+  const bands = tops.map((top, i) => ({ top, bottom: tops[i + 1] ?? height, beam: i > 0 ? beams[i - 1] : null, next: beams[i] ?? null }));
+  const bandOf = (y) => {
+    let i = bands.length - 1;
+    while (i > 0 && y < bands[i].top) i--;
+    return i;
+  };
+  // The ladder: two long vertical rails between the posts (nothing else there runs so far straight down).
+  let ladder = null;
+  {
+    const minRun = (bands[1] ? bands[1].bottom - bands[1].top : height / 6) * 1.4;
+    const rails = [];
+    for (let x = L[1] + pad + 1; x < R[0] - pad; x++) {
+      let best = null;
+      for (let y = 0, s = -1; y <= height; y++) {
+        const on = y < height && alpha(x, y) > 128;
+        if (on && s < 0) s = y;
+        if (!on && s >= 0) {
+          if (!best || y - s > best[1] - best[0]) best = [s, y];
+          s = -1;
+        }
+      }
+      if (best && best[1] - best[0] >= minRun) rails.push([x, ...best]);
+    }
+    if (rails.length >= 2 && rails[rails.length - 1][0] - rails[0][0] > 12) {
+      ladder = {
+        x0: rails[0][0] - 3,
+        x1: rails[rails.length - 1][0] + 3,
+        y0: Math.min(...rails.map((r) => r[1])) - 4,
+        y1: Math.max(...rails.map((r) => r[2])) + 2,
+      };
+    }
+  }
+  const inLadder = (x, y) => ladder && x >= ladder.x0 && x <= ladder.x1 && y >= ladder.y0 && y <= ladder.y1;
+  // Layers: per band, 0 left post, 1 right post, 2 brace "\", 3 brace "/", 4 plank, 5 the rest.
+  const KINDS = ['post', 'post', 'brace', 'brace', 'beam', 'extra', 'ladder'];
+  const owner = new Int16Array(width * height).fill(-1);
+  const board = Math.max(10, (L[1] - L[0]) * 0.85);
+  for (let y = 0; y < height; y++) {
+    const bi = bandOf(y);
+    const band = bands[bi];
+    for (let x = 0; x < width; x++) {
+      if (alpha(x, y) < 6) continue;
+      let k = 5;
+      const p = inPost(x);
+      if (band.beam && y < band.beam.bottom && x >= band.beam.x0 && x <= band.beam.x1) k = 4;
+      else if (p >= 0) k = p;
+      else if (inLadder(x, y)) k = 6;
+      else if (band.beam && band.next && x > L[1] && x < R[0] && band.next.top - band.beam.bottom > (R[0] - L[1]) * 0.5) {
+        // The cross brace runs corner to corner between the posts and the planks.
+        const x0 = L[1];
+        const x1 = R[0];
+        const y0 = band.beam.bottom;
+        const y1 = band.next.top;
+        const len = Math.hypot(x1 - x0, y1 - y0);
+        const dA = Math.abs((y1 - y0) * (x - x0) - (x1 - x0) * (y - y0)) / len; // "\"
+        const dB = Math.abs((y1 - y0) * (x - x0) + (x1 - x0) * (y - y1)) / len; // "/"
+        if (Math.min(dA, dB) <= board) k = dA <= board && dB <= board ? 2 : dA < dB ? 2 : 3;
+      }
+      owner[y * width + x] = k === 6 ? 6 * bands.length : bi * 6 + k;
+    }
+  }
+  const parts = [];
+  // The ladder leans on the highest band it reaches.
+  const ladderBand = ladder ? bandOf(ladder.y0 + 6) : -1;
+  for (let bi = 0; bi < bands.length; bi++) {
+    for (let k = 0; k < 7; k++) {
+      if (k === 6 && bi !== ladderBand) continue;
+      const id = k === 6 ? 6 * bands.length : bi * 6 + k;
+      const rows = k === 6 ? [0, height] : [bands[bi].top, bands[bi].bottom];
+      let x0 = width, y0 = height, x1 = -1, y1 = -1, n = 0;
+      for (let y = rows[0]; y < rows[1]; y++) {
+        for (let x = 0; x < width; x++) {
+          if (owner[y * width + x] !== id) continue;
+          if (alpha(x, y) > 40) n++;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+      if (n < 30) continue;
+      // A post segment reaches up behind its plank.
+      if (k < 2 && bands[bi].beam) y0 = Math.min(y0, bands[bi].beam.top);
+      const w = x1 - x0 + 1;
+      const h = y1 - y0 + 1;
+      const px = Buffer.alloc(w * h * 4);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          let sy = y;
+          if (owner[y * width + x] !== id) {
+            // A post carries on behind its plank: copy the post from just above the plank.
+            const beam = bands[bi].beam;
+            if (!(k < 2 && beam && y < beam.bottom && inPost(x) === k)) continue;
+            sy = Math.max(0, beam.top - 1);
+            if (alpha(x, sy) < 6) continue;
+          }
+          data.copy(px, ((y - y0) * w + x - x0) * 4, (sy * width + x) * 4, (sy * width + x) * 4 + 4);
+        }
+      }
+      parts.push({ band: bi, kind: KINDS[k], side: k === 0 || k === 2 ? -1 : k === 1 || k === 3 ? 1 : 0, x: x0, y: y0, w, h, px });
+    }
+  }
+  return { bands: bands.map((b) => [b.top, b.bottom]), parts };
+}
+
+/** Packs the parts into one sheet (shelves, 2 px apart). */
+function packParts(parts, sheetW = 1024) {
+  const sorted = [...parts].sort((a, b) => b.h - a.h);
+  let x = 0, y = 0, row = 0;
+  for (const p of sorted) {
+    if (x + p.w > sheetW) {
+      x = 0;
+      y += row + 2;
+      row = 0;
+    }
+    p.ax = x;
+    p.ay = y;
+    x += p.w + 2;
+    row = Math.max(row, p.h);
+  }
+  const sheetH = y + row;
+  const sheet = Buffer.alloc(sheetW * sheetH * 4);
+  for (const p of parts) for (let r = 0; r < p.h; r++) p.px.copy(sheet, ((p.ay + r) * sheetW + p.ax) * 4, r * p.w * 4, (r + 1) * p.w * 4);
+  return { sheet, sheetW, sheetH };
+}
+
+/**
  * The masons' scaffold shown while a part is built: cut like a tower, with
  * one bay of the lattice (beam to beam) as the shaft so it repeats cleanly.
  */
@@ -762,7 +918,21 @@ async function scaffold(input, outDir) {
   await webp(slice(best.a, best.b), width, best.b - best.a, join(outDir, 'scaffold-shaft.webp'));
   await webp(slice(best.b, height), width, height - best.b, join(outDir, 'scaffold-base.webp'));
   const top = rows.findIndex(Boolean);
-  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top }, planks };
+  // And its separate timbers, so it can go up one board at a time.
+  const cut = scaffoldParts(data, width, height, posts, planks);
+  const packed = packParts(cut.parts);
+  await webp(packed.sheet, packed.sheetW, packed.sheetH, join(outDir, 'scaffold-parts.webp'));
+  const parts = {
+    width,
+    height,
+    centerX: left + (right - left + 1) / 2,
+    shaftWidth: right - left + 1,
+    bands: cut.bands,
+    // The band that repeats: the one starting at the plank the shaft starts on.
+    shaftBand: 1 + planks.findIndex(([a, b]) => best.a >= a && best.a <= b),
+    pieces: cut.parts.map((q) => [q.band, q.kind, q.side, q.x, q.y, q.w, q.h, q.ax, q.ay]),
+  };
+  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top }, planks, parts };
 }
 
 async function shared(dir, outDir, manifest, old) {
@@ -780,8 +950,8 @@ async function shared(dir, outDir, manifest, old) {
     const group = name === 'scaffold' ? null : m[2] ? 'decals' : 'props';
     const into = group ? (manifest[group] ??= {}) : manifest;
     const was = group ? old[group]?.[name] : old.scaffold;
-    // A scaffold cut before planks were measured is cut again.
-    if (was && (group || was.planks) && (await mtime(probe)) >= (await mtime(input))) {
+    // A scaffold cut before its timbers were separated is cut again.
+    if (was && (group || was.parts) && (await mtime(probe)) >= (await mtime(input))) {
       into[key] = was;
       continue;
     }
