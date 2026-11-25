@@ -54,10 +54,44 @@ export interface PaintedCastle {
   ruins: Texture | null;
   /** Windows, banners, lanterns and ivy laid over the plain shafts as they grow. */
   ornaments: Ornament[];
+  /** The hero's painted banner turned on its side: the cloth its flags fly (rod along the pole, at the left). */
+  flag: Texture | null;
 }
 
+/** Heroes with no plants of their own borrow these for their walls. */
+const IVY_DONOR = 'guardian';
+
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind, number?] | null)[] }[] }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: OrnamentSheet[] }>;
+interface OrnamentSheet {
+  name: string;
+  frames: ([number, number, number, number, OrnamentKind, number?] | null)[];
+  /** A `-glow` sheet holds the pieces' own lights, at the same frames. */
+  glow?: boolean;
+  /** A `-flag` image (its size) holds the banner turned on its side. */
+  flag?: [number, number] | null;
+}
+
+/** A hero's ornament sheets cut into pieces, each with its own light, and the first flag found. */
+async function ornamentsOf(hero: string, sheets: OrnamentSheet[]): Promise<{ ornaments: Ornament[]; flag: Texture | null }> {
+  const loaded = await Promise.all(
+    sheets.map(async (o) => {
+      const [t, g, flag] = await Promise.all([
+        texture(`castles/${hero}/${o.name}.webp`),
+        o.glow ? texture(`castles/${hero}/${o.name}-glow.webp`) : Promise.resolve(null),
+        o.flag ? texture(`castles/${hero}/${o.name}-flag.webp`) : Promise.resolve(null),
+      ]);
+      if (!t) return { list: [] as Ornament[], flag };
+      const list = o.frames.flatMap((f) => {
+        if (!f) return [];
+        const frame = new Rectangle(f[0], f[1], f[2], f[3]);
+        return [{ tex: new Texture({ source: t.source, frame }), glow: g ? new Texture({ source: g.source, frame: frame.clone() }) : null, kind: f[4], light: f[5] ?? 0 }];
+      });
+      return { list, flag };
+    }),
+  );
+  return { ornaments: loaded.flatMap((l) => l.list), flag: loaded.find((l) => l.flag)?.flag ?? null };
+}
 
 let foot: Texture | null = null;
 
@@ -119,13 +153,12 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
     set = loadManifest().then(async (m) => {
       const entry = m[hero];
       if (!entry?.keep) return null;
-      const sheets = await Promise.all(
-        (entry.ornaments ?? []).map(async (o) => {
-          const t = await texture(`castles/${hero}/${o.name}.webp`);
-          if (!t) return [];
-          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4], light: f[5] ?? 0 }] : []));
-        }),
-      );
+      const { ornaments, flag } = await ornamentsOf(hero, entry.ornaments ?? []);
+      // A wall wears only plants: a hero with none painted borrows another's.
+      if (ornaments.length && !ornaments.some((o) => o.kind === 'ivy') && m[IVY_DONOR]?.ornaments) {
+        const donor = await ornamentsOf(IVY_DONOR, m[IVY_DONOR].ornaments);
+        ornaments.push(...donor.ornaments.filter((o) => o.kind === 'ivy'));
+      }
       const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
         stacked(hero, 'keep', entry.keep),
         stacked(hero, 'tower1', entry.tower1),
@@ -134,7 +167,7 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
         stacked(hero, 'wall', entry.wall),
         entry.ruins ? texture(`castles/${hero}/ruins.webp`) : Promise.resolve(null),
       ]);
-      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments: sheets.flat() } : null;
+      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments, flag } : null;
     });
     sets.set(hero, set);
   }
@@ -143,22 +176,25 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
 
 /**
  * How an ornament sits on a tower. win, deco: front-facing, on the shaft.
- * hang: hangs from its top (banner, chains). ivy: climbing plants, moss or
+ * hang: hangs from its top (chains, a rack). banner: the hero's banner, hung
+ * the same way (and the cloth of its flags). ivy: climbing plants, moss or
  * grass, hung like a banner; the only thing a curtain wall wears.
  * edgeR / edgeL: seen from the side, fixed to a wall on its left / right, so
  * it sticks out of that edge. bal: a balcony set under a window. balD: a
  * balcony with its own door.
  */
-export type OrnamentKind = 'win' | 'deco' | 'hang' | 'ivy' | 'edgeR' | 'edgeL' | 'bal' | 'balD';
+export type OrnamentKind = 'win' | 'deco' | 'hang' | 'banner' | 'ivy' | 'edgeR' | 'edgeL' | 'bal' | 'balD';
 export interface Ornament {
   tex: Texture;
+  /** Its own light (a pane, a flame, a crystal), laid over it and made to flicker; null if it has none. */
+  glow: Texture | null;
   kind: OrnamentKind;
   /** The side it was painted lit from: -1 left, 1 right, 0 unclear. */
   light: number;
 }
 
 /** How often each kind is picked within its turn (windows and the rest take turns up the shaft). */
-const KIND_WEIGHT: Record<OrnamentKind, number> = { win: 3, deco: 1.1, hang: 1, ivy: 0.8, edgeR: 0.8, edgeL: 0.8, bal: 0.9, balD: 0.6 };
+const KIND_WEIGHT: Record<OrnamentKind, number> = { win: 3, deco: 1.1, hang: 1, banner: 1, ivy: 0.8, edgeR: 0.8, edgeL: 0.8, bal: 0.9, balD: 0.6 };
 /** Kinds that open the tower: a window, or a balcony with one. */
 const OPENINGS: readonly OrnamentKind[] = ['win', 'bal', 'balD'];
 /** Where a stack stands: a tower wears anything; a curtain wall has no rooms behind it, so only plants. */
@@ -243,6 +279,8 @@ export class Stack {
   /** Each slot's group, built at a shaft width of 1 and scaled, and the ornament it shows. */
   private readonly slots: ({ root: Container; half: number; pick: Ornament } | null)[] = [];
   private readonly ornamentLayer = new Container();
+  /** The ornaments' own lights, each with its own beat so they do not flicker in step. */
+  private lights: { sprite: Sprite; beat: number }[] = [];
   /** The last layout: scale, body height and base rows shown (for `courses`). */
   private fit = { k: 1, h: 0, rows: 0 };
 
@@ -416,6 +454,23 @@ export class Stack {
     this.seed = seed;
     for (const s of this.slots) s?.root.destroy({ children: true });
     this.slots.length = 0;
+    this.lights = [];
+  }
+
+  /**
+   * The ornaments' lights burn like candles, lanterns and witch-fire: each
+   * breathes on its own beat with a quick flutter, and now and then gutters.
+   * `phase` is the castle's clock, `level` how brightly they burn (0 out).
+   */
+  flicker(phase: number, level: number): void {
+    for (const l of this.lights) {
+      const b = l.beat;
+      const breath = Math.sin(phase * (1.3 + b * 0.5) + b * 9) * 0.18;
+      const flutter = Math.sin(phase * (7.1 + b * 3) + b * 4) * 0.09 + Math.sin(phase * 13.3 + b * 17) * 0.06;
+      // A gust: a brief dip on a slow cycle of its own.
+      const gust = Math.max(0, Math.sin(phase * (0.37 + b * 0.2) + b * 31) - 0.9) * 4;
+      l.sprite.alpha = Math.max(0, level * (0.95 + breath + flutter - gust * 0.45));
+    }
   }
 
   /** One slot's ornament (and the window behind a bare balcony), sized for a shaft 1 wide. */
@@ -445,6 +500,14 @@ export class Stack {
       const k = Math.min(width / tex.width, maxH / tex.height);
       sp.scale.set(turned(orn) ? -k : k, k);
       root.addChild(sp);
+      if (orn.glow) {
+        // Its light, on top: a child, so it is sized, turned and moved with it.
+        const g = new Sprite(orn.glow);
+        g.anchor.set(0.5);
+        g.blendMode = 'add';
+        sp.addChild(g);
+        this.lights.push({ sprite: g, beat: r(5 + this.lights.length) });
+      }
       return sp;
     };
     let top = 0;
@@ -472,7 +535,7 @@ export class Stack {
         break;
       }
       default: {
-        const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' || o.kind === 'ivy' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
+        const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' || o.kind === 'banner' || o.kind === 'ivy' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
         const sp = sprite(o, width, maxH);
         top = -sp.height / 2;
         bottom = sp.height / 2;

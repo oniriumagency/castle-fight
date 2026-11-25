@@ -399,10 +399,11 @@ function evenTile(shaft, width, b) {
  * warm sunlit sandstone or brick is never taken for a light: it would glow on
  * the crown and base but not on the shaft, a band of light ending at the cut.
  */
-async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
-  // Brightness of the neighbourhood: a lit window stands out from the stone around it.
+async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }, loose = false) {
+  // Brightness of the neighbourhood: a lit window stands out from the stone around it. Loose pieces
+  // (ornaments painted on their own) have nothing around them; the air there counts as mid-grey.
   const lumBuf = Buffer.alloc(width * height);
-  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = loose && buf[i + 3] < 128 ? 110 : Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
   const around = await sharp(lumBuf, { raw: { width, height, channels: 1 } }).blur(Math.max(3, width / 40)).raw().toBuffer();
   const out = Buffer.alloc(buf.length);
   let lit = 0;
@@ -418,10 +419,10 @@ async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
     // potion, a blue crystal) only vivid.
     const dh = Math.abs(((hue(r, g, b) - stone.hue + 540) % 360) - 180);
     const floor = dh < 35 ? Math.max(80, stone.sat + 20) : 80;
-    const k =
-      Math.min(1, Math.max(0, (pop - 22) / 34)) *
-      Math.min(1, Math.max(0, (sat - floor) / 60)) *
-      Math.min(1, Math.max(0, (lum - 100) / 60));
+    // A loose piece's pane sits in its own frame, not in a dark wall, so it needs to stand out less.
+    const k = loose
+      ? Math.min(1, Math.max(0, (sat - 70) / 50)) * Math.min(1, Math.max(0, (lum - (hue(r, g, b) < 65 ? 140 : 110)) / 40))
+      : Math.min(1, Math.max(0, (pop - 22) / 34)) * Math.min(1, Math.max(0, (sat - floor) / 60)) * Math.min(1, Math.max(0, (lum - 100) / 60));
     if (k <= 0) continue;
     lit++;
     out[i] = r;
@@ -430,7 +431,25 @@ async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
     out[i + 3] = Math.round(k * 255);
   }
   if (lit < 12) return null;
-  return sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+  if (loose) {
+    // A pane or a flame is a patch of light; a glint along a copper pipe or a gilt rim is a thin line.
+    // Keep only what is lit over an area.
+    const alpha = Buffer.alloc(width * height);
+    for (let i = 0, j = 0; j < alpha.length; i += 4, j++) alpha[j] = out[i + 3];
+    const spread = await sharp(alpha, { raw: { width, height, channels: 1 } }).blur(Math.max(2, width / 160)).extractChannel(0).raw().toBuffer();
+    for (let i = 0, j = 0; j < alpha.length; i += 4, j++) out[i + 3] = Math.round(out[i + 3] * Math.min(1, Math.max(0, (spread[j] - 70) / 70)));
+  }
+  // The light itself, and a soft halo it throws on the stones around, so a flicker reads at a glance.
+  const core = await sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+  const halo = await sharp(out, { raw: { width, height, channels: 4 } }).blur(Math.max(4, Math.min(width, height) / 45)).raw().toBuffer();
+  for (let i = 0; i < core.length; i += 4) {
+    const a = Math.min(255, halo[i + 3] * 1.6);
+    if (a <= core[i + 3]) continue;
+    // Where the light itself is faint, the halo brings its colour.
+    if (core[i + 3] < 24) for (let c = 0; c < 3; c++) core[i + c] = halo[i + c];
+    core[i + 3] = a;
+  }
+  return core;
 }
 
 const webp = (data, width, height, file) => sharp(data, { raw: { width, height, channels: 4 } }).webp({ quality: 86, alphaQuality: 92 }).toFile(file);
@@ -658,7 +677,9 @@ async function stoneColour(file) {
 }
 
 /** Bump when the ornament treatment changes, so cached sheets are redone. */
-const ORNAMENT_VERSION = 4;
+const ORNAMENT_VERSION = 11;
+/** Kinds that may carry a light of their own (a lit pane, a lantern, a crystal); cloth and plants never do. */
+const LIT_KINDS = new Set(['win', 'deco', 'edgeR', 'edgeL', 'bal', 'balD']);
 /** Ornament sheets are painted far finer than the walls they sit on: shrink them to about the walls' grain. */
 const ORNAMENT_SHEET = 576;
 
@@ -670,7 +691,9 @@ const ORNAMENT_SHEET = 576;
  * their darks lifted and colours pulled a little toward the stone (the same
  * air and light falls on both), and each gets a soft shadow on the wall, cast
  * away from its own light. The side each is lit from is recorded, so the
- * game can turn it to match its tower.
+ * game can turn it to match its tower. Their own lights (panes, lanterns,
+ * crystals) go to a `-glow` sheet the game makes flicker, and the hero's
+ * banner, turned on its side, becomes the cloth of the castle's flags.
  */
 async function ornamentSheet(input, outDir, name, kinds, stone) {
   const big = 1152;
@@ -760,7 +783,45 @@ async function ornamentSheet(input, outDir, name, kinds, stone) {
     frames.push(r > l && b > t && kinds[q] !== 'x' ? [x0 + l, y0 + t, r - l + 1, b - t + 1, kinds[q] ?? 'deco', light[q]] : null);
   }
   await webp(out, size, size, join(outDir, `${name}.webp`));
-  return { name, v: ORNAMENT_VERSION, frames };
+
+  // The ornaments' own lights, only on pieces that can hold one; the rest of the sheet stays dark.
+  const litOnly = Buffer.from(out);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const q = Math.floor(y / cellPx) * 3 + Math.floor(x / cellPx);
+      if (!LIT_KINDS.has(kinds[q])) litOnly[(y * size + x) * 4 + 3] = 0;
+    }
+  }
+  const glow = await glowOf(litOnly, size, size, { sat: Math.max(...ref) - Math.min(...ref) + 30, hue: hue(ref[0], ref[1], ref[2]) }, true);
+  if (glow) await webp(glow, size, size, join(outDir, `${name}-glow.webp`));
+
+  // The hero's banner, turned so the rod it hangs from runs down the flagpole and the cloth flies off it.
+  let flag = null;
+  const bq = kinds.indexOf('banner');
+  if (bq >= 0) {
+    const x0 = (bq % 3) * cpx;
+    const y0 = Math.floor(bq / 3) * cpx;
+    let l = cpx, r = -1, t = cpx, b = -1;
+    for (let y = 0; y < cpx; y++) {
+      for (let x = 0; x < cpx; x++) {
+        if (img[((y0 + y) * size + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    if (r > l && b > t) {
+      const file = join(outDir, `${name}-flag.webp`);
+      const info = await sharp(img, { raw: { width: size, height: size, channels: 4 } })
+        .extract({ left: x0 + l, top: y0 + t, width: r - l + 1, height: b - t + 1 })
+        .rotate(270)
+        .webp({ quality: 88, alphaQuality: 92 })
+        .toFile(file);
+      flag = [info.width, info.height];
+    }
+  }
+  return { name, v: ORNAMENT_VERSION, frames, glow: !!glow, flag };
 }
 
 /**
