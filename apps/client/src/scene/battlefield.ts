@@ -283,6 +283,8 @@ export class Battlefield {
   private maxPoints = DEFAULT_RULES.keepWin;
   private lastRect: FieldRect | undefined;
   private weatherTimer = 0;
+  /** Bumped by every height change of a castle, so an older tween stops moving it. */
+  private castleMoves: number[] = [];
   private castleTargets: { keep: number; wall: number }[] = [
     { keep: 30, wall: 10 },
     { keep: 30, wall: 10 },
@@ -643,6 +645,7 @@ export class Battlefield {
   /** Jump straight to these heights (new game, resume, layout). */
   setCastles(values: { keep: number; wall: number }[]): void {
     values.forEach((v, i) => {
+      this.castleMoves[i] = (this.castleMoves[i] ?? 0) + 1;
       this.castleTargets[i] = { ...v };
       this.castles[i]?.setHeights(v.keep, v.wall);
     });
@@ -655,9 +658,12 @@ export class Battlefield {
     this.castleTargets[player] = { keep, wall };
     const growing = keep >= from.keep && wall >= from.wall;
     this.lastTops[player] = null;
+    // A newer move (or a jump) takes over: this one stops touching the castle.
+    const move = (this.castleMoves[player] = (this.castleMoves[player] ?? 0) + 1);
     return this.tweens.run(
       ms,
       (t) => {
+        if (this.castleMoves[player] !== move) return;
         castle.setHeights(from.keep + (keep - from.keep) * t, from.wall + (wall - from.wall) * t);
         this.shed(player);
       },
