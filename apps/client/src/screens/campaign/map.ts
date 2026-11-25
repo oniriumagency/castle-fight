@@ -29,6 +29,8 @@ import {
   playerDeck,
   startBattle,
   heroesDefeated,
+  revealedBy,
+  visibleTerritories,
   type BattleOutcome,
   type CampaignDifficulty,
   type CampaignSave,
@@ -138,6 +140,8 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
   let selected: string | null = null;
   let hero: HeroId = save?.hero ?? 'arquitecta';
   let busy = false;
+  /** Territories that just came into view after a victory: they fade in once. */
+  let revealed = new Set<string>(after?.won && save ? revealedBy(save, after.territory) : []);
 
   const back = (): void => {
     audio.play('uiBack');
@@ -217,6 +221,8 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
   const mapSvg = (): SVGSVGElement => {
     const s = save!;
     const open = new Set(attackable(s));
+    // Fog of war: only the player's land and what they can attack now are drawn.
+    const visible = new Set(visibleTerritories(s));
     const root = svg('svg', { viewBox: '0 0 1000 700', class: 'campaign-map', role: 'img', 'aria-label': t('campaignTitle') });
     const defs = svg('defs', {});
     defs.append(
@@ -244,6 +250,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
 
     // Borders.
     for (const [a, b] of BORDERS) {
+      if (!visible.has(a) || !visible.has(b)) continue;
       const ta = getTerritory(a);
       const tb = getTerritory(b);
       const owned = isConquered(s, a) && isConquered(s, b);
@@ -260,6 +267,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
 
     // Territories.
     for (const territory of TERRITORIES) {
+      if (!visible.has(territory.id)) continue;
       const owned = isConquered(s, territory.id);
       const canAttack = open.has(territory.id);
       const kingdom = territory.kingdom ? getKingdom(territory.kingdom) : null;
@@ -267,7 +275,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
       const big = territory.kind !== 'territory';
       const r = territory.kind === 'final' ? 30 : big ? 24 : 16;
       const g = svg('g', {
-        class: `cm-node ${territory.kind}${owned ? ' owned' : ''}${canAttack ? ' open' : ''}${selected === territory.id ? ' selected' : ''}`,
+        class: `cm-node ${territory.kind}${owned ? ' owned' : ''}${canAttack ? ' open' : ''}${selected === territory.id ? ' selected' : ''}${revealed.has(territory.id) ? ' revealed' : ''}`,
         transform: `translate(${territory.x} ${territory.y})`,
         tabindex: 0,
         role: 'button',
@@ -308,7 +316,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
 
   const detail = (): HTMLElement => {
     const s = save!;
-    const id = selected ?? attackable(s)[0] ?? 'valdepiedra';
+    const id = selected && visibleTerritories(s).includes(selected) ? selected : (attackable(s)[0] ?? 'valdepiedra');
     const territory = getTerritory(id);
     const owned = isConquered(s, id);
     const canAttack = attackable(s).includes(id);
@@ -560,6 +568,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
       h('button.btn.icon-only', { type: 'button', title: t('campaignOptions'), 'aria-label': t('campaignOptions'), onclick: options }, html(iconSvg('gear'))),
     );
     const scroller = h('div.campaign-map-wrap', null, mapSvg());
+    revealed = new Set();
     el.replaceChildren(header, h('div.campaign-body', null, scroller, save.finished ? doneCard() : detail()));
     // On a narrow screen the map scrolls: start at the player's front.
     requestAnimationFrame(() => {
