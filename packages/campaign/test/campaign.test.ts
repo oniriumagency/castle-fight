@@ -23,6 +23,8 @@ import {
   settleBattle,
   startBattle,
   ultimateAwake,
+  revealedBy,
+  visibleTerritories,
   type CampaignSave,
 } from '../src/index';
 
@@ -87,6 +89,24 @@ describe('progress', () => {
     expect(heroesDefeated(after)).toBe(1);
     // The result counts once.
     expect(settleBattle(after, 'x', true)).toBeNull();
+  });
+
+  it('the map shows only the player’s land and what they can attack; the hero shows up last', () => {
+    let save = newCampaign();
+    expect(visibleTerritories(save).sort()).toEqual(['alambiques-a', 'bastion-a', 'valdepiedra']);
+    save = win(save, 'bastion-a');
+    expect(visibleTerritories(save)).toContain('bastion-c');
+    expect(revealedBy(save, 'bastion-a')).toContain('bastion-c');
+    save = win(win(save, 'bastion-c'), 'bastion-b');
+    // Three captains down: the castle next to them is still out of sight.
+    expect(visibleTerritories(save)).not.toContain('bastion-castillo');
+    save = win(save, 'bastion-d');
+    expect(visibleTerritories(save)).toContain('bastion-castillo');
+    expect(revealedBy(save, 'bastion-d')).toContain('bastion-castillo');
+    expect(visibleTerritories(save)).not.toContain('corona');
+    // Every visible territory is held or can be attacked, and nothing else.
+    const shown = new Set(visibleTerritories(save));
+    for (const t of TERRITORIES) expect(shown.has(t.id)).toBe(save.conquered.includes(t.id) || attackable(save).includes(t.id));
   });
 
   it('a defeat leaves a copy with the territory until it is conquered', () => {

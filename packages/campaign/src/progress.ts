@@ -237,6 +237,25 @@ export function attackable(save: CampaignSave): string[] {
   return out;
 }
 
+/**
+ * Territories the map shows: those the player holds and those they can attack
+ * right now. Everything else stays hidden until it borders the player's land;
+ * a hero's castle stays hidden until all four of their captains have fallen,
+ * and the Crown until the five castles have. Worked out from the progress
+ * alone, so saves need nothing new.
+ */
+export function visibleTerritories(save: CampaignSave): string[] {
+  const open = new Set(attackable(save));
+  return TERRITORIES.filter((t) => isConquered(save, t.id) || open.has(t.id)).map((t) => t.id);
+}
+
+/** Territories that came into view with the conquest of `territoryId` (what `visibleTerritories` adds compared to before it). */
+export function revealedBy(save: CampaignSave, territoryId: string): string[] {
+  if (!isConquered(save, territoryId)) return [];
+  const before = new Set(visibleTerritories({ ...save, conquered: save.conquered.filter((id) => id !== territoryId), finished: false }));
+  return visibleTerritories(save).filter((id) => !before.has(id));
+}
+
 /** A kingdom's castle can be challenged only once its four territories are conquered. */
 export function castleOpen(save: CampaignSave, kingdom: KingdomId): boolean {
   return TERRITORIES.filter((t) => t.kingdom === kingdom && t.kind === 'territory').every((t) => isConquered(save, t.id));
