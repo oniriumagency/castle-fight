@@ -533,13 +533,9 @@ export class Castle extends Container {
     this.layoutScars();
   }
 
-  /** Masons mend the newest wounds of a part. */
-  mend(part: 'keep' | 'wall', count: number): void {
-    for (let i = 0; i < count; i++) {
-      const last = [...this.scars].reverse().find((s) => s.part === part);
-      if (!last) return;
-      this.dropScar(last);
-    }
+  /** Masons at work on a part mend all its wounds. */
+  mend(part: 'keep' | 'wall'): void {
+    for (const s of this.scars.filter((s) => s.part === part)) this.dropScar(s);
   }
 
   /**
@@ -888,12 +884,12 @@ export class Castle extends Container {
       (spec.front ? this.keepLayer : this.backLayer).addChild(t.root);
       return t;
     });
-    // Windows, banners and ivy break up the repeating stones (sparser on the busy Keep, denser on the plain Wall).
+    // Windows, banners and ivy break up the repeating stones of the towers; the Wall wears only plants.
     if (p?.ornaments.length) {
       const seed = this.facing > 0 ? 3 : 11;
-      this.keepTower.painted?.setOrnaments(p.ornaments, seed, 0.8);
-      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7, 0.6);
-      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 0.85);
+      this.keepTower.painted?.setOrnaments(p.ornaments, seed);
+      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7);
+      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 'wall');
     }
     this.invalidate();
   }
@@ -998,12 +994,9 @@ export class Castle extends Container {
 
     this.drawWall(l);
     if (fallen) this.clearScars();
-    // A painted castle wears painted wounds; seed a few if it is already hurt (a game joined late).
+    // A painted castle wears painted wounds, and only those of blows it has taken: none at the start
+    // of a game (nor while it rises from the ground), however low it stands.
     if (this.painted && this.kit && !fallen) {
-      if (dmg >= 1 && !this.scars.some((s) => s.part === 'keep')) {
-        this.scar('keep', 'cracks');
-        if (dmg >= 2) this.scar('keep', 'holes');
-      }
       this.cracks.clear();
       this.crackKey = '';
     } else {

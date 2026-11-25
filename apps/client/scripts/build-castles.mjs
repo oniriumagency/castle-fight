@@ -171,6 +171,53 @@ function plainBand(data, width, b, share = 0.7) {
   return { crown: b.crown + best, base: b.crown + best + len };
 }
 
+/** Per-row look of the shaft's middle: mean light, saturation, and its bright and dark ends. */
+function rowFeatures(data, width, b, y) {
+  const x0 = Math.round(b.shaftLeft + b.shaftWidth * 0.1);
+  const x1 = Math.round(b.shaftLeft + b.shaftWidth * 0.9);
+  let lum = 0;
+  let sat = 0;
+  const ls = [];
+  for (let x = x0; x < x1; x++) {
+    const i = (y * width + x) * 4;
+    const l = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+    lum += l;
+    sat += Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+    ls.push(data[i + 3] > 128 ? l : -255);
+  }
+  ls.sort((a, c) => a - c);
+  const n = x1 - x0;
+  return [lum / n, sat / n, ls[Math.floor(n * 0.95)], ls[Math.floor(n * 0.05)]];
+}
+
+/**
+ * How many rows at the bottom of the crown are still plain stones, like the
+ * shaft (above them the crown's own windows, cornice or gallery begin), so
+ * ornaments may climb that far instead of stopping where the crown is cut.
+ */
+function plainCrown(data, width, b) {
+  const shaft = [];
+  for (let y = b.crown; y < b.base; y++) shaft.push(rowFeatures(data, width, b, y));
+  const stats = [0, 1, 2, 3].map((k) => {
+    const col = shaft.map((f) => f[k]);
+    const med = median(col);
+    return { med, mad: median(col.map((v) => Math.abs(v - med))) || 1 };
+  });
+  const score = (f) => f.reduce((n, v, k) => n + Math.min(6, Math.abs(v - stats[k].med) / stats[k].mad), 0);
+  const scores = shaft.map(score).sort((a, c) => a - c);
+  // The shaft's own mortar lines score high now and then; a stretch of rows all unlike it does not happen there.
+  const limit = Math.max(8, scores[Math.floor(scores.length * 0.8)] * 1.5);
+  // Walk up from the cut; a few rows in a row unlike the shaft mark where the crown's features begin.
+  const run = Math.max(6, Math.round(b.shaftWidth * 0.03));
+  let odd = 0;
+  for (let y = b.crown - 1; y >= 0; y--) {
+    if (score(rowFeatures(data, width, b, y)) > limit) {
+      if (++odd >= run) return Math.max(0, b.crown - 1 - y - run + 1);
+    } else odd = 0;
+  }
+  return b.crown;
+}
+
 /**
  * The painting is lit from above, so a band cut from it is a touch brighter at
  * one end than the other. Repeated, that slope shows as stripes, and against
@@ -420,6 +467,8 @@ async function stacked(input, outDir, piece, override) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
   const len = b.base - b.crown;
+  // Read before the crown's lower part is eased toward the shaft's light.
+  const plain = plainCrown(data, width, b);
   const gains = rowGains(band, width, len, b);
   const stone = stoneOf(band, width, len, b);
   // The side the shaft is lit from, so ornaments can be turned to match it.
@@ -484,7 +533,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { light, plain, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 /**
@@ -826,8 +875,8 @@ export async function buildCastles(source, target) {
       const probe = join(outDir, piece === 'ruins' ? 'ruins.webp' : `${piece}-shaft.webp`);
       const stale = Math.max(await mtime(input), await mtime(join(root, 'slices.json')));
       manifest[hero] ??= {};
-      // Pieces cut before the skirts or the light side existed are cut again.
-      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined)) && (await mtime(probe)) >= stale) {
+      // Pieces cut before the skirts, the light side or the plain crown existed are cut again.
+      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined && old[hero][piece].plain !== undefined)) && (await mtime(probe)) >= stale) {
         manifest[hero][piece] = old[hero][piece];
         continue;
       }
