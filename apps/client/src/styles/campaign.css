@@ -885,3 +885,378 @@
     font-size: 0.7rem;
   }
 }
+
+/* Claiming the campaign rewards: cards dealt face down, tapped one by one to turn them over.
+   Each rarity has its colour (--rc, light --rl): common warm white, rare blue, epic purple, legendary gold. */
+
+.results-box.campaign .campaign-summary .reward-title {
+  margin: 10px 0 8px;
+  font-family: var(--display);
+  font-size: clamp(1.05rem, min(2.4vw, 3.6vh), 1.5rem);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--gold-l);
+  text-shadow: 0 0 12px rgb(255 200 90 / 45%);
+  animation: reward-title-glow 2.2s ease-in-out infinite;
+}
+
+.results-box.campaign .campaign-summary.claimed .reward-title {
+  margin: 8px 0 4px;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-shadow: none;
+  animation: none;
+}
+
+@keyframes reward-title-glow {
+  50% { text-shadow: 0 0 22px rgb(255 210 110 / 75%), 0 0 4px rgb(255 240 200 / 60%); }
+}
+
+.reward-cards {
+  gap: 24px clamp(10px, 1.6vw, 18px);
+  padding: 4px 0 22px;
+  perspective: 900px;
+}
+
+.reward-slot {
+  position: relative;
+  display: grid;
+  cursor: pointer;
+  border-radius: 10px;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  animation: reward-deal 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+  animation-delay: calc(0.35s + var(--i) * 0.14s);
+}
+
+@keyframes reward-deal {
+  from { opacity: 0; transform: translateY(-40px) rotate(-8deg) scale(0.8); }
+}
+
+.reward-flip {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.3, 1.4, 0.45, 1);
+}
+
+.reward-side {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.reward-side .card {
+  transform: none;
+  transform-style: flat;
+}
+
+.reward-side.face-side {
+  transform: rotateY(180deg);
+}
+
+/* Face down: the backs sway gently, a glint runs across them, they lift under the pointer. */
+.reward-slot:not(.charging, .revealed) .reward-flip {
+  animation: reward-idle 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.7s);
+}
+
+@keyframes reward-idle {
+  50% { transform: translateY(-4px) rotate(0.6deg); }
+}
+
+.reward-slot .back-side .card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 35%, rgb(255 240 200 / 35%) 48%, transparent 60%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  animation: reward-glint 3.4s ease-in-out infinite;
+  animation-delay: calc(1.2s + var(--i) * 0.5s);
+  pointer-events: none;
+}
+
+@keyframes reward-glint {
+  0%, 60% { background-position: 150% 0; }
+  100% { background-position: -60% 0; }
+}
+
+@media (hover: hover) {
+  .reward-slot:not(.charging, .revealed):hover {
+    transform: translateY(-6px) scale(1.04);
+    transition: transform 0.2s;
+  }
+
+  .reward-slot:not(.charging, .revealed):hover .back-side .card {
+    box-shadow: var(--drop), 0 0 18px rgb(255 214 120 / 55%);
+  }
+}
+
+.reward-slot:focus-visible .back-side .card {
+  box-shadow: var(--drop), 0 0 0 3px var(--gold-l);
+}
+
+/* The glow behind the card: it grows while it charges and stays, in the rarity's colour, once turned. */
+.reward-aura {
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--rc), transparent);
+  opacity: 0;
+  transform: scale(0.6);
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.reward-slot.charging .reward-aura {
+  opacity: 0.75;
+  transform: scale(1.1);
+  transition: opacity 0.25s, transform 1.2s ease-out;
+}
+
+.reward-slot.revealed .reward-aura {
+  opacity: 0.45;
+  transform: scale(1);
+  animation: reward-aura 2.6s ease-in-out infinite;
+}
+
+.reward-slot.r-comun.revealed .reward-aura { opacity: 0.22; animation: none; }
+.reward-slot.r-rara.revealed .reward-aura { opacity: 0.35; }
+.reward-slot.r-legendaria.revealed .reward-aura { inset: -22%; opacity: 0.6; }
+
+@keyframes reward-aura {
+  50% { opacity: 0.25; transform: scale(0.92); }
+}
+
+/* Charging: the back lights up in the rarity's colour and trembles, harder the rarer the card. */
+.reward-slot.charging .back-side .card {
+  box-shadow: var(--drop), 0 0 10px 2px var(--rl), 0 0 28px 6px var(--rc);
+  filter: brightness(1.25);
+}
+
+.reward-slot.charging .reward-flip { animation: reward-shake 0.12s linear infinite; }
+.reward-slot.r-rara.charging .reward-flip { animation: reward-shake-mid 0.1s linear infinite; }
+.reward-slot.r-epica.charging .reward-flip,
+.reward-slot.r-legendaria.charging .reward-flip { animation: reward-shake-big 0.08s linear infinite, reward-rise 1.2s ease-out forwards; }
+.reward-slot.r-legendaria.charging .back-side .card {
+  box-shadow: var(--drop), 0 0 14px 4px var(--rl), 0 0 44px 14px var(--rc);
+  filter: brightness(1.4) saturate(1.2);
+}
+
+@keyframes reward-shake {
+  25% { transform: translateX(-1px) rotate(-0.5deg); }
+  75% { transform: translateX(1px) rotate(0.5deg); }
+}
+
+@keyframes reward-shake-mid {
+  25% { transform: translateX(-2px) rotate(-1deg); }
+  75% { transform: translateX(2px) rotate(1deg); }
+}
+
+@keyframes reward-shake-big {
+  25% { translate: -3px 1px; rotate: -1.5deg; }
+  75% { translate: 3px -1px; rotate: 1.5deg; }
+}
+
+@keyframes reward-rise {
+  to { transform: translateY(-12px) scale(1.08); }
+}
+
+/* Turned over: a quick pop as it flips, then it rests face up with a coloured rim. */
+.reward-slot.revealed .reward-flip {
+  transform: rotateY(180deg);
+  animation: reward-pop 0.7s ease-out;
+}
+
+@keyframes reward-pop {
+  40% { scale: 1.16; }
+}
+
+.reward-slot.revealed .face-side .card {
+  box-shadow: var(--drop), 0 0 0 2px var(--rc), 0 0 16px var(--rc);
+}
+
+.reward-slot.r-comun.revealed .face-side .card {
+  box-shadow: var(--drop), 0 0 0 1px rgb(255 240 208 / 60%), 0 0 10px rgb(255 240 208 / 35%);
+}
+
+.reward-rarity {
+  position: absolute;
+  left: 50%;
+  bottom: -20px;
+  translate: -50% 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--rc);
+  text-shadow: 0 0 8px var(--rc), 0 1px 2px #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reward-slot.revealed .reward-rarity {
+  opacity: 1;
+  transition: opacity 0.4s 0.35s;
+}
+
+.reward-slot.r-comun .reward-rarity { text-shadow: 0 1px 2px #000; }
+
+/* The way back to the map waits until every card is claimed, then arrives with a little bounce. */
+.results-actions .btn.unclaimed {
+  display: none;
+}
+
+.campaign-summary.claimed ~ .results-actions .btn.primary {
+  animation: reward-back-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+@keyframes reward-back-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.9); }
+}
+
+.results-box.reward-quake {
+  animation: reward-quake 0.5s linear;
+}
+
+@keyframes reward-quake {
+  10%, 50%, 90% { translate: -4px 2px; }
+  30%, 70% { translate: 4px -2px; }
+}
+
+/* The burst, over everything at the card's centre. */
+.reward-burst {
+  position: fixed;
+  z-index: 1000;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.reward-burst > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% -50%;
+  border-radius: 50%;
+}
+
+.rb-flash {
+  width: calc(var(--size) * 1.4);
+  height: calc(var(--size) * 1.4);
+  background: radial-gradient(closest-side, #fff, var(--rl) 25%, var(--rc) 50%, transparent);
+  mix-blend-mode: screen;
+  animation: rb-flash 0.7s ease-out forwards;
+}
+
+.reward-burst.r-epica .rb-flash { animation-duration: 0.9s; }
+.reward-burst.r-legendaria .rb-flash { width: calc(var(--size) * 2.2); height: calc(var(--size) * 2.2); animation-duration: 1.2s; }
+
+@keyframes rb-flash {
+  0% { opacity: 0; scale: 0.3; }
+  15% { opacity: 1; scale: 1; }
+  100% { opacity: 0; scale: 1.5; }
+}
+
+.rb-ring {
+  width: var(--size);
+  height: var(--size);
+  border: 3px solid var(--rl);
+  box-shadow: 0 0 14px var(--rc), inset 0 0 14px var(--rc);
+  animation: rb-ring 0.8s ease-out forwards;
+}
+
+.rb-ring.late { animation-delay: 0.15s; opacity: 0; }
+.reward-burst.r-legendaria .rb-ring { border-width: 4px; animation-duration: 1.1s; }
+
+@keyframes rb-ring {
+  0% { opacity: 1; scale: 0.4; }
+  100% { opacity: 0; scale: 2.4; }
+}
+
+.rb-rays {
+  width: calc(var(--size) * 3);
+  height: calc(var(--size) * 3);
+  background: repeating-conic-gradient(from 0deg, var(--rc) 0deg 5deg, transparent 5deg 22deg);
+  mask: radial-gradient(closest-side, #000 15%, transparent);
+  -webkit-mask: radial-gradient(closest-side, #000 15%, transparent);
+  mix-blend-mode: screen;
+  animation: rb-rays 1.6s ease-out forwards;
+}
+
+.reward-burst.r-legendaria .rb-rays { width: calc(var(--size) * 4.2); height: calc(var(--size) * 4.2); animation-duration: 2.1s; }
+
+@keyframes rb-rays {
+  0% { opacity: 0; scale: 0.4; rotate: 0deg; }
+  20% { opacity: 0.9; }
+  100% { opacity: 0; scale: 1.15; rotate: 50deg; }
+}
+
+.rb-spark {
+  width: var(--s);
+  height: var(--s);
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c), 0 0 2px #fff;
+  animation: rb-spark var(--t) cubic-bezier(0.15, 0.7, 0.35, 1) forwards;
+}
+
+@keyframes rb-spark {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 18px)) scale(0.3); }
+}
+
+.reward-screen-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--rc), transparent 75%);
+  mix-blend-mode: screen;
+  animation: reward-screen-flash 0.8s ease-out forwards;
+}
+
+@keyframes reward-screen-flash {
+  0% { opacity: 0; }
+  15% { opacity: var(--a); }
+  100% { opacity: 0; }
+}
+
+/* Reduce motion: no dealing, swaying, trembling or flying sparks; the card simply turns face up in its colour. */
+:root.reduced-motion .reward-slot,
+:root.reduced-motion .reward-slot .reward-flip,
+:root.reduced-motion .reward-slot .reward-aura,
+:root.reduced-motion .reward-slot .back-side .card::after,
+:root.reduced-motion .reward-title {
+  animation: none !important;
+}
+
+:root.reduced-motion .reward-flip {
+  transition: none;
+}
+
+/* Phones on their side: smaller title, room for the rarity label. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .results-box.campaign .campaign-summary .reward-title {
+    margin: 2px 0 4px;
+    font-size: 0.95rem;
+  }
+
+  .results-box.campaign .campaign-summary.claimed .reward-title {
+    font-size: 11px;
+  }
+
+  .reward-cards {
+    padding-bottom: 16px;
+  }
+
+  .reward-rarity {
+    bottom: -15px;
+    font-size: 9px;
+  }
+}
