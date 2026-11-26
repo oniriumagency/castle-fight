@@ -13,6 +13,7 @@ import { getTerritory, type BattleOutcome } from '@cardcraft-castles/campaign';
 import type { LocalSession } from '../../game/localSession';
 import { cardFace } from '../../ui/card';
 import { attachCardZoom } from '../../ui/cardZoom';
+import { withFireworks } from '../../ui/avatarFireworks';
 
 export interface ResultsOptions {
   host: HTMLElement;
@@ -182,7 +183,9 @@ export function showResults(o: ResultsOptions): void {
         h(
           'div.results-hero',
           { class: seat === winner ? 'winner' : o.view.players[seat].eliminated ? 'fallen' : '', style: `--hero:${heroCss(o.view.players[seat].hero)}` },
-          faceImg(o.session.seats[seat]?.portrait ?? getHero(o.view.players[seat].hero).art, getHero(o.view.players[seat].hero).art),
+          ((face) => (seat === winner ? withFireworks(face) : face))(
+            faceImg(o.session.seats[seat]?.portrait ?? getHero(o.view.players[seat].hero).art, getHero(o.view.players[seat].hero).art),
+          ),
           h('strong', null, o.name(seat)),
           h('small', null, o.session.seats[seat]?.title ? L(o.session.seats[seat]!.title!) : L(getHero(o.view.players[seat].hero).name)),
         ),

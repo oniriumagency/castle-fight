@@ -1661,6 +1661,21 @@
   color: var(--muted);
 }
 
+/* The winner's fireworks: a canvas centred on the portrait, larger than it, over it and never in the way. */
+.avatar-fireworks {
+  position: relative;
+  display: inline-flex;
+}
+
+.avatar-fireworks canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .results-stats {
   width: 100%;
   border-collapse: collapse;
