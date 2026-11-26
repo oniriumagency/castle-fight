@@ -394,6 +394,8 @@ const STRINGS = {
   buffHero: { es: 'Pasiva de {name}', en: '{name}’s passive' },
   buffCombo: { es: 'Combo activo', en: 'Combo active' },
   buffComboDetail: { es: 'Tu última carta fue de la misma escuela', en: 'Your last card was from the same school' },
+  buffCond: { es: 'Condición cumplida', en: 'Condition met' },
+  buffCondDetail: { es: 'Se cumple la condición de la carta', en: 'The card’s condition holds' },
   buffAttacksLeft: { es: '{name} ({n} ataques más)', en: '{name} ({n} more attacks)' },
   buffAttackLeft: { es: '{name} (1 ataque más)', en: '{name} (1 more attack)' },
   logDiscarded: { es: '{who} descarta {card}', en: '{who} discards {card}' },

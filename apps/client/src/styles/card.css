@@ -526,8 +526,8 @@
 .card .combo-buff {
   color: #0b7fae;
 }
-/* With the Combo lit, its "+X" glows like the word Combo, so both read as one thing. */
-.card.combo .combo-buff {
+/* With the Combo or the condition lit, its "+X" glows like the word Combo or the condition, so both read as one thing. */
+.card.boosted .combo-buff {
   text-shadow: 0 0 calc(6 * var(--u)) rgb(79 216 255 / 70%);
 }
 

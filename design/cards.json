@@ -173,8 +173,8 @@
         "en": "Emergency Repairs"
       },
       "text": {
-        "es": "+7 Castillo. Si tu Castillo está por debajo de 35, +15 en su lugar.",
-        "en": "+7 Castle. If your Castle is below 35, +15 instead."
+        "es": "+7 Castillo. Si tu Castillo está por debajo de 35, +8 Castillo más.",
+        "en": "+7 Castle. If your Castle is below 35, +8 more Castle."
       },
       "art": "cards/reparaciones-de-urgencia.jpg"
     },

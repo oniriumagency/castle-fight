@@ -130,13 +130,14 @@ export interface CardBuffs {
   build?: NumberBuff[];
   status: NumberBuff[];
   /**
-   * The card gets (or got, once played) its Combo: the Combo amount is added
-   * to the number it raises as one more "+X" ("7+8 damage").
+   * The card gets (or got, once played) its Combo, or its condition holds:
+   * the Combo amount, or what the condition adds, goes after the number it
+   * raises as one more "+X" ("7+8 damage", "+7+8 Castle").
    */
   combo?: boolean;
 }
 
-export type BuffKind = 'attack' | 'build' | 'status' | 'combo';
+export type BuffKind = 'attack' | 'build' | 'status' | 'combo' | 'cond';
 
 const NO_BUFFS: CardBuffs = { attack: [], build: [], status: [] };
 
@@ -254,6 +255,8 @@ interface EffectNumbers {
   comboDamage: Map<number, number>;
   comboWall: Map<number, number>;
   comboKeep: Map<number, number>;
+  /** "+7 Castle. If ..., +8 more Castle.": the printed number → what the condition adds to it. */
+  condKeep: Map<number, number>;
 }
 
 /** Attack amounts and Burn/Frost/Rust durations among a card's effects, to tell which printed numbers they are. */
@@ -268,6 +271,7 @@ function effectNumbers(
     comboDamage: new Map(),
     comboWall: new Map(),
     comboKeep: new Map(),
+    condKeep: new Map(),
   },
 ): EffectNumbers {
   for (const op of ops) {
@@ -284,7 +288,12 @@ function effectNumbers(
     else if (op.op === 'enchant' && op.modifiers?.onTurnStart) effectNumbers(op.modifiers.onTurnStart, out);
     else if (op.op === 'burn') out.status.add(tableAmount(op.turns));
     else if (op.op === 'frost' || op.op === 'rust') out.status.add(op.turns);
-    else if (op.op === 'if') {
+    else if (op.op === 'if' && conditionalBuild(op)) {
+      // Printed as the base build plus what the condition adds ("+7 Castle. If ..., +8 more Castle.").
+      const { base, bonus } = conditionalBuild(op)!;
+      out.build.add(base);
+      out.condKeep.set(base, bonus);
+    } else if (op.op === 'if') {
       effectNumbers(op.then, out);
       if (op.else) effectNumbers(op.else, out);
     } else if (op.op === 'roll') {
@@ -292,6 +301,15 @@ function effectNumbers(
     }
   }
   return out;
+}
+
+/** A condition that only raises a Castle build ("+7, or +15 if ..."): the base and what the condition adds. */
+function conditionalBuild(op: Extract<EffectOp, { op: 'if' }>): { base: number; bonus: number } | null {
+  const [then] = op.then;
+  const [other] = op.else ?? [];
+  if (op.then.length !== 1 || op.else?.length !== 1 || then?.op !== 'keep' || other?.op !== 'keep') return null;
+  if (then.perDiscard || other.perDiscard || then.amount <= other.amount) return null;
+  return { base: other.amount, bonus: then.amount - other.amount };
 }
 
 // Markers around a buff after a number ("\u0001a0\u0002" is attack buff 0),
@@ -313,16 +331,19 @@ function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): str
   const marks = (kind: 'a' | 'b' | 's', list: NumberBuff[]): string => list.map((_, i) => `${BUFF_OPEN}${kind}${i}${BUFF_CLOSE}`).join('');
   // The Combo goes first, as the engine adds it to the printed number before the other bonuses.
   const combo = (map: Map<number, number>, n: number): string => (buffs.combo && map.get(n) ? `${BUFF_OPEN}c${map.get(n)}${BUFF_CLOSE}` : '');
+  const cond = (n: number): string => (buffs.combo && numbers.condKeep.get(n) ? `${BUFF_OPEN}k${numbers.condKeep.get(n)}${BUFF_CLOSE}` : '');
   const es = locale() === 'es';
   let out = text;
   if ((buffs.attack.length && numbers.damage.size) || (buffs.combo && numbers.comboDamage.size)) {
     const damage = es ? /(?<![+\d])(\d+)(?= de daño(?! menos| por))/g : /(?<![+\d])(\d+)(?= (?:piercing )?damage(?! per| for each))/g;
     out = out.replace(damage, (m) => (numbers.damage.has(Number(m)) ? `${m}${combo(numbers.comboDamage, Number(m))}${marks('a', buffs.attack)}` : m));
   }
-  if ((build.length && numbers.build.size) || (buffs.combo && numbers.comboKeep.size)) {
-    // "+7 Castle", and the stronger "+15 instead" of a conditional build.
-    const castle = es ? /(?<=\+)(\d+)(?= (?:Castillo(?! por)|en su lugar))/g : /(?<=\+)(\d+)(?= (?:Castle(?! for each)|instead))/g;
-    out = out.replace(castle, (m) => (numbers.build.has(Number(m)) ? `${m}${combo(numbers.comboKeep, Number(m))}${marks('b', build)}` : m));
+  if ((build.length && numbers.build.size) || (buffs.combo && (numbers.comboKeep.size || numbers.condKeep.size))) {
+    // "+7 Castle". What a condition adds ("+8 more Castle") is not a build of its own and keeps its number.
+    const castle = es ? /(?<=\+)(\d+)(?= Castillo(?! por| más))/g : /(?<=\+)(\d+)(?= Castle(?! for each))/g;
+    out = out.replace(castle, (m) =>
+      numbers.build.has(Number(m)) ? `${m}${combo(numbers.comboKeep, Number(m))}${cond(Number(m))}${marks('b', build)}` : m,
+    );
   }
   if (buffs.combo && numbers.comboWall.size) {
     const wall = es ? /(?<=\+)(\d+)(?= Muralla)/g : /(?<=\+)(\d+)(?= Wall)/g;
@@ -332,6 +353,10 @@ function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): str
   // would read as a second bonus: only the keyword stays.
   if (buffs.combo && out.includes(`${BUFF_OPEN}c`)) {
     out = out.replace(new RegExp(`(${L(TERMS.combo)}): [^.]*\\.`), '$1.');
+  }
+  // The same for a condition: "If your Castle is below 35, +8 more Castle." keeps only the condition.
+  if (buffs.combo && out.includes(`${BUFF_OPEN}k`)) {
+    out = out.replace(es ? /((?:^|\. )Si [^,.]*), \+\d+ Castillo más\./ : /((?:^|\. )If [^,.]*), \+\d+ more Castle\./, '$1.');
   }
   // Per card discarded: the bonus goes once, at the end of the sentence that counts the cards.
   const perCard = (list: NumberBuff[], kind: 'a' | 'b', eachRival: boolean): void => {
@@ -362,9 +387,14 @@ function comboBuff(amount: number): NumberBuff {
   return { source: 'combo', amount, label: t('buffComboDetail') };
 }
 
+function condBuff(amount: number): NumberBuff {
+  return { source: 'combo', amount, label: t('buffCondDetail') };
+}
+
 function buffHtml(html: string, buffs: CardBuffs): string {
-  return html.replace(/\u0001([absc])(\d+)\u0002/g, (_, kind: string, i: string) => {
+  return html.replace(/\u0001([absck])(\d+)\u0002/g, (_, kind: string, i: string) => {
     if (kind === 'c') return buffSpan(comboBuff(Number(i)));
+    if (kind === 'k') return buffSpan(condBuff(Number(i)));
     const b = (kind === 'a' ? buffs.attack : kind === 'b' ? (buffs.build ?? []) : buffs.status)[Number(i)];
     return b ? buffSpan(b) : '';
   });
@@ -397,6 +427,7 @@ function buffsOn(ops: readonly EffectOp[], text: string, buffs: CardBuffs | null
     // The Combo amounts the text gets, as they are marked on it.
     const marked = buffText(ops, text, { ...NO_BUFFS, combo: true });
     for (const m of marked.matchAll(/\u0001c(\d+)\u0002/g)) found.unshift({ buff: comboBuff(Number(m[1])), kind: 'combo' as const });
+    for (const m of marked.matchAll(/\u0001k(\d+)\u0002/g)) found.unshift({ buff: condBuff(Number(m[1])), kind: 'cond' as const });
   }
   return found;
 }

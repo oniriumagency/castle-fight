@@ -1617,7 +1617,7 @@ class BoardScreen implements Screen {
   private async showPlayed(cardId: string, from: DOMRect, boost: Boost, hero?: HeroId | CardBuffs): Promise<void> {
     this.clearPlayed();
     const gen = this.animGen;
-    const card = markBoost(cardFace(cardId, { className: 'played', ...look(hero), combo: boost === 'combo' }), cardId, boost);
+    const card = markBoost(cardFace(cardId, { className: 'played', ...look(hero), combo: boost !== null }), cardId, boost);
     const combo = boost === 'combo';
     this.stage.replaceChildren(card);
     this.playedCard = card;
@@ -1764,7 +1764,7 @@ class BoardScreen implements Screen {
     this.discardHero = hero;
     this.discardTopDiscarded = discarded;
     this.discardBoost = boost;
-    const top = cardId ? cardFace(cardId, { calm: true, ...look(hero), combo: boost === 'combo' }) : cardBack();
+    const top = cardId ? cardFace(cardId, { calm: true, ...look(hero), combo: boost !== null }) : cardBack();
     if (cardId && discarded) markDiscarded(top);
     const count = this.discardPile.querySelector('.pile-count');
     this.discardPile.replaceChildren(top, count ?? h('span.pile-count'));
@@ -1796,7 +1796,7 @@ class BoardScreen implements Screen {
   private showCardPreview(cardId: string, anchor: DOMRect, prefer: 'above' | 'below' | 'left' | 'right', hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null): void {
     this.hidePilePreview();
     if (this.el.classList.contains('touch')) return;
-    const big = markBoost(cardFace(cardId, { calm: true, ...look(hero), combo: boost === 'combo' }), cardId, boost);
+    const big = markBoost(cardFace(cardId, { calm: true, ...look(hero), combo: boost !== null }), cardId, boost);
     if (discarded) markDiscarded(big);
     big.classList.add('hover-preview', 'pile-preview');
     const host = this.layer.getBoundingClientRect();
@@ -2227,7 +2227,7 @@ class BoardScreen implements Screen {
     if (!ctx || !cardId) return;
     const reason = blockReason(ctx, cardId);
     const handCard = this.hand.elementOf(uid);
-    const buffs = withCombo(this.hand.buffs(), !reason && handCard?.classList.contains('combo') === true);
+    const buffs = withCombo(this.hand.buffs(), !reason && handCard?.classList.contains('boosted') === true);
     const big = cardFace(cardId, { tilt: true, cost: undefined, buffs });
     big.classList.toggle('combo', !reason && handCard?.classList.contains('combo') === true);
     big.classList.toggle('boosted', !reason && handCard?.classList.contains('boosted') === true);
@@ -2268,7 +2268,7 @@ class BoardScreen implements Screen {
       const cost = handCard.querySelector('.cost');
       if (cost) big.querySelector('.cost')?.replaceWith(cost.cloneNode(true));
       // An enchantment ran out or a new bonus started: the "+X" follow.
-      const buffsNow = withCombo(this.hand.buffs(), combo);
+      const buffsNow = withCombo(this.hand.buffs(), boosted);
       if ((big.dataset.buffs ?? '') !== buffsKey(buffsNow)) {
         const rules = big.querySelector('.rules > span');
         if (rules) rules.innerHTML = rulesInnerHtml(cardId, buffsNow);
@@ -2309,7 +2309,8 @@ class BoardScreen implements Screen {
 
   private inspectCard(cardId: string, hero?: HeroId | CardBuffs, discarded = false, boost: Boost = null, copied: string | null = null): void {
     audio.play('cardSelect');
-    const combo = boost === 'combo';
+    // Its Combo or its condition: the amount it added goes after the number it raised.
+    const combo = boost !== null;
     const face = markBoost(cardFace(cardId, { tilt: true, ...look(hero), combo }), cardId, boost);
     if (discarded) markDiscarded(face);
     // A Mirage from the history shows, on its right, the card it copied.
