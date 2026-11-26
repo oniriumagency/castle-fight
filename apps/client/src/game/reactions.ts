@@ -314,6 +314,11 @@ export class ReactionDirector {
     this.lastKind.clear();
   }
 
+  /** Keeps the heroes quiet until `until` (and the usual gap after it), e.g. while they trade opening lines. */
+  hush(until: number): void {
+    this.lastAt = Math.max(this.lastAt, until);
+  }
+
   pick(
     events: GameEvent[],
     before: readonly PlayerPublicState[],

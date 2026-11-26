@@ -10,6 +10,7 @@ import {
   twilightLevel,
   type GameEvent,
   type HeroId,
+  type LocalizedText,
   type PlayerId,
   type PlayerPublicState,
   type PlayerView,
@@ -32,6 +33,7 @@ import { describeEvent } from '../../game/describe';
 import { openTwilightInfo, twilightCardFor, twilightLine, twilightStatus, twilightValues } from '../../game/twilight';
 import type { MatchSession, Presence, SessionEvent } from '../../game/session';
 import { MatchStats } from '../../game/stats';
+import { faceOff, seeded, type FaceOffLine } from '../../game/faceOff';
 import { ReactionDirector, type Reaction, type Voice } from '../../game/reactions';
 import { CAPTAIN_LINES } from '../../game/captainLines';
 import { artUrl, iconSvg, preloadArt } from '../../ui/assets';
@@ -63,7 +65,7 @@ import { heroCss, skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
 import { Hand, blockReason, inspectPanel, type InspectPanel } from './hand';
-import { CastlePlaque, SidePanel } from './hud';
+import { bubbleSeconds, CastlePlaque, SidePanel } from './hud';
 import { showResults } from './results';
 import { UltimateMode } from './ultimateMode';
 import { muteButton } from '../../ui/muteButton';
@@ -1070,8 +1072,12 @@ class BoardScreen implements Screen {
       await this.snapTo(update.view, starting);
       if (starting) {
         this.reactions.reset();
-        const hello = this.pickReactions(events, update.view.players, update.view);
-        if (hello.length) this.later(() => this.say(hello), 500);
+        const meeting = this.faceOff(update.view);
+        if (meeting.length) this.later(() => this.sayInTurn(meeting), 700);
+        else {
+          const hello = this.pickReactions(events, update.view.players, update.view);
+          if (hello.length) this.later(() => this.say(hello), 500);
+        }
       }
       return;
     }
@@ -1094,11 +1100,60 @@ class BoardScreen implements Screen {
     this.clearPlayed();
   }
 
-  /** Who may speak from a seat: AI rivals freely, heroes played here now and then, nobody online. */
+  /**
+   * Who may speak from a seat: AI rivals freely, heroes played by people
+   * (here or online) only at their big moments.
+   */
   private voiceOf(seat: PlayerId): Voice {
-    if (this.session.kind === 'online' || this.session.spectator || !settings.get().heroReactions) return null;
+    if (!settings.get().heroReactions) return null;
     if (this.session.seats[seat]?.isAi) return 'rival';
-    return this.session.isLocal(seat) ? 'own' : null;
+    return 'own';
+  }
+
+  /**
+   * The heroes' exchange as the match begins, outside the campaign (whose
+   * battles open with their own story). Online, every player sees the same one.
+   */
+  private faceOff(view: PlayerView): FaceOffLine[] {
+    if ((this.session as { campaign?: unknown }).campaign || !settings.get().heroReactions) return [];
+    try {
+      const heroes = view.players.map((p) => p?.hero);
+      const id = this.session.kind === 'online' ? this.session.gameId?.() : null;
+      const random = id ? seeded(`${id}:${heroes.join(',')}`) : Math.random;
+      // Against the AI, the rival opens.
+      const ai = this.session.seats.findIndex((s) => s.isAi);
+      return faceOff(heroes, random, ai >= 0 ? ai : undefined);
+    } catch (error) {
+      console.error('Hero face-off failed', error);
+      return [];
+    }
+  }
+
+  /**
+   * Says the face-off one line after another: the next speaker starts as the
+   * previous bubble is fading, and the match's own remarks wait until it ends.
+   */
+  private sayInTurn(lines: FaceOffLine[]): void {
+    let at = 0;
+    let prevSeat: PlayerId | null = null;
+    let prevMs = 0;
+    const start = performance.now();
+    for (const line of lines) {
+      if (prevSeat !== null) at += prevSeat === line.seat ? prevMs + 250 : Math.max(1600, prevMs * 0.8);
+      const text = line.text;
+      const seat = line.seat;
+      this.later(() => this.sayLine(seat, text), at);
+      prevSeat = seat;
+      prevMs = bubbleSeconds(L(text)) * 1000;
+    }
+    this.reactions.hush(start + 700 + at + prevMs);
+  }
+
+  private sayLine(seat: PlayerId, text: LocalizedText): void {
+    if (this.destroyed || this.resultsShown) return;
+    const side = this.sideOf(seat);
+    this.panels[side]?.showReaction(L(text));
+    audio.play(voiceOf(this.session.seats[seat]?.hero ?? null), 0.5, { pan: [-0.5, 0.5, 0.1][side] ?? 0, gain: 0.7 });
   }
 
   /** Campaign captains speak their own lines; everyone else, their hero's. */
@@ -1120,12 +1175,7 @@ class BoardScreen implements Screen {
   /** Shows the bubbles; a second one (an answer) comes a moment later. */
   private say(reactions: Reaction[]): void {
     reactions.forEach((r, i) => {
-      const show = (): void => {
-        if (this.destroyed || this.resultsShown) return;
-        const side = this.sideOf(r.seat);
-        this.panels[side]?.showReaction(L(r.text));
-        audio.play(voiceOf(this.session.seats[r.seat]?.hero ?? null), 0.5, { pan: [-0.5, 0.5, 0.1][side] ?? 0, gain: 0.7 });
-      };
+      const show = (): void => this.sayLine(r.seat, r.text);
       if (i === 0) show();
       else this.later(show, 1700 * i);
     });
