@@ -1,5 +1,6 @@
 import { h } from './dom';
 import { t } from './i18n';
+import { EMBEDDED } from './platform';
 
 /**
  * Calls the player back when the game needs them and the tab is in the
@@ -30,6 +31,8 @@ if (typeof document !== 'undefined') {
 
 function permission(): NotificationPermission | null {
   try {
+    // Browsers refuse to ask for notifications from another site's frame (itch.io).
+    if (EMBEDDED) return null;
     return 'Notification' in window ? Notification.permission : null;
   } catch {
     return null;

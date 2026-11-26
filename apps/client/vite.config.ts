@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { offlineCache } from './sw/plugin';
 
 /** `0.1.0+abc1234`: the package version and the commit, shown in player reports. */
@@ -24,9 +24,22 @@ function appVersion(): string {
  */
 export const GAME_PATH = '/cardcraft-castles/';
 
-export default defineConfig({
-  base: GAME_PATH,
-  plugins: [offlineCache()],
+/**
+ * `--mode itch` (`pnpm build:itch`) builds the game for itch.io into
+ * `dist-itch/`: relative paths, so it runs from whatever folder itch serves
+ * the upload from, and none of the site-only parts (offline cache, manifest).
+ * The server address comes from `.env.itch`.
+ */
+function itchPage(): Plugin {
+  return {
+    name: 'cardcraft-itch-page',
+    transformIndexHtml: (html) => html.replace(/\s*<link rel="manifest"[^>]*>/, ''),
+  };
+}
+
+export default defineConfig(({ mode }) => ({
+  base: mode === 'itch' ? './' : GAME_PATH,
+  plugins: mode === 'itch' ? [itchPage()] : [offlineCache()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
@@ -39,5 +52,6 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    ...(mode === 'itch' ? { outDir: 'dist-itch' } : {}),
   },
-});
+}));

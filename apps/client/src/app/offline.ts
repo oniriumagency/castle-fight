@@ -4,6 +4,7 @@
  * device. Only in builds: the dev server always serves fresh files.
  */
 import { isInstalled } from './install';
+import { ON_ITCH } from './platform';
 
 /** The installed game can stay open for days: look for a new version when it comes back to the front. */
 const UPDATE_EVERY = 60 * 60 * 1000;
@@ -18,7 +19,8 @@ function watchForUpdates(registration: ServiceWorkerRegistration): void {
 }
 
 export function initOffline(): void {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  // Not on itch.io: itch serves each upload from its own address and keeps the files itself.
+  if (!import.meta.env.PROD || ON_ITCH || !('serviceWorker' in navigator)) return;
   const base = import.meta.env.BASE_URL;
   const start = (): void => {
     navigator.serviceWorker

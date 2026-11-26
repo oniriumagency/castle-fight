@@ -1,6 +1,7 @@
 import type { HeroId } from '@cardcraft-castles/engine';
 import type { RoomInfo } from '@cardcraft-castles/protocol';
 import { turnNotificationOffer } from '../app/attention';
+import { copyText, INVITE_PAGE } from '../app/platform';
 import { h, html, toast } from '../app/dom';
 import { t } from '../app/i18n';
 import { setScreenName } from '../app/reportContext';
@@ -102,7 +103,7 @@ export function watchOnline(roomId: string): void {
 function waitingScreen(session: OnlineSession, cancel: () => void, watching = false): Screen {
   const el = h('div.waiting-screen');
   const seatsBox = h('div.waiting-seats');
-  const link = online.inviteUrl(session.connection.roomId);
+  const link = online.inviteUrl(session.connection.roomId, INVITE_PAGE);
 
   const renderSeats = (room: RoomInfo | null): void => {
     const seats = room?.seats ?? [null, null];
@@ -166,9 +167,11 @@ function waitingScreen(session: OnlineSession, cancel: () => void, watching = fa
               try {
                 if (navigator.share && matchMedia('(hover: none)').matches) {
                   await navigator.share({ url: link, title: 'Cardcraft: Castles' });
-                } else {
-                  await navigator.clipboard.writeText(link);
+                } else if (await copyText(link)) {
                   toast(t('copied'));
+                } else {
+                  // Copying is blocked (some embedded frames): show the link to copy by hand.
+                  toast(link, 'info', 8000);
                 }
               } catch {
                 // The user closed the share sheet.
