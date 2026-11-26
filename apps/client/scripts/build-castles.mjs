@@ -1144,6 +1144,8 @@ async function ruins(input, outDir) {
   return { width: info.width, height: info.height };
 }
 
+/** Bump when the flag's cut changes, so flags already cut are cut again. */
+const FLAG_VERSION = 2;
 /** Height the painted flagpole is brought to (the cloth keeps the same scale). */
 const FLAG_POLE_HEIGHT = 640;
 
@@ -1181,16 +1183,19 @@ async function flagAsset(input, outDir) {
   const pad = Math.max(2, Math.round((right - left + 1) * 0.6));
   const poleL = Math.max(0, left - pad);
   const poleR = Math.min(width - 1, right + pad);
-  // The cloth: left of the pole, as high as anything opaque reaches there.
+  // The cloth: the rows with a good stretch of it left of the pole (a finial or a ring sticking out
+  // of the pole is not cloth), and as far left as it reaches in them.
   let top = height;
   let bottom = -1;
   let clothL = poleL;
   for (let y = 0; y < height; y++) {
+    let n = 0;
+    for (let x = 0; x < poleL; x++) if (opaque(x, y)) n++;
+    if (n < width * 0.06) continue;
+    if (y < top) top = y;
+    bottom = y;
     for (let x = 0; x < poleL; x++) {
-      if (!opaque(x, y)) continue;
-      if (y < top) top = y;
-      if (y > bottom) bottom = y;
-      if (x < clothL) clothL = x;
+      if (opaque(x, y) && x < clothL) clothL = x;
     }
   }
   if (bottom <= top || clothL >= poleL) return null;
@@ -1202,6 +1207,7 @@ async function flagAsset(input, outDir) {
   await cut(clothL, top, clothW, bottom - top + 1).toFile(join(outDir, 'flag-cloth.webp'));
   await cut(poleL, poleTop, poleR - poleL + 1, height - poleTop).toFile(join(outDir, 'flag-pole.webp'));
   return {
+    v: FLAG_VERSION,
     cloth: [clothW, bottom - top + 1],
     pole: [poleR - poleL + 1, height - poleTop],
     // Where the pole's axis is across its own image, and how far below its tip the cloth begins.
@@ -1253,7 +1259,7 @@ export async function buildCastles(source, target) {
     if (flagFile) {
       const input = join(root, hero, flagFile);
       manifest[hero] ??= {};
-      if (old[hero]?.flag && (await mtime(join(outDir, 'flag-cloth.webp'))) >= (await mtime(input))) manifest[hero].flag = old[hero].flag;
+      if (old[hero]?.flag?.v === FLAG_VERSION && (await mtime(join(outDir, 'flag-cloth.webp'))) >= (await mtime(input))) manifest[hero].flag = old[hero].flag;
       else {
         const flag = await flagAsset(input, outDir);
         if (flag) manifest[hero].flag = flag;

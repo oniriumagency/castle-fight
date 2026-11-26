@@ -1,4 +1,4 @@
-import { ColorMatrixFilter, Container, Graphics, MeshSimple, Sprite, TilingSprite, type Texture } from 'pixi.js';
+import { ColorMatrixFilter, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import type { HeroId } from '@cardcraft-castles/engine';
 import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
@@ -28,7 +28,6 @@ class PaintedFlag {
     pole: Texture | null = null,
   ) {
     this.pole = pole ? new Sprite(pole) : null;
-    if (this.pole) this.root.addChild(this.pole);
     for (let i = 0; i < FLAG_STRIPS; i++) {
       const u0 = hoistRight ? 1 - i / FLAG_STRIPS : i / FLAG_STRIPS;
       const u1 = hoistRight ? 1 - (i + 1) / FLAG_STRIPS : (i + 1) / FLAG_STRIPS;
@@ -42,6 +41,8 @@ class PaintedFlag {
       this.strips.push(mesh);
       this.root.addChild(mesh);
     }
+    // The mast in front, over the edge of cloth painted around it.
+    if (this.pole) this.root.addChild(this.pole);
   }
 
   /**
@@ -2068,9 +2069,16 @@ export class Castle extends Container {
         }
         flagIndex++;
         f.root.visible = true;
-        const mast = len * (pennant ? 1.5 : 1.7);
-        const s = mast / own.pole.height;
+        // The painting's scale comes from its whole mast; only its top part stands above the roof, a
+        // third of it, or as much as the cloth needs to hang clear.
+        const s = (len * (pennant ? 1.5 : 1.7)) / own.pole.height;
         const pole = f.pole!;
+        const shown = Math.min(own.pole.height, Math.round(Math.max(own.pole.height / 3, own.clothTop + own.cloth.height * 1.15)));
+        if (pole.texture.height !== shown) {
+          const fr = own.pole.frame;
+          pole.texture = new Texture({ source: own.pole.source, frame: new Rectangle(fr.x, fr.y, fr.width, shown) });
+        }
+        const mast = shown * s;
         pole.scale.set(s);
         pole.position.set(x - own.poleAxis * s, y - mast);
         f.draw(x, y - mast + own.clothTop * s, own.cloth.width * s, 1, phase, dir);
@@ -2114,6 +2122,11 @@ export class Castle extends Container {
       // A pole off to one side flies its flag outward, clear of the roof.
       const dir = WIND;
       cloth(k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.8, k.w * 0.3, false, p, dir);
+    } else if (painted && !fallen && !k.broken && this.painted?.ownFlag) {
+      // The Sorceress's dome carries her telescope at its top: her flag stands on the shoulder of the
+      // dome away from it, so it never hides the telescope.
+      const side = k.apexX > 0 ? -1 : 1;
+      cloth(k.cx + side * k.w * 0.3, k.topY - k.crown * 0.74, k.w * 0.8, k.w * 0.3, false, p, WIND);
     }
     // Keep flag (the Sorceress has her orb instead).
     if (!painted && !fallen && !k.broken && s.signature !== 'orb') {
