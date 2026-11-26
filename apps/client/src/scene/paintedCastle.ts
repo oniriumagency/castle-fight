@@ -1,5 +1,6 @@
 import { Assets, Container, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import { artUrl } from '../ui/assets';
+import type { ScaffoldParts, ScaffoldPartsMeta } from './scaffold';
 
 /**
  * Painted castles: each hero's Keep, back tower, Wall and ruins painted like
@@ -28,6 +29,8 @@ export interface StackedMeta {
   glow?: { crown: boolean; base: boolean };
   /** The scaffold's planks: top and bottom edge of each, in source px from the crown's top. */
   planks?: [number, number][];
+  /** The scaffold cut into its separate timbers. */
+  parts?: ScaffoldPartsMeta;
   /** The side the shaft is lit from: -1 left, 1 right, 0 unclear. */
   light?: number;
   /** Rows at the bottom of the crown that are still plain stones, like the shaft (ornaments may climb onto them). */
@@ -208,6 +211,8 @@ export type ScenerySheet = 'grass' | 'rocks' | 'trees' | 'farm' | 'farm2';
 export interface CastleKit {
   decals: Record<ScarKind, Texture[]>;
   scaffold: StackedPiece | null;
+  /** The scaffold's separate timbers, to put it up one board at a time. */
+  scaffoldParts: ScaffoldParts | null;
   /** Props planted around the castles, four per sheet, each standing on the bottom of its frame. */
   scenery: Partial<Record<ScenerySheet, Texture[]>>;
 }
@@ -218,7 +223,7 @@ let kit: Promise<CastleKit | null> | null = null;
 export function castleKit(): Promise<CastleKit | null> {
   kit ??= loadManifest().then(async (m) => {
     const common = (m as unknown as Record<string, { decals?: Record<string, { kind: ScarKind; frames: number[][] }>; scaffold?: StackedMeta }>)._comun;
-    if (!common) return { decals: { cracks: [], holes: [], scorch: [] }, scaffold: null, scenery: {} };
+    if (!common) return { decals: { cracks: [], holes: [], scorch: [] }, scaffold: null, scaffoldParts: null, scenery: {} };
     const decals: Record<ScarKind, Texture[]> = { cracks: [], holes: [], scorch: [] };
     await Promise.all(
       Object.entries(common.decals ?? {}).map(async ([name, sheet]) => {
@@ -228,6 +233,9 @@ export function castleKit(): Promise<CastleKit | null> {
       }),
     );
     const scaffold = await stacked('_comun', 'scaffold', common.scaffold);
+    const partsMeta = common.scaffold?.parts;
+    const partsSheet = partsMeta ? await texture('castles/_comun/scaffold-parts.webp') : null;
+    const scaffoldParts = partsMeta && partsSheet ? { meta: partsMeta, sheet: partsSheet } : null;
     const props = (m as unknown as Record<string, { props?: Record<string, { frames: number[][] }> }>)._escenario?.props ?? {};
     const scenery: Partial<Record<ScenerySheet, Texture[]>> = {};
     await Promise.all(
@@ -236,7 +244,7 @@ export function castleKit(): Promise<CastleKit | null> {
         if (t) scenery[name as ScenerySheet] = sheet.frames.map(([x, y, w, h]) => new Texture({ source: t.source, frame: new Rectangle(x!, y!, w!, h!) }));
       }),
     );
-    return { decals, scaffold, scenery };
+    return { decals, scaffold, scaffoldParts, scenery };
   });
   return kit;
 }
@@ -281,8 +289,6 @@ export class Stack {
   private readonly ornamentLayer = new Container();
   /** The ornaments' own lights, each with its own beat so they do not flicker in step. */
   private lights: { sprite: Sprite; beat: number }[] = [];
-  /** The last layout: scale, body height and base rows shown (for `courses`). */
-  private fit = { k: 1, h: 0, rows: 0 };
 
   constructor(readonly piece: StackedPiece) {
     this.crown = new Sprite(piece.crown);
@@ -346,7 +352,6 @@ export class Stack {
         this.baseGlowCrop.update();
       }
     }
-    this.fit = { k, h: Math.max(0, h), rows };
     this.base.visible = h > 0.5;
     this.base.position.set(left, -rows * k);
     this.base.width = W;
@@ -404,43 +409,6 @@ export class Stack {
 
     const apexX = (left + m.apex.x * k) * (mirror ? -1 : 1);
     return { crown: crownH, apexY: -(m.crown - m.apex.y) * k, apexX };
-  }
-
-  /**
-   * Heights above the ground (scene px, as last laid out) where each plank of
-   * a scaffold begins, lowest first, ending at the very top: cut there, the
-   * scaffold shows whole bays, each topped by its plank. Empty without planks.
-   */
-  courses(): number[] {
-    const m = this.piece.meta;
-    const planks = m.planks;
-    if (!planks?.length) return [];
-    const { k, h, rows } = this.fit;
-    const bay = m.shaft * k;
-    const baseH = Math.min(m.base, rows) * k;
-    const crownH = m.crown * k;
-    const cuts: number[] = [];
-    const baseTop = m.crown + m.shaft;
-    for (const [top, bottom] of planks) {
-      const mid = (top + bottom) / 2;
-      // In the base (cropped from its top when the body is short), or in the crown above the body.
-      if (mid > baseTop + 1) cuts.push(baseH - (top - baseTop) * k);
-      else if (mid < m.crown - 1) cuts.push(h + (m.crown - top) * k);
-    }
-    // The bays of the shaft, each starting where the plank between two bays does.
-    const seam = planks.find(([a, b]) => Math.abs((a + b) / 2 - baseTop) <= 2);
-    const lift = seam ? (baseTop - seam[0]) * k : 0;
-    for (let y = baseH + lift; y < h + lift - 1; y += bay) cuts.push(y);
-    if (h > baseH) cuts.push(h + lift);
-    const all = h + crownH;
-    // Planks closer than a third of a bay go up together.
-    const out: number[] = [];
-    for (const c of cuts.filter((c) => c > 0 && c < all).sort((a, b) => a - b)) {
-      if (!out.length || c - out[out.length - 1]! > bay * 0.34) out.push(c);
-    }
-    if (out.length && all - out[out.length - 1]! < bay * 0.34) out.pop();
-    out.push(all);
-    return out;
   }
 
   /**

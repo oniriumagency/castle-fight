@@ -4,6 +4,7 @@ import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
 import { glowTexture } from './textures';
 import { drawTombstone } from './tombstone';
+import { ScaffoldRig } from './scaffold';
 import { castleKit, paintedCastle, Stack, type CastleKit, type PaintedCastle, type ScarKind, type StackedPiece } from './paintedCastle';
 
 /** Strips a painted flag is cut into along its length, each bent and shaded on its own. */
@@ -264,26 +265,17 @@ interface Scar {
 
 /** Most wounds shown at once on each part (the oldest heal first). */
 const MAX_SCARS = { keep: 7, wall: 4 };
-/** How long each plank of the masons' scaffold takes to go up or come down (ms). */
-const PLANK_MS = 130;
 /** A scaffold left standing this long comes down by itself (ms). */
 const SCAFFOLD_HOLD_MS = 5000;
 
 interface Scaffold {
-  stack: Stack;
-  /** Shows only the planks put up so far. */
-  mask: Graphics;
+  rig: ScaffoldRig;
   /** The height it is built to (Keep or Wall points). */
   value: number;
-  /** Heights above the ground where each plank begins, lowest first; the last is the very top. */
-  cuts: number[];
-  /** Planks standing (0: none). */
-  level: number;
-  /** +1 going up, -1 coming down, 0 standing. */
-  dir: -1 | 0 | 1;
-  /** Time into the current plank, or standing (ms). */
-  t: number;
-  plankMs: number;
+  /** How long it has stood complete (ms). */
+  held: number;
+  /** Tall enough to bother with. */
+  show: boolean;
 }
 
 interface Puff {
@@ -355,7 +347,7 @@ export class Castle extends Container {
   readonly sceneryFront = new Container();
   private scars: Scar[] = [];
   private scaffolds: Partial<Record<'keep' | 'wall', Scaffold>> = {};
-  /** Each time a plank of the scaffold is put up or taken down: where (scene px of the castle) and how wide. */
+  /** Each time a plank of the scaffold is laid or lifted off: where (scene px of the castle) and how wide. */
   onPlank: ((x: number, y: number, w: number, up: boolean) => void) | null = null;
   private towers: Tower[] = [];
   private puffs: Puff[] = [];
@@ -607,111 +599,58 @@ export class Castle extends Container {
   }
 
   /**
-   * The masons put up their scaffold against a part, plank by plank from the
-   * ground up to the height it is about to reach (`value` points). Returns how
-   * long that takes (ms; 0 with no scaffold to show). `speed` scales it.
+   * The masons put up their scaffold against a part, one timber at a time from
+   * the ground up to the height it is about to reach (`value` points). Returns
+   * how long that takes (ms; 0 with no scaffold to show). `speed` scales it.
    */
   raiseScaffold(part: 'keep' | 'wall', value: number, speed = 1): number {
-    const piece = this.kit?.scaffold;
-    if (!piece || !this.painted || !this.layoutValue) return 0;
+    const kit = this.kit?.scaffoldParts;
+    if (!kit || !this.painted || !this.layoutValue) return 0;
     let s = this.scaffolds[part];
     if (!s) {
-      const mask = new Graphics();
-      s = { stack: new Stack(piece), mask, value, cuts: [], level: 0, dir: 0, t: 0, plankMs: PLANK_MS };
-      s.stack.root.mask = mask;
-      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(s.stack.root, mask);
+      const rig = new ScaffoldRig(kit);
+      rig.onPlank = (x, y, w, up) => this.onPlank?.(x, y, w, up);
+      s = { rig, value, held: 0, show: false };
+      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(rig.root);
       this.scaffolds[part] = s;
     }
     s.value = value;
-    s.plankMs = PLANK_MS * speed;
+    s.held = 0;
     this.layoutScaffold(part);
-    if (!s.cuts.length) {
-      s.level = 0;
-      s.dir = 0;
-      this.layoutScaffold(part);
-      return 0;
-    }
-    // Already partly up (built again before it came down): carry on from there.
-    if (s.dir < 0) s.t = 0;
-    s.level = Math.min(s.level, s.cuts.length);
-    s.dir = s.level < s.cuts.length ? 1 : 0;
-    if (s.dir === 0) s.t = 0;
-    return (s.cuts.length - s.level) * s.plankMs;
+    return s.show ? s.rig.raise(speed) : 0;
   }
 
-  /** The masons take their scaffold down, plank by plank from the top. Returns how long that takes (ms). */
+  /** The masons take their scaffold down, from the top. Returns how long that takes (ms). */
   lowerScaffold(part: 'keep' | 'wall'): number {
-    const s = this.scaffolds[part];
-    if (!s || s.level <= 0) return 0;
-    if (s.dir > 0) s.level++; // the plank on its way up is taken down first
-    s.level = Math.min(s.level, s.cuts.length);
-    s.dir = -1;
-    s.t = 0;
-    return s.level * s.plankMs;
-  }
-
-  /** Height of the scaffold shown with `n` planks up. */
-  private plankHeight(s: Scaffold, n: number): number {
-    return n <= 0 ? 0 : (s.cuts[Math.min(n, s.cuts.length) - 1] ?? 0);
+    return this.scaffolds[part]?.rig.lower() ?? 0;
   }
 
   private tickScaffold(part: 'keep' | 'wall', dt: number): void {
     const s = this.scaffolds[part];
-    if (!s) return;
-    if (s.dir === 0) {
-      if (s.level <= 0) return;
-      s.t += dt;
-      if (s.t > SCAFFOLD_HOLD_MS) this.lowerScaffold(part);
-    } else {
-      s.t += dt;
-      while (s.dir !== 0 && s.t >= s.plankMs) {
-        s.t -= s.plankMs;
-        s.level += s.dir;
-        this.plankLanded(part, s);
-        if (s.level >= s.cuts.length || s.level <= 0) {
-          s.level = Math.max(0, Math.min(s.level, s.cuts.length));
-          s.dir = 0;
-          s.t = 0;
-        }
-      }
-    }
+    if (!s || !s.rig.standing) return;
     this.layoutScaffold(part);
-  }
-
-  /** A plank is in place (or gone): the battlefield puffs a little sawdust there. */
-  private plankLanded(part: 'keep' | 'wall', s: Scaffold): void {
-    const b = this.bodies();
-    if (!b || !this.onPlank) return;
-    const up = s.dir > 0;
-    const y = b.groundY - this.plankHeight(s, up ? s.level : s.level + 1);
-    this.onPlank(b[part].x + this.facing * b[part].w * 0.12, y, b[part].w, up);
+    s.rig.tick(dt);
+    // Left standing too long (nothing took it down): it comes down by itself.
+    if (s.rig.up && (s.held += dt) > SCAFFOLD_HOLD_MS) {
+      s.held = 0;
+      s.rig.lower();
+    }
   }
 
   private layoutScaffold(part: 'keep' | 'wall'): void {
     const s = this.scaffolds[part];
     const b = this.bodies();
     const l = this.layoutValue;
+    const crown = this.kit?.scaffold?.meta;
     if (!s || !b || !l) return;
     const body = b[part];
     const w = body.w * (part === 'keep' ? 0.82 : 0.7);
     // Built to the height the part is about to reach, not the one it has now.
     const h = Math.min(s.value, l.maxPoints) * l.unit;
-    // The crane's platform sits near the top course; the crown (crane and pulley) rises above it.
-    const crown = (s.stack.piece.meta.crown * w) / s.stack.piece.meta.shaftWidth;
-    const cx = body.x + this.facing * body.w * 0.12;
-    s.stack.layout(cx, b.groundY + 2, w, Math.max(0, h - crown * 0.62), this.facing < 0, true);
-    s.cuts = h > body.w * 0.3 ? s.stack.courses().map((c) => c + 2) : [];
-    // Each plank slides up into place (or down out of sight) over the first part of its turn.
-    let shown = this.plankHeight(s, s.level);
-    if (s.dir !== 0) {
-      const next = this.plankHeight(s, s.level + s.dir);
-      const k = Math.min(1, s.t / (s.plankMs * 0.6));
-      shown += (next - shown) * (1 - (1 - k) ** 3);
-    }
-    const m = s.mask;
-    m.clear();
-    if (shown > 0.5) m.rect(cx - w * 2.2, b.groundY - shown, w * 4.4, shown + w).fill(0xffffff);
-    s.stack.root.visible = shown > 0.5;
+    s.show = h > body.w * 0.3;
+    // The crane's platform sits near the top course; the crane and pulley rise above it.
+    const above = crown ? ((crown.crown * w) / crown.shaftWidth) * 0.38 : 0;
+    s.rig.layout(body.x + this.facing * body.w * 0.12, b.groundY + 2, w, h + above, this.facing < 0);
   }
 
   private dropScar(s: Scar): void {
