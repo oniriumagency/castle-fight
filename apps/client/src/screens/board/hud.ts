@@ -16,6 +16,11 @@ import { artUrl, emblemSvg, iconSvg, watchArt, type EmblemName } from '../../ui/
 import { discardOverlay, parseHistoryEntry, rulesOf, ultimateHtml, type CardBuffs } from '../../ui/card';
 import { heroCss } from '../../ui/theme';
 
+/** How long a hero's speech bubble stays, in seconds: longer lines stay longer. */
+export function bubbleSeconds(text: string): number {
+  return Math.min(7, Math.max(3.4, 2.4 + text.length * 0.055));
+}
+
 const RESOURCE_EMBLEM: Record<Resource, EmblemName> = { piedra: 'piedra', acero: 'acero', mana: 'mana' };
 
 export interface SideInfo {
@@ -253,7 +258,7 @@ export class SidePanel {
 
   /** A hero's line about the match: a speech bubble that stays longer the more it says. */
   showReaction(text: string): void {
-    const seconds = Math.min(7, Math.max(3.4, 2.4 + text.length * 0.055));
+    const seconds = bubbleSeconds(text);
     this.bubble.style.setProperty('--bubble-time', `${seconds}s`);
     this.bubble.classList.add('reaction');
     this.bubble.textContent = text;

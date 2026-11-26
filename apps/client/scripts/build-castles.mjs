@@ -1144,6 +1144,73 @@ async function ruins(input, outDir) {
   return { width: info.width, height: info.height };
 }
 
+/** Height the painted flagpole is brought to (the cloth keeps the same scale). */
+const FLAG_POLE_HEIGHT = 640;
+
+/**
+ * A hero's own flag, painted on magenta: a tall pole standing at the right
+ * with the cloth flying off it to the left (the way the wind blows). Split in
+ * two so the game can bend the cloth: the pole is the run of columns opaque
+ * down most of the picture; the cloth is everything left of it. Records where
+ * the cloth's top meets the pole, measured down from the pole's tip.
+ */
+async function flagAsset(input, outDir) {
+  const raw = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  keyOut(raw.data, raw.info);
+  const trimmed = await sharp(raw.data, { raw: raw.info }).trim({ threshold: 1 }).raw().toBuffer({ resolveWithObject: true });
+  const scale = FLAG_POLE_HEIGHT / trimmed.info.height;
+  const { data, info } = await sharp(trimmed.data, { raw: trimmed.info })
+    .resize({ height: FLAG_POLE_HEIGHT, kernel: 'lanczos3' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const opaque = (x, y) => data[(y * width + x) * 4 + 3] > 128;
+  // The pole: columns opaque over most of the height; its rightmost run of them.
+  const tall = [];
+  for (let x = 0; x < width; x++) {
+    let n = 0;
+    for (let y = 0; y < height; y++) if (opaque(x, y)) n++;
+    tall.push(n > height * 0.6);
+  }
+  let right = tall.lastIndexOf(true);
+  if (right < 0) return null;
+  let left = right;
+  while (left > 0 && tall[left - 1]) left--;
+  // A little either side for the pole's own shading and the rings it carries.
+  const pad = Math.max(2, Math.round((right - left + 1) * 0.6));
+  const poleL = Math.max(0, left - pad);
+  const poleR = Math.min(width - 1, right + pad);
+  // The cloth: left of the pole, as high as anything opaque reaches there.
+  let top = height;
+  let bottom = -1;
+  let clothL = poleL;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < poleL; x++) {
+      if (!opaque(x, y)) continue;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (x < clothL) clothL = x;
+    }
+  }
+  if (bottom <= top || clothL >= poleL) return null;
+  let poleTop = 0;
+  while (poleTop < height && ![...Array(poleR - poleL + 1)].some((_, i) => opaque(poleL + i, poleTop))) poleTop++;
+  const cut = (x, y, w, h) => sharp(data, { raw: info }).extract({ left: x, top: y, width: w, height: h }).webp({ quality: 88, alphaQuality: 92 });
+  // The cloth reaches into the pole by its hem, so the bend never shows a gap at the pole.
+  const clothW = Math.min(width, left + Math.round((right - left + 1) / 2)) - clothL;
+  await cut(clothL, top, clothW, bottom - top + 1).toFile(join(outDir, 'flag-cloth.webp'));
+  await cut(poleL, poleTop, poleR - poleL + 1, height - poleTop).toFile(join(outDir, 'flag-pole.webp'));
+  return {
+    cloth: [clothW, bottom - top + 1],
+    pole: [poleR - poleL + 1, height - poleTop],
+    // Where the pole's axis is across its own image, and how far below its tip the cloth begins.
+    poleAxis: (left + right) / 2 - poleL,
+    clothTop: top - poleTop,
+    scale,
+  };
+}
+
 export async function buildCastles(source, target) {
   const root = join(source, 'castles');
   const heroes = await readdir(root, { withFileTypes: true }).catch(() => []);
@@ -1180,6 +1247,19 @@ export async function buildCastles(source, target) {
       }
       manifest[hero][piece] = piece === 'ruins' ? await ruins(input, outDir) : await stacked(input, outDir, piece, slices[`${hero}/${piece}`]);
       built++;
+    }
+    // The hero's own flag, if painted: cloth and pole apart, so the cloth can billow.
+    const flagFile = files.find((f) => /^flag\.(png|jpe?g|webp)$/i.test(f));
+    if (flagFile) {
+      const input = join(root, hero, flagFile);
+      manifest[hero] ??= {};
+      if (old[hero]?.flag && (await mtime(join(outDir, 'flag-cloth.webp'))) >= (await mtime(input))) manifest[hero].flag = old[hero].flag;
+      else {
+        const flag = await flagAsset(input, outDir);
+        if (flag) manifest[hero].flag = flag;
+        else console.warn(`castles/${hero}/${flagFile}: no pole found (a tall pole standing at the right is expected)`);
+        built++;
+      }
     }
     // A shaft lit straight on takes the side most of the castle is lit from, so its ornaments agree with the rest.
     const pieces = Object.values(manifest[hero] ?? {}).filter((p) => p && typeof p.light === 'number');

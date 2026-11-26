@@ -12,6 +12,120 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <style>
+      /* Loading screen: inline so it is the very first thing painted, before the code and the art arrive. */
+      #loader {
+        position: fixed;
+        inset: 0;
+        z-index: 9500;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        color: #e3b656;
+        background:
+          radial-gradient(ellipse at 50% 42%, rgb(227 182 86 / 13%), transparent 55%),
+          radial-gradient(ellipse at 50% 120%, #2a1a0e 0%, transparent 60%),
+          #0d1020;
+        transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+      }
+      #loader.done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #loader svg {
+        width: 64px;
+        height: auto;
+        filter: drop-shadow(0 0 16px rgb(255 190 80 / 45%));
+        animation: loader-breathe 2.4s ease-in-out infinite;
+      }
+      #loader .loader-title,
+      #loader .loader-tagline {
+        margin: 0;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+      }
+      #loader.fonts .loader-title,
+      #loader.fonts .loader-tagline {
+        opacity: 1;
+      }
+      #loader .loader-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-family: 'Cinzel', Georgia, serif;
+        font-weight: 800;
+        line-height: 1.05;
+      }
+      #loader .loader-main {
+        font-size: clamp(2rem, 6vw, 3.2rem);
+        letter-spacing: 0.03em;
+        background: linear-gradient(180deg, #fff6d0 10%, #f3c766 45%, #b8741c 90%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 3px 0 #2a1606) drop-shadow(0 0 18px rgb(255 170 60 / 35%));
+      }
+      #loader .loader-sub {
+        font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+        font-weight: 600;
+        letter-spacing: 0.5em;
+        margin-right: -0.5em;
+        text-transform: uppercase;
+        color: #ffe3a0;
+      }
+      #loader .loader-bar {
+        position: relative;
+        width: min(260px, 60vw);
+        height: 6px;
+        margin-top: 8px;
+        border: 1px solid rgb(227 182 86 / 45%);
+        border-radius: 4px;
+        background: rgb(0 0 0 / 45%);
+        overflow: hidden;
+        box-shadow: 0 0 12px rgb(0 0 0 / 60%) inset;
+      }
+      #loader .loader-fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 0%;
+        background: linear-gradient(90deg, #8a6420, #e3b656 70%, #ffe3a0);
+        box-shadow: 0 0 10px rgb(255 190 80 / 60%);
+        transition: width 0.35s ease;
+      }
+      #loader .loader-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgb(255 240 200 / 35%), transparent);
+        transform: translateX(-100%);
+        animation: loader-shine 1.6s ease-in-out infinite;
+      }
+      #loader .loader-tagline {
+        font-family: 'EB Garamond', Georgia, serif;
+        font-style: italic;
+        font-size: 1.05rem;
+        color: #ece6d6;
+        opacity: 0;
+        text-align: center;
+      }
+      #loader.fonts .loader-tagline {
+        opacity: 0.8;
+      }
+      @keyframes loader-breathe {
+        50% { transform: scale(1.05); filter: drop-shadow(0 0 24px rgb(255 190 80 / 65%)); }
+      }
+      @keyframes loader-shine {
+        to { transform: translateX(100%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #loader svg,
+        #loader .loader-bar::after { animation: none; }
+      }
+    </style>
   </head>
   <body>
     <div id="stage"></div>
@@ -19,6 +133,12 @@
       <div class="boot"><div class="spinner big"></div></div>
     </div>
     <div id="overlay"></div>
+    <div id="loader" role="progressbar" aria-label="Cargando" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <svg viewBox="0 0 120 150" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" aria-hidden="true"><path d="M60 4l52 71-52 71L8 75z"/><path d="M60 22l38 53-38 53-38-53z" stroke-width="1.4"/><path d="M42 104V62h-5V46h8v6h7v-6h16v6h7v-6h8v16h-5v42z" fill="currentColor" fill-opacity=".22"/><path d="M54 104V88a6 6 0 0112 0v16"/><path d="M60 46V30l12 5-12 5"/></svg>
+      <h1 class="loader-title"><span class="loader-main">Cardcraft</span><span class="loader-sub">Castles</span></h1>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+      <p class="loader-tagline">Levanta tu castillo. Derriba el del rival.</p>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

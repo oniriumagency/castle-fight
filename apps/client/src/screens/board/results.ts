@@ -3,6 +3,7 @@ import { callAttention } from '../../app/attention';
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
+import { rewardReveal } from '../../ui/rewardReveal';
 import type { MatchSession, Presence } from '../../game/session';
 import { gamesOf, loadRecord, nemesisOf, recordAi, recordOnline, type Outcome } from '../../game/record';
 import type { MatchStats } from '../../game/stats';
@@ -13,6 +14,7 @@ import { getTerritory, type BattleOutcome } from '@cardcraft-castles/campaign';
 import type { LocalSession } from '../../game/localSession';
 import { cardFace } from '../../ui/card';
 import { attachCardZoom } from '../../ui/cardZoom';
+import { withFireworks } from '../../ui/avatarFireworks';
 
 export interface ResultsOptions {
   host: HTMLElement;
@@ -63,8 +65,11 @@ function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 
   );
 }
 
-/** Campaign: what the battle won or cost (cards, an ally, the ultimate waking up). */
-function campaignSummary(outcome: BattleOutcome): HTMLElement {
+/**
+ * Campaign: what the battle won or cost (cards, an ally, the ultimate waking up).
+ * New cards come face down to be claimed one by one; `onClaimed` runs when all are turned.
+ */
+function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLElement {
   const name = L(getTerritory(outcome.territory).name);
   const cards = (ids: readonly string[]): HTMLElement =>
     h(
@@ -82,7 +87,7 @@ function campaignSummary(outcome: BattleOutcome): HTMLElement {
     outcome.won ? h('h2', null, t('campaignConqueredTitle', { name })) : null,
     outcome.ally ? h('p.campaign-ally', null, t('campaignRewardHero', { hero: L(getHero(outcome.ally).name) })) : null,
     outcome.awakened ? h('p.campaign-awake', null, t('campaignUltimateAwake')) : null,
-    outcome.rewards.length ? [h('h3', null, t('campaignNewCards')), cards(outcome.rewards), h('small.campaign-zoom-hint', null, t('campaignZoomHint'))] : null,
+    outcome.rewards.length ? rewardReveal(outcome.rewards, onClaimed).el : null,
     outcome.recovered.length ? [h('h3', null, t('campaignRecovered')), cards(outcome.recovered)] : null,
     outcome.lost ? [h('p.campaign-lost', null, t('campaignLost', { name })), cards([outcome.lost])] : null,
   );
@@ -171,6 +176,16 @@ export function showResults(o: ResultsOptions): void {
   });
 
   const hideBtn = h('button.btn.ghost', { type: 'button' }, t('viewBoard'));
+  const backBtn = h(
+    'button.btn.big',
+    {
+      // Campaign rewards still face down: no way back to the map until they are claimed.
+      class: `${campaign && !(campaignOutcome && !campaignOutcome.won && o.onRetry) ? 'primary' : ''}${campaignOutcome?.rewards.length ? ' unclaimed' : ''}`,
+      type: 'button',
+      onclick: () => (audio.play('uiBack'), o.onExit()),
+    },
+    campaign ? t('campaignBackToMap') : o.session.kind === 'online' ? t('back') : t('mainMenu'),
+  );
   const box = h(
     'div.results-box.panel',
     { class: `${outcome}${multi ? ' multi' : ''}${campaignOutcome ? ' campaign' : ''}` },
@@ -182,14 +197,16 @@ export function showResults(o: ResultsOptions): void {
         h(
           'div.results-hero',
           { class: seat === winner ? 'winner' : o.view.players[seat].eliminated ? 'fallen' : '', style: `--hero:${heroCss(o.view.players[seat].hero)}` },
-          faceImg(o.session.seats[seat]?.portrait ?? getHero(o.view.players[seat].hero).art, getHero(o.view.players[seat].hero).art),
+          ((face) => (seat === winner ? withFireworks(face) : face))(
+            faceImg(o.session.seats[seat]?.portrait ?? getHero(o.view.players[seat].hero).art, getHero(o.view.players[seat].hero).art),
+          ),
           h('strong', null, o.name(seat)),
           h('small', null, o.session.seats[seat]?.title ? L(o.session.seats[seat]!.title!) : L(getHero(o.view.players[seat].hero).name)),
         ),
       ),
     ),
     headToHead,
-    campaignOutcome ? campaignSummary(campaignOutcome) : null,
+    campaignOutcome ? campaignSummary(campaignOutcome, () => backBtn.classList.remove('unclaimed')) : null,
     h(
       'table.results-stats',
       null,
@@ -212,11 +229,7 @@ export function showResults(o: ResultsOptions): void {
       campaignOutcome && !campaignOutcome.won && o.onRetry
         ? h('button.btn.big.primary', { type: 'button', onclick: () => (audio.play('uiClick'), o.onRetry!()) }, t('campaignRetry'))
         : null,
-      h(
-        'button.btn.big',
-        { class: campaign && !(campaignOutcome && !campaignOutcome.won && o.onRetry) ? 'primary' : '', type: 'button', onclick: () => (audio.play('uiBack'), o.onExit()) },
-        campaign ? t('campaignBackToMap') : o.session.kind === 'online' ? t('back') : t('mainMenu'),
-      ),
+      backBtn,
       hideBtn,
     ),
   );

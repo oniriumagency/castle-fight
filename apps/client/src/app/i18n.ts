@@ -8,6 +8,7 @@ import { settings } from './settings';
  */
 const STRINGS = {
   // Main menu
+  loading: { es: 'Cargando', en: 'Loading' },
   tagline: { es: 'Levanta tu castillo. Derriba el del rival.', en: 'Raise your castle. Bring down theirs.' },
   playAi: { es: 'Jugar contra la IA', en: 'Play vs AI' },
   playAiHint: { es: 'Una partida rápida contra el ordenador', en: 'A quick match against the computer' },
@@ -20,7 +21,6 @@ const STRINGS = {
   // Campaign
   playCampaign: { es: 'Campaña', en: 'Campaign' },
   playCampaignHint: { es: 'Conquista los seis reinos del valle', en: 'Conquer the six kingdoms of the valley' },
-  betaTag: { es: 'Beta', en: 'Beta' },
   campaignTitle: { es: 'El Valle de los Seis Torreones', en: 'The Valley of Six Keeps' },
   campaignNew: { es: 'Nueva campaña', en: 'New campaign' },
   campaignNewLead: { es: 'Empiezas con la Arquitecta, 18 cartas sencillas y tu castillo. Cada territorio que conquistes te da cartas nuevas, y cada héroe que venzas se une a ti.', en: 'You start with the Architect, 18 simple cards and your castle. Every territory you conquer gives you new cards, and every hero you defeat joins you.' },
@@ -54,6 +54,9 @@ const STRINGS = {
   campaignConqueredTitle: { es: '¡{name} es tuyo!', en: '{name} is yours!' },
   campaignNewCards: { es: 'Cartas nuevas', en: 'New cards' },
   campaignZoomHint: { es: 'Pasa el mouse o toca una carta para leerla.', en: 'Hover or tap a card to read it.' },
+  campaignClaimTitle: { es: 'Reclama tus recompensas', en: 'Claim your rewards' },
+  campaignClaimHint: { es: 'Toca cada carta para revelarla.', en: 'Tap each card to reveal it.' },
+  campaignClaimCard: { es: 'Revelar carta', en: 'Reveal card' },
   campaignRecovered: { es: 'Recuperas', en: 'Won back' },
   campaignLost: { es: '{name} se queda con una copia de esta carta hasta que lo conquistes.', en: '{name} keeps a copy of this card until you conquer it.' },
   campaignUltimateAwake: { es: 'Tu definitiva ha despertado. Se carga con el daño que recibes.', en: 'Your ultimate has awoken. It charges with the damage you take.' },

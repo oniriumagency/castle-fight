@@ -18,11 +18,20 @@ const FLAG_STRIPS = 14;
 class PaintedFlag {
   readonly root = new Container();
   private readonly strips: MeshSimple[] = [];
+  /** The mast of a hero's own flag, behind its cloth. */
+  readonly pole: Sprite | null;
 
-  constructor(readonly texture: Texture) {
+  /** `hoistRight`: the painting's hoist (the edge on the pole) is its right edge. */
+  constructor(
+    readonly texture: Texture,
+    hoistRight = false,
+    pole: Texture | null = null,
+  ) {
+    this.pole = pole ? new Sprite(pole) : null;
+    if (this.pole) this.root.addChild(this.pole);
     for (let i = 0; i < FLAG_STRIPS; i++) {
-      const u0 = i / FLAG_STRIPS;
-      const u1 = (i + 1) / FLAG_STRIPS;
+      const u0 = hoistRight ? 1 - i / FLAG_STRIPS : i / FLAG_STRIPS;
+      const u1 = hoistRight ? 1 - (i + 1) / FLAG_STRIPS : (i + 1) / FLAG_STRIPS;
       const mesh = new MeshSimple({
         texture,
         vertices: new Float32Array(8),
@@ -102,6 +111,9 @@ export interface CastleLayout {
   /** Visual cap so a huge Wall does not leave the screen. */
   maxPoints: number;
 }
+
+/** How long a castle stays hidden waiting for its painting before the drawn one shows instead. */
+const PAINT_WAIT_MS = 8000;
 
 /** The drawn gravestone on a fallen castle; off until there is a painted one. */
 const SHOW_GRAVESTONES = false;
@@ -337,6 +349,8 @@ export class Castle extends Container {
   private keepTower!: Tower;
   /** The hero's painted castle once loaded (null: drawn). */
   private painted: PaintedCastle | null = null;
+  /** The painting being loaded for the current hero (see `loadPainted`). */
+  private paintedLoad: Promise<void> = Promise.resolve();
   private wallStack: Stack | null = null;
   private ruinsSprite: Sprite | null = null;
   /** Soft shadow pooled under a painted castle. */
@@ -421,16 +435,37 @@ export class Castle extends Container {
     });
   }
 
-  /** Swaps in the hero's painted castle if there is one (the drawn one stands until it loads). */
+  /**
+   * Swaps in the hero's painted castle if there is one. While it loads the
+   * castle is not shown at all: the drawn castle is only a stand-in for heroes
+   * with no painting, and flashing it for a moment before the art arrived read
+   * as "the old graphics". If the painting takes too long, the drawn one shows.
+   */
   private loadPainted(): void {
     const hero = this.hero;
-    void paintedCastle(hero).then((set) => {
-      if (hero !== this.hero || set === this.painted || this.destroyed) return;
-      this.painted = set;
-      this.clearScars();
-      this.buildTowers();
-      if (this.layoutValue) this.setLayout(this.layoutValue);
-    });
+    this.renderable = false;
+    const reveal = (): void => {
+      if (hero === this.hero && !this.destroyed) this.renderable = true;
+    };
+    const late = setTimeout(reveal, PAINT_WAIT_MS);
+    this.paintedLoad = paintedCastle(hero)
+      .then((set) => {
+        if (hero !== this.hero || set === this.painted || this.destroyed) return;
+        this.painted = set;
+        this.clearScars();
+        this.buildTowers();
+        if (this.layoutValue) this.setLayout(this.layoutValue);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(late);
+        reveal();
+      });
+  }
+
+  /** Resolves once the castle shows its final look: painted, or drawn when its hero has no painting. */
+  whenPainted(): Promise<void> {
+    return this.paintedLoad;
   }
 
   get keep(): number {
@@ -2022,6 +2057,25 @@ export class Castle extends Container {
     let flagIndex = 0;
     // The hero's own banner flies where there is one; drawn cloth otherwise.
     const cloth = (x: number, y: number, len: number, h: number, pennant: boolean, phase: number, dir: number): void => {
+      const own = this.painted?.ownFlag;
+      if (own) {
+        // The hero's own flag: a tall mast standing on the tip of the roof, the cloth flying from its top.
+        let f = this.paintedFlags[flagIndex];
+        if (!f || f.texture !== own.cloth) {
+          f?.destroy();
+          f = this.paintedFlags[flagIndex] = new PaintedFlag(own.cloth, true, own.pole);
+          this.flagLayer.addChild(f.root);
+        }
+        flagIndex++;
+        f.root.visible = true;
+        const mast = len * (pennant ? 1.5 : 1.7);
+        const s = mast / own.pole.height;
+        const pole = f.pole!;
+        pole.scale.set(s);
+        pole.position.set(x - own.poleAxis * s, y - mast);
+        f.draw(x, y - mast + own.clothTop * s, own.cloth.width * s, 1, phase, dir);
+        return;
+      }
       const tex = this.painted?.flag;
       if (!tex) {
         this.drawCloth(flags, x, y, len, h, this.bannerColor, pennant, phase, dir);

@@ -70,11 +70,10 @@ function toolButton(icon: IconName, label: string, onClick: () => void, tag?: st
   );
 }
 
-/** The campaign, flagged as beta while it is being tested. */
+/** The campaign mode. */
 function campaignButton(): HTMLElement {
   const btn = modeButton('keep', t('playCampaign'), t('playCampaignHint'), () => flow.campaign());
   btn.classList.add('campaign-mode');
-  btn.querySelector('strong')!.append(h('span.beta-tag', null, t('betaTag')));
   return btn;
 }
 
