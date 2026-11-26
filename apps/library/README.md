@@ -34,5 +34,3 @@ Añade una entrada a `games.json`, en el orden en que debe aparecer:
 | `badge` | Opcional: una insignia (como "Beta"); el botón pasa a ser secundario. |
 
 Si el juego se sirve desde este mismo sitio, añádelo también a `BUNDLED` en `build.mjs` con la carpeta de su compilación, y compílalo con su `base` en esa ruta. `moreComing` muestra al final la tarjeta "Más juegos en camino".
-
-La beta del rediseño apunta a la copia de pruebas (`cardcraft-castles-preview` en workers.dev, ver `.github/workflows/preview.yml` en esa rama). Esa copia no tiene biblioteca: su raíz lleva directamente al juego.
