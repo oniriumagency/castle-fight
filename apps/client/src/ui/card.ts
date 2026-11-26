@@ -298,8 +298,6 @@ function effectNumbers(
 // put in before escaping and turned into a span after.
 const BUFF_OPEN = '\u0001';
 const BUFF_CLOSE = '\u0002';
-/** Where the Combo clause said what it adds, now that the amount is already in the number. */
-const COMBO_DONE = '\u0003';
 
 /**
  * Card text with what is added to its numbers, each source on its own:
@@ -331,9 +329,9 @@ function buffText(ops: readonly EffectOp[], text: string, buffs: CardBuffs): str
     out = out.replace(wall, (m) => `${m}${combo(numbers.comboWall, Number(m))}`);
   }
   // Once the Combo amount is added to the number, its own clause ("Combo: +8 damage.")
-  // would read as a second bonus: it says it is already counted instead.
+  // would read as a second bonus: only the keyword stays.
   if (buffs.combo && out.includes(`${BUFF_OPEN}c`)) {
-    out = out.replace(new RegExp(`(${L(TERMS.combo)}): [^.]*\\.`), `$1 ${COMBO_DONE}.`);
+    out = out.replace(new RegExp(`(${L(TERMS.combo)}): [^.]*\\.`), '$1.');
   }
   // Per card discarded: the bonus goes once, at the end of the sentence that counts the cards.
   const perCard = (list: NumberBuff[], kind: 'a' | 'b', eachRival: boolean): void => {
@@ -365,8 +363,7 @@ function comboBuff(amount: number): NumberBuff {
 }
 
 function buffHtml(html: string, buffs: CardBuffs): string {
-  const done = `<span class="combo-done">${escapeHtml(t('comboIncluded'))}</span>`;
-  return html.replace(/\u0003/g, done).replace(/\u0001([absc])(\d+)\u0002/g, (_, kind: string, i: string) => {
+  return html.replace(/\u0001([absc])(\d+)\u0002/g, (_, kind: string, i: string) => {
     if (kind === 'c') return buffSpan(comboBuff(Number(i)));
     const b = (kind === 'a' ? buffs.attack : kind === 'b' ? (buffs.build ?? []) : buffs.status)[Number(i)];
     return b ? buffSpan(b) : '';
