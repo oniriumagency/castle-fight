@@ -186,15 +186,15 @@ export class Hand {
       slot.el.classList.toggle('playable', myTurn && !reason);
       slot.el.classList.toggle('blocked', myTurn && !!reason);
       const combo = myTurn && !reason && isComboActive(ctx.view, ctx.seat, slot.cardId);
-      // An enchantment came or went (or spent a charge), or the Combo turned on: the "+X" after the numbers follow.
-      const cardKey = combo ? `${key}|combo` : key;
-      if ((slot.el.dataset.buffs ?? '') !== cardKey) {
-        const rules = slot.el.querySelector('.rules > span');
-        if (rules) rules.innerHTML = rulesInnerHtml(slot.cardId, withCombo(buffs, combo));
-        slot.el.dataset.buffs = cardKey;
-      }
       // Combo on or a condition met ("if your rival played Construction..."): same aura.
       const boosted = combo || (myTurn && !reason && isConditionMet(ctx.view, ctx.seat, slot.cardId));
+      // An enchantment came or went (or spent a charge), or the Combo or condition turned on: the "+X" after the numbers follow.
+      const cardKey = boosted ? `${key}|combo` : key;
+      if ((slot.el.dataset.buffs ?? '') !== cardKey) {
+        const rules = slot.el.querySelector('.rules > span');
+        if (rules) rules.innerHTML = rulesInnerHtml(slot.cardId, withCombo(buffs, boosted));
+        slot.el.dataset.buffs = cardKey;
+      }
       slot.el.classList.toggle('combo', combo);
       slot.el.classList.toggle('boosted', boosted);
       setComboAura(slot.el, boosted);
@@ -245,7 +245,7 @@ export class Hand {
     const slot = this.slots.find((s) => s.uid === uid);
     if (!host || !slot?.cardId || this.selected !== null) return;
     this.hidePreview();
-    const big = cardFace(slot.cardId, { calm: true, buffs: this.buffs(), combo: slot.el.classList.contains('combo') });
+    const big = cardFace(slot.cardId, { calm: true, buffs: this.buffs(), combo: slot.el.classList.contains('boosted') });
     const costEl = slot.el.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     big.classList.add('hover-preview');
@@ -393,11 +393,11 @@ export function inspectPanel(opts: {
 }): InspectPanel {
   const gloss = glossaryFor(opts.text);
   const buffEntries = (buffs: NonNullable<typeof opts.buffs>): HTMLElement[] =>
-    (['combo', 'attack', 'build', 'status'] as const).flatMap((kind) => {
+    (['combo', 'cond', 'attack', 'build', 'status'] as const).flatMap((kind) => {
       const list = buffs.filter((b) => b.kind === kind);
       if (!list.length) return [];
       return [
-        h('dt.buff-line', null, t(kind === 'combo' ? 'buffCombo' : kind === 'attack' ? 'buffDamage' : kind === 'build' ? 'buffBuild' : 'buffTurns')),
+        h('dt.buff-line', null, t(kind === 'combo' ? 'buffCombo' : kind === 'cond' ? 'buffCond' : kind === 'attack' ? 'buffDamage' : kind === 'build' ? 'buffBuild' : 'buffTurns')),
         ...list.map(({ buff }) => h('dd.buff-line', null, h(`b.buff.${buff.source}-buff`, null, `+${buff.amount}`), ' ', buff.label)),
       ];
     });
