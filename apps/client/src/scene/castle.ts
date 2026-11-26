@@ -1,4 +1,4 @@
-import { ColorMatrixFilter, Container, Graphics, MeshSimple, Sprite, TilingSprite, type Texture } from 'pixi.js';
+import { ColorMatrixFilter, Container, Graphics, MeshSimple, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import type { HeroId } from '@cardcraft-castles/engine';
 import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
@@ -2068,9 +2068,16 @@ export class Castle extends Container {
         }
         flagIndex++;
         f.root.visible = true;
-        const mast = len * (pennant ? 1.5 : 1.7);
-        const s = mast / own.pole.height;
+        // The painting's scale comes from its whole mast; only its top part stands above the roof, a
+        // third of it, or as much as the cloth needs to hang clear.
+        const s = (len * (pennant ? 1.5 : 1.7)) / own.pole.height;
         const pole = f.pole!;
+        const shown = Math.min(own.pole.height, Math.round(Math.max(own.pole.height / 3, own.clothTop + own.cloth.height * 1.15)));
+        if (pole.texture.height !== shown) {
+          const fr = own.pole.frame;
+          pole.texture = new Texture({ source: own.pole.source, frame: new Rectangle(fr.x, fr.y, fr.width, shown) });
+        }
+        const mast = shown * s;
         pole.scale.set(s);
         pole.position.set(x - own.poleAxis * s, y - mast);
         f.draw(x, y - mast + own.clothTop * s, own.cloth.width * s, 1, phase, dir);
