@@ -36,6 +36,14 @@ import { Tweens, ease } from './tween';
  * smooth screen shake. `fx/director.ts` decides which effect plays when.
  */
 
+/**
+ * Room kept above a winning Keep for its crown, roof and flags, in Keep
+ * widths (the tallest, the Sorceress's spires and pennants, take about 2.3).
+ */
+const CROWN_ROOM = 2.4;
+/** The shortest a winning Keep's stones may stand, in Keep widths. */
+const KEEP_BODY_MIN = 4.5;
+
 export interface FieldRect {
   left: number;
   top: number;
@@ -525,10 +533,15 @@ export class Battlefield {
     // Left to right: the player, the middle rival, the next rival.
     const order = (this.count > 2 ? [0, 2, 1] : [0, 1]).filter((p) => !this.offField.has(p));
     const three = order.length > 2;
-    const keepWidth = Math.max(three ? 28 : 34, Math.min(rect.width * (three ? 0.062 : 0.075), three ? 84 : 96));
-    // A winning Keep (or Wall) reaches the top edge of the screen, roof beyond
-    // it, so every point gained or lost is plainly visible.
-    const unit = Math.max(1.2, (this.groundY - 6) / this.maxPoints);
+    // A winning Keep stands as tall as the field allows, so every point gained
+    // or lost is plainly visible, yet its roof, flags and scaffold stay whole
+    // below the top bar. On a short field (a phone held sideways) the castles
+    // narrow as well, so a full Keep keeps its proportions instead of becoming
+    // all crown.
+    const room = Math.max(40, this.groundY - rect.top - 6);
+    const wide = Math.max(three ? 28 : 34, Math.min(rect.width * (three ? 0.062 : 0.075), three ? 84 : 96));
+    const keepWidth = Math.max(14, Math.min(wide, room / (CROWN_ROOM + KEEP_BODY_MIN)));
+    const unit = Math.max(0.4, (room - keepWidth * CROWN_ROOM) / this.maxPoints);
     const common = { groundY: this.groundY, unit, keepWidth, wallWidth: keepWidth * 0.42, gap: keepWidth * 0.55, maxPoints: this.maxPoints * 1.1 };
     const leftX = rect.left + sideRoom * 0.75;
     const rightX = rect.left + rect.width - sideRoom * 0.75;
