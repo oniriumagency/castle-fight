@@ -171,6 +171,53 @@ function plainBand(data, width, b, share = 0.7) {
   return { crown: b.crown + best, base: b.crown + best + len };
 }
 
+/** Per-row look of the shaft's middle: mean light, saturation, and its bright and dark ends. */
+function rowFeatures(data, width, b, y) {
+  const x0 = Math.round(b.shaftLeft + b.shaftWidth * 0.1);
+  const x1 = Math.round(b.shaftLeft + b.shaftWidth * 0.9);
+  let lum = 0;
+  let sat = 0;
+  const ls = [];
+  for (let x = x0; x < x1; x++) {
+    const i = (y * width + x) * 4;
+    const l = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+    lum += l;
+    sat += Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+    ls.push(data[i + 3] > 128 ? l : -255);
+  }
+  ls.sort((a, c) => a - c);
+  const n = x1 - x0;
+  return [lum / n, sat / n, ls[Math.floor(n * 0.95)], ls[Math.floor(n * 0.05)]];
+}
+
+/**
+ * How many rows at the bottom of the crown are still plain stones, like the
+ * shaft (above them the crown's own windows, cornice or gallery begin), so
+ * ornaments may climb that far instead of stopping where the crown is cut.
+ */
+function plainCrown(data, width, b) {
+  const shaft = [];
+  for (let y = b.crown; y < b.base; y++) shaft.push(rowFeatures(data, width, b, y));
+  const stats = [0, 1, 2, 3].map((k) => {
+    const col = shaft.map((f) => f[k]);
+    const med = median(col);
+    return { med, mad: median(col.map((v) => Math.abs(v - med))) || 1 };
+  });
+  const score = (f) => f.reduce((n, v, k) => n + Math.min(6, Math.abs(v - stats[k].med) / stats[k].mad), 0);
+  const scores = shaft.map(score).sort((a, c) => a - c);
+  // The shaft's own mortar lines score high now and then; a stretch of rows all unlike it does not happen there.
+  const limit = Math.max(8, scores[Math.floor(scores.length * 0.8)] * 1.5);
+  // Walk up from the cut; a few rows in a row unlike the shaft mark where the crown's features begin.
+  const run = Math.max(6, Math.round(b.shaftWidth * 0.03));
+  let odd = 0;
+  for (let y = b.crown - 1; y >= 0; y--) {
+    if (score(rowFeatures(data, width, b, y)) > limit) {
+      if (++odd >= run) return Math.max(0, b.crown - 1 - y - run + 1);
+    } else odd = 0;
+  }
+  return b.crown;
+}
+
 /**
  * The painting is lit from above, so a band cut from it is a touch brighter at
  * one end than the other. Repeated, that slope shows as stripes, and against
@@ -352,10 +399,11 @@ function evenTile(shaft, width, b) {
  * warm sunlit sandstone or brick is never taken for a light: it would glow on
  * the crown and base but not on the shaft, a band of light ending at the cut.
  */
-async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
-  // Brightness of the neighbourhood: a lit window stands out from the stone around it.
+async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }, loose = false) {
+  // Brightness of the neighbourhood: a lit window stands out from the stone around it. Loose pieces
+  // (ornaments painted on their own) have nothing around them; the air there counts as mid-grey.
   const lumBuf = Buffer.alloc(width * height);
-  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = loose && buf[i + 3] < 128 ? 110 : Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
   const around = await sharp(lumBuf, { raw: { width, height, channels: 1 } }).blur(Math.max(3, width / 40)).raw().toBuffer();
   const out = Buffer.alloc(buf.length);
   let lit = 0;
@@ -371,10 +419,10 @@ async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
     // potion, a blue crystal) only vivid.
     const dh = Math.abs(((hue(r, g, b) - stone.hue + 540) % 360) - 180);
     const floor = dh < 35 ? Math.max(80, stone.sat + 20) : 80;
-    const k =
-      Math.min(1, Math.max(0, (pop - 22) / 34)) *
-      Math.min(1, Math.max(0, (sat - floor) / 60)) *
-      Math.min(1, Math.max(0, (lum - 100) / 60));
+    // A loose piece's pane sits in its own frame, not in a dark wall, so it needs to stand out less.
+    const k = loose
+      ? Math.min(1, Math.max(0, (sat - 70) / 50)) * Math.min(1, Math.max(0, (lum - (hue(r, g, b) < 65 ? 140 : 110)) / 40))
+      : Math.min(1, Math.max(0, (pop - 22) / 34)) * Math.min(1, Math.max(0, (sat - floor) / 60)) * Math.min(1, Math.max(0, (lum - 100) / 60));
     if (k <= 0) continue;
     lit++;
     out[i] = r;
@@ -383,7 +431,25 @@ async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
     out[i + 3] = Math.round(k * 255);
   }
   if (lit < 12) return null;
-  return sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+  if (loose) {
+    // A pane or a flame is a patch of light; a glint along a copper pipe or a gilt rim is a thin line.
+    // Keep only what is lit over an area.
+    const alpha = Buffer.alloc(width * height);
+    for (let i = 0, j = 0; j < alpha.length; i += 4, j++) alpha[j] = out[i + 3];
+    const spread = await sharp(alpha, { raw: { width, height, channels: 1 } }).blur(Math.max(2, width / 160)).extractChannel(0).raw().toBuffer();
+    for (let i = 0, j = 0; j < alpha.length; i += 4, j++) out[i + 3] = Math.round(out[i + 3] * Math.min(1, Math.max(0, (spread[j] - 70) / 70)));
+  }
+  // The light itself, and a soft halo it throws on the stones around, so a flicker reads at a glance.
+  const core = await sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+  const halo = await sharp(out, { raw: { width, height, channels: 4 } }).blur(Math.max(4, Math.min(width, height) / 45)).raw().toBuffer();
+  for (let i = 0; i < core.length; i += 4) {
+    const a = Math.min(255, halo[i + 3] * 1.6);
+    if (a <= core[i + 3]) continue;
+    // Where the light itself is faint, the halo brings its colour.
+    if (core[i + 3] < 24) for (let c = 0; c < 3; c++) core[i + c] = halo[i + c];
+    core[i + 3] = a;
+  }
+  return core;
 }
 
 const webp = (data, width, height, file) => sharp(data, { raw: { width, height, channels: 4 } }).webp({ quality: 86, alphaQuality: 92 }).toFile(file);
@@ -420,6 +486,8 @@ async function stacked(input, outDir, piece, override) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
   const len = b.base - b.crown;
+  // Read before the crown's lower part is eased toward the shaft's light.
+  const plain = plainCrown(data, width, b);
   const gains = rowGains(band, width, len, b);
   const stone = stoneOf(band, width, len, b);
   // The side the shaft is lit from, so ornaments can be turned to match it.
@@ -484,7 +552,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { light, plain, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 /**
@@ -609,7 +677,9 @@ async function stoneColour(file) {
 }
 
 /** Bump when the ornament treatment changes, so cached sheets are redone. */
-const ORNAMENT_VERSION = 4;
+const ORNAMENT_VERSION = 11;
+/** Kinds that may carry a light of their own (a lit pane, a lantern, a crystal); cloth and plants never do. */
+const LIT_KINDS = new Set(['win', 'deco', 'edgeR', 'edgeL', 'bal', 'balD']);
 /** Ornament sheets are painted far finer than the walls they sit on: shrink them to about the walls' grain. */
 const ORNAMENT_SHEET = 576;
 
@@ -621,7 +691,9 @@ const ORNAMENT_SHEET = 576;
  * their darks lifted and colours pulled a little toward the stone (the same
  * air and light falls on both), and each gets a soft shadow on the wall, cast
  * away from its own light. The side each is lit from is recorded, so the
- * game can turn it to match its tower.
+ * game can turn it to match its tower. Their own lights (panes, lanterns,
+ * crystals) go to a `-glow` sheet the game makes flicker, and the hero's
+ * banner, turned on its side, becomes the cloth of the castle's flags.
  */
 async function ornamentSheet(input, outDir, name, kinds, stone) {
   const big = 1152;
@@ -711,7 +783,45 @@ async function ornamentSheet(input, outDir, name, kinds, stone) {
     frames.push(r > l && b > t && kinds[q] !== 'x' ? [x0 + l, y0 + t, r - l + 1, b - t + 1, kinds[q] ?? 'deco', light[q]] : null);
   }
   await webp(out, size, size, join(outDir, `${name}.webp`));
-  return { name, v: ORNAMENT_VERSION, frames };
+
+  // The ornaments' own lights, only on pieces that can hold one; the rest of the sheet stays dark.
+  const litOnly = Buffer.from(out);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const q = Math.floor(y / cellPx) * 3 + Math.floor(x / cellPx);
+      if (!LIT_KINDS.has(kinds[q])) litOnly[(y * size + x) * 4 + 3] = 0;
+    }
+  }
+  const glow = await glowOf(litOnly, size, size, { sat: Math.max(...ref) - Math.min(...ref) + 30, hue: hue(ref[0], ref[1], ref[2]) }, true);
+  if (glow) await webp(glow, size, size, join(outDir, `${name}-glow.webp`));
+
+  // The hero's banner, turned so the rod it hangs from runs down the flagpole and the cloth flies off it.
+  let flag = null;
+  const bq = kinds.indexOf('banner');
+  if (bq >= 0) {
+    const x0 = (bq % 3) * cpx;
+    const y0 = Math.floor(bq / 3) * cpx;
+    let l = cpx, r = -1, t = cpx, b = -1;
+    for (let y = 0; y < cpx; y++) {
+      for (let x = 0; x < cpx; x++) {
+        if (img[((y0 + y) * size + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    if (r > l && b > t) {
+      const file = join(outDir, `${name}-flag.webp`);
+      const info = await sharp(img, { raw: { width: size, height: size, channels: 4 } })
+        .extract({ left: x0 + l, top: y0 + t, width: r - l + 1, height: b - t + 1 })
+        .rotate(270)
+        .webp({ quality: 88, alphaQuality: 92 })
+        .toFile(file);
+      flag = [info.width, info.height];
+    }
+  }
+  return { name, v: ORNAMENT_VERSION, frames, glow: !!glow, flag };
 }
 
 /**
@@ -826,8 +936,8 @@ export async function buildCastles(source, target) {
       const probe = join(outDir, piece === 'ruins' ? 'ruins.webp' : `${piece}-shaft.webp`);
       const stale = Math.max(await mtime(input), await mtime(join(root, 'slices.json')));
       manifest[hero] ??= {};
-      // Pieces cut before the skirts or the light side existed are cut again.
-      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined)) && (await mtime(probe)) >= stale) {
+      // Pieces cut before the skirts, the light side or the plain crown existed are cut again.
+      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined && old[hero][piece].plain !== undefined)) && (await mtime(probe)) >= stale) {
         manifest[hero][piece] = old[hero][piece];
         continue;
       }

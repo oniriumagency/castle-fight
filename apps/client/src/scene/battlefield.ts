@@ -728,9 +728,9 @@ export class Battlefield {
     this.castles[player]?.scar(part, kind);
   }
 
-  /** Masons at work: the newest wounds of the part are mended. */
-  mend(player: PlayerId, part: 'keep' | 'wall', amount: number): void {
-    this.castles[player]?.mend(part, 1 + Math.floor(amount / 6));
+  /** Masons at work: every wound of the part is mended. */
+  mend(player: PlayerId, part: 'keep' | 'wall'): void {
+    this.castles[player]?.mend(part);
   }
 
   /**

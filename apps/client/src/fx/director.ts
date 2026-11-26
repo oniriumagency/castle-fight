@@ -328,7 +328,7 @@ export const fx = {
     const before = field.anchor(side, target);
     const grow = field.animateCastle(side, heights.keep, heights.wall, ms(620 + Math.min(400, amount * 15)));
     field.placeBlocks(side, target, 2 + amount / 3);
-    field.mend(side, target, amount);
+    field.mend(side, target);
     // Dust where the masons work, then motes of gold up the new courses.
     const x = target === 'keep' ? base.x : before.x;
     field.burst(x, base.y - 6, { count: 4 + Math.round(amount / 4), texture: 'smoke', color: 0xb8a080, speed: 1.6, spread: Math.PI * 0.8, gravity: -0.01, size: 44, life: 1200, alpha: 0.55, area: { w: 60, h: 8 } });
