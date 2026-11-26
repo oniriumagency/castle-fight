@@ -1,3 +1,5 @@
+import { ON_ITCH } from './platform';
+
 /**
  * "Add to home screen": installed from the menu, the game opens full screen
  * in landscape with no browser bar at all (see manifest.webmanifest).
@@ -21,6 +23,8 @@ export function isInstalled(): boolean {
 }
 
 export function initInstall(): void {
+  // On itch.io the game is played on itch's page: nothing to install.
+  if (ON_ITCH) return;
   window.addEventListener('beforeinstallprompt', (e) => {
     // Keep the browser's own banner for the menu button instead.
     e.preventDefault();

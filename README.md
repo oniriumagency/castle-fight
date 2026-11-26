@@ -54,6 +54,12 @@ Necesita dos secretos en el repositorio (Settings → Secrets and variables → 
 | `CLOUDFLARE_API_TOKEN` | Token de API creado con la plantilla "Edit Cloudflare Workers", limitado a la cuenta y a la zona `onirium.agency`. |
 | `CLOUDFLARE_ACCOUNT_ID` | El Account ID de la cuenta de Cloudflare. |
 
+### itch.io
+
+`pnpm --filter @cardcraft-castles/client build:itch` compila el juego para itch.io en `apps/client/dist-itch/` y lo empaqueta en `apps/client/cardcraft-castles-itch.zip`, con `index.html` en la raíz y rutas relativas. Ese ZIP se sube tal cual como proyecto HTML5 ("This file will be played in the browser").
+
+Esa compilación (modo `itch`, ver `apps/client/.env.itch`) juega contra el servidor de games.onirium.agency, así que en itch y en la web se juega en las mismas salas. Como itch sirve el juego en un iframe de otro dominio (`*.itch.zone`), deja fuera la caché sin conexión y la instalación como app, los enlaces de invitación abren el juego en games.onirium.agency (el iframe de itch no recibe `?room=`), copiar el enlace tiene un plan B por si el iframe bloquea el portapapeles, y no ofrece avisos del navegador, que no se pueden pedir desde un iframe. El servidor ya acepta peticiones y WebSockets de cualquier origen.
+
 ### Versión de pruebas (preview)
 
 Para probar cambios grandes sin tocar el juego publicado, el flujo [Preview](.github/workflows/preview.yml) publica la rama en un Worker aparte, `cardcraft-castles-preview`, en su dirección de `workers.dev` (sale al final del registro del flujo y en su resumen). Tiene sus propias salas y sus propios reportes, y usa los mismos dos secretos. Se publica en cada push a las ramas que lista el flujo (y a `preview/**`), y nunca toca games.onirium.agency.

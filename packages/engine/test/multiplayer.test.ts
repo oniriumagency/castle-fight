@@ -223,9 +223,15 @@ describe('Powder Keg with three players', () => {
 });
 
 describe('free-for-all rules text', () => {
+  // A condition that only raises one attack is printed as the base and what it adds
+  // ("10 damage. If ..., +10 damage."), so its stronger attack is checked as that difference.
+  const raisedAttack = (o: EffectOp): boolean =>
+    o.op === 'if' && o.then.length === 1 && o.else?.length === 1 && o.then[0]!.op === 'damage' && o.else[0]!.op === 'damage';
   const flat = (ops: readonly EffectOp[]): EffectOp[] =>
     ops.flatMap((o) =>
-      o.op === 'if'
+      o.op === 'if' && raisedAttack(o)
+        ? [o, ...flat(o.else ?? [])]
+        : o.op === 'if'
         ? [o, ...flat(o.then), ...flat(o.else ?? [])]
         : o.op === 'roll'
           ? [o, ...flat(o.results.flatMap((r) => r.then))]
@@ -243,6 +249,12 @@ describe('free-for-all rules text', () => {
         if (op.op === 'damage' && op.amount > 0 && !op.perDiscard) {
           expect(card.textFfa!.es, card.id).toContain(`${scaled(op.amount)} de daño`);
           expect(card.textFfa!.en, card.id).toMatch(new RegExp(`\\b${scaled(op.amount)} (piercing )?damage`));
+        }
+        if (op.op === 'if' && raisedAttack(op)) {
+          const [then, other] = [op.then[0]!, op.else![0]!] as { amount: number }[];
+          const bonus = scaled(then!.amount) - scaled(other!.amount);
+          expect(card.textFfa!.es, card.id).toContain(`+${bonus} de daño`);
+          expect(card.textFfa!.en, card.id).toContain(`+${bonus} damage`);
         }
         if (op.op === 'stealResource' || op.op === 'drainResources') expect(card.textFfa!.es, card.id).toContain(String(scaled(op.amount)));
         if (op.op === 'burn') expect(card.textFfa!.es, card.id).toContain(`${scaled(op.turns)} turnos`);

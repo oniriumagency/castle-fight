@@ -1,8 +1,10 @@
 import {
   RESOURCE_NAMES,
+  SCHOOL_NAMES,
   costResource,
   effectiveCost,
   getCard,
+  hasCombo,
   isComboActive,
   isConditionMet,
   playBlocker,
@@ -71,7 +73,7 @@ export class Hand {
   compact = false;
   /** Where the big hover preview goes (mouse only); null disables it. */
   previewHost: HTMLElement | null = null;
-  private preview: { uid: number; el: HTMLElement; source: HTMLElement } | null = null;
+  private preview: { uid: number; el: HTMLElement; source: HTMLElement; tip: HTMLElement | null } | null = null;
   /** Turn and active seat at the last render, to drop the preview when the turn moves on. */
   private lastTurn: string | null = null;
   private readonly spacer = h('div.hand-spacer', { 'aria-hidden': 'true' });
@@ -186,15 +188,15 @@ export class Hand {
       slot.el.classList.toggle('playable', myTurn && !reason);
       slot.el.classList.toggle('blocked', myTurn && !!reason);
       const combo = myTurn && !reason && isComboActive(ctx.view, ctx.seat, slot.cardId);
-      // An enchantment came or went (or spent a charge), or the Combo turned on: the "+X" after the numbers follow.
-      const cardKey = combo ? `${key}|combo` : key;
-      if ((slot.el.dataset.buffs ?? '') !== cardKey) {
-        const rules = slot.el.querySelector('.rules > span');
-        if (rules) rules.innerHTML = rulesInnerHtml(slot.cardId, withCombo(buffs, combo));
-        slot.el.dataset.buffs = cardKey;
-      }
       // Combo on or a condition met ("if your rival played Construction..."): same aura.
       const boosted = combo || (myTurn && !reason && isConditionMet(ctx.view, ctx.seat, slot.cardId));
+      // An enchantment came or went (or spent a charge), or the Combo or condition turned on: the "+X" after the numbers follow.
+      const cardKey = boosted ? `${key}|combo` : key;
+      if ((slot.el.dataset.buffs ?? '') !== cardKey) {
+        const rules = slot.el.querySelector('.rules > span');
+        if (rules) rules.innerHTML = rulesInnerHtml(slot.cardId, withCombo(buffs, boosted));
+        slot.el.dataset.buffs = cardKey;
+      }
       slot.el.classList.toggle('combo', combo);
       slot.el.classList.toggle('boosted', boosted);
       setComboAura(slot.el, boosted);
@@ -245,7 +247,7 @@ export class Hand {
     const slot = this.slots.find((s) => s.uid === uid);
     if (!host || !slot?.cardId || this.selected !== null) return;
     this.hidePreview();
-    const big = cardFace(slot.cardId, { calm: true, buffs: this.buffs(), combo: slot.el.classList.contains('combo') });
+    const big = cardFace(slot.cardId, { calm: true, buffs: this.buffs(), combo: slot.el.classList.contains('boosted') });
     const costEl = slot.el.querySelector('.cost');
     if (costEl) big.querySelector('.cost')?.replaceWith(costEl.cloneNode(true));
     big.classList.add('hover-preview');
@@ -263,12 +265,36 @@ export class Hand {
     big.style.left = `${x - hostRect.left}px`;
     big.style.top = `${Math.max(64, handTop - w * 1.4 - 12) - hostRect.top}px`;
     host.appendChild(big);
-    this.preview = { uid, el: big, source: slot.el };
+    const tip = hasCombo(slot.cardId) ? this.comboTip(slot.cardId, host, x, w, big) : null;
+    this.preview = { uid, el: big, source: slot.el, tip };
+  }
+
+  /** Beside the preview of a card with a Combo, two lines on how the Combo works. */
+  private comboTip(cardId: string, host: HTMLElement, x: number, w: number, big: HTMLElement): HTMLElement {
+    const school = L(SCHOOL_NAMES[getCard(cardId).school]);
+    const tip = h(
+      'div.combo-tip',
+      { 'aria-hidden': 'true' },
+      h('p', null, h('b', null, t('comboReady')), ' · ', t('comboTipWhen', { school })),
+      h('p', null, t('comboTipBreak')),
+    );
+    host.appendChild(tip);
+    const hostRect = host.getBoundingClientRect();
+    const gap = 14;
+    const tipW = tip.offsetWidth;
+    // On the right of the card; on its left when the screen ends first.
+    const right = x + w + gap;
+    const left = right + tipW <= window.innerWidth - 8 ? right : x - gap - tipW;
+    tip.classList.toggle('on-left', left !== right);
+    tip.style.left = `${left - hostRect.left}px`;
+    tip.style.top = `${parseFloat(big.style.top) + w * 0.18}px`;
+    return tip;
   }
 
   hidePreview(uid?: number): void {
     if (!this.preview || (uid !== undefined && this.preview.uid !== uid)) return;
     this.preview.el.remove();
+    this.preview.tip?.remove();
     this.preview = null;
   }
 
@@ -393,11 +419,11 @@ export function inspectPanel(opts: {
 }): InspectPanel {
   const gloss = glossaryFor(opts.text);
   const buffEntries = (buffs: NonNullable<typeof opts.buffs>): HTMLElement[] =>
-    (['combo', 'attack', 'build', 'status'] as const).flatMap((kind) => {
+    (['combo', 'cond', 'attack', 'build', 'status'] as const).flatMap((kind) => {
       const list = buffs.filter((b) => b.kind === kind);
       if (!list.length) return [];
       return [
-        h('dt.buff-line', null, t(kind === 'combo' ? 'buffCombo' : kind === 'attack' ? 'buffDamage' : kind === 'build' ? 'buffBuild' : 'buffTurns')),
+        h('dt.buff-line', null, t(kind === 'combo' ? 'buffCombo' : kind === 'cond' ? 'buffCond' : kind === 'attack' ? 'buffDamage' : kind === 'build' ? 'buffBuild' : 'buffTurns')),
         ...list.map(({ buff }) => h('dd.buff-line', null, h(`b.buff.${buff.source}-buff`, null, `+${buff.amount}`), ' ', buff.label)),
       ];
     });

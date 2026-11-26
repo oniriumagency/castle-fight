@@ -904,6 +904,50 @@
   from { opacity: 0; transform: translateY(14px) scale(0.96); }
 }
 
+/* Beside the hover preview of a card with a Combo: how the Combo works, in two lines. */
+.combo-tip {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  padding: 9px 13px 9px 14px;
+  border: 1px solid rgb(79 216 255 / 35%);
+  border-left: 3px solid #4fd8ff;
+  border-radius: 8px;
+  background: linear-gradient(160deg, rgb(16 28 46 / 94%), rgb(10 16 28 / 94%));
+  box-shadow: 0 0 18px rgb(79 216 255 / 18%), 0 10px 26px rgb(0 0 0 / 55%);
+  color: #dbe6f3;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  animation: tipIn 0.18s ease-out 0.08s both;
+}
+.combo-tip.on-left {
+  border-left-width: 1px;
+  border-right: 3px solid #4fd8ff;
+}
+.combo-tip p {
+  margin: 0;
+  white-space: nowrap;
+}
+.combo-tip p + p {
+  margin-top: 3px;
+  color: #9fb0c4;
+}
+.combo-tip b {
+  color: #4fd8ff;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+@keyframes tipIn {
+  from { opacity: 0; transform: translateX(-6px); }
+}
+.combo-tip.on-left {
+  animation-name: tipInLeft;
+}
+@keyframes tipInLeft {
+  from { opacity: 0; transform: translateX(6px); }
+}
+
 /* Phones in portrait: a sideways-scrolling row of readable cards. */
 .hand.scroll {
   left: 0 !important;
