@@ -59,13 +59,30 @@ export interface PaintedCastle {
   ornaments: Ornament[];
   /** The hero's painted banner turned on its side: the cloth its flags fly (rod along the pole, at the left). */
   flag: Texture | null;
+  /** The hero's own painted flag on a tall mast, when there is one (it wins over the banner). */
+  ownFlag: OwnFlag | null;
+}
+
+/** A hero's own flag: the cloth (flying left, its hoist at the right edge) and the mast it flies from. */
+export interface OwnFlag {
+  cloth: Texture;
+  pole: Texture;
+  /** The mast's axis across its image, and how far below its tip the cloth's top is (image px). */
+  poleAxis: number;
+  clothTop: number;
+}
+interface OwnFlagMeta {
+  cloth: [number, number];
+  pole: [number, number];
+  poleAxis: number;
+  clothTop: number;
 }
 
 /** Heroes with no plants of their own borrow these for their walls. */
 const IVY_DONOR = 'guardian';
 
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: OrnamentSheet[] }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: OrnamentSheet[]; flag?: OwnFlagMeta }>;
 interface OrnamentSheet {
   name: string;
   frames: ([number, number, number, number, OrnamentKind, number?] | null)[];
@@ -170,7 +187,11 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
         stacked(hero, 'wall', entry.wall),
         entry.ruins ? texture(`castles/${hero}/ruins.webp`) : Promise.resolve(null),
       ]);
-      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments, flag } : null;
+      const [cloth, pole] = entry.flag
+        ? await Promise.all([texture(`castles/${hero}/flag-cloth.webp`), texture(`castles/${hero}/flag-pole.webp`)])
+        : [null, null];
+      const ownFlag = cloth && pole && entry.flag ? { cloth, pole, poleAxis: entry.flag.poleAxis, clothTop: entry.flag.clothTop } : null;
+      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments, flag, ownFlag } : null;
     });
     sets.set(hero, set);
   }
