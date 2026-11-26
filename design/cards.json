@@ -679,12 +679,12 @@
         "en": "Ambush"
       },
       "text": {
-        "es": "10 de daño. Si el rival jugó Construcción en su último turno, 20 de daño.",
-        "en": "10 damage. If your opponent played Construction last turn, 20 damage."
+        "es": "10 de daño. Si el rival jugó Construcción en su último turno, +10 de daño.",
+        "en": "10 damage. If your opponent played Construction last turn, +10 damage."
       },
       "textFfa": {
-        "es": "6 de daño a cada rival. Si algún rival jugó Construcción en su último turno, 12 de daño.",
-        "en": "6 damage to each rival. If any rival played Construction last turn, 12 damage."
+        "es": "6 de daño a cada rival. Si algún rival jugó Construcción en su último turno, +6 de daño.",
+        "en": "6 damage to each rival. If any rival played Construction last turn, +6 damage."
       },
       "art": "cards/emboscada.jpg"
     },
