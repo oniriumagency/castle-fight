@@ -1,10 +1,75 @@
-import { ColorMatrixFilter, Container, Graphics, Sprite, TilingSprite, type Texture } from 'pixi.js';
+import { ColorMatrixFilter, Container, Graphics, MeshSimple, Sprite, TilingSprite, type Texture } from 'pixi.js';
 import type { HeroId } from '@cardcraft-castles/engine';
 import { heroColor } from '../ui/theme';
 import { castleStyle, footTexture, shadeTexture, styleTextures, type CastleStyle, type ParapetKind, type RoofKind, type WindowKind } from './castleStyles';
 import { glowTexture } from './textures';
 import { drawTombstone } from './tombstone';
+import { ScaffoldRig } from './scaffold';
 import { castleKit, paintedCastle, Stack, type CastleKit, type PaintedCastle, type ScarKind, type StackedPiece } from './paintedCastle';
+
+/** Strips a painted flag is cut into along its length, each bent and shaded on its own. */
+const FLAG_STRIPS = 14;
+
+/**
+ * A flag of painted cloth (the hero's banner turned on its side): a row of
+ * textured strips, each set along the wave every frame and shaded by its
+ * fold, so the painting itself billows.
+ */
+class PaintedFlag {
+  readonly root = new Container();
+  private readonly strips: MeshSimple[] = [];
+
+  constructor(readonly texture: Texture) {
+    for (let i = 0; i < FLAG_STRIPS; i++) {
+      const u0 = i / FLAG_STRIPS;
+      const u1 = (i + 1) / FLAG_STRIPS;
+      const mesh = new MeshSimple({
+        texture,
+        vertices: new Float32Array(8),
+        uvs: new Float32Array([u0, 0, u1, 0, u1, 1, u0, 1]),
+        indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+      });
+      mesh.autoUpdate = true;
+      this.strips.push(mesh);
+      this.root.addChild(mesh);
+    }
+  }
+
+  /**
+   * Hangs it from a pole at (x, y): `len` long toward `dir`, as tall as the
+   * painting's proportions give, tapering to `tip` of that at the far end.
+   */
+  draw(x: number, y: number, len: number, tip: number, phase: number, dir: number): void {
+    const h = (len * this.texture.height) / this.texture.width;
+    // The cloth hangs still at the rod and billows more toward the free end.
+    const wave = (t: number): number => Math.sin(phase * 1.1 - t * 3.4) * h * 0.16 * t + Math.sin(phase * 2.3 - t * 7) * h * 0.04 * t;
+    const fold = (t: number): number => Math.cos(phase * 1.1 - t * 3.4) * Math.min(1, t * 3);
+    const px = (t: number): number => x + dir * len * t * (1 - Math.abs(Math.sin(phase * 1.1 - t * 3.4)) * 0.05 * t);
+    const tall = (t: number): number => h * (1 - (1 - tip) * t);
+    // A tapering pennant also droops toward its point.
+    const top = (t: number): number => y + wave(t) + (h - tall(t)) * 0.45;
+    this.strips.forEach((m, i) => {
+      const t0 = i / FLAG_STRIPS;
+      const t1 = (i + 1) / FLAG_STRIPS;
+      const v = m.vertices;
+      v[0] = px(t0);
+      v[1] = top(t0);
+      v[2] = px(t1);
+      v[3] = top(t1);
+      v[4] = px(t1);
+      v[5] = top(t1) + tall(t1);
+      v[6] = px(t0);
+      v[7] = top(t0) + tall(t0);
+      // Troughs fall into shade; the folds toward the sun keep the painting's own light.
+      const k = fold((t0 + t1) / 2);
+      m.tint = k >= 0 ? mix(0xeeeeee, 0xffffff, k) : mix(0xeeeeee, 0x3a3046, -k * 0.32);
+    });
+  }
+
+  destroy(): void {
+    this.root.destroy({ children: true });
+  }
+}
 
 /**
  * One castle, drawn in the style of its hero (see `castleStyles.ts`).
@@ -200,26 +265,17 @@ interface Scar {
 
 /** Most wounds shown at once on each part (the oldest heal first). */
 const MAX_SCARS = { keep: 7, wall: 4 };
-/** How long each plank of the masons' scaffold takes to go up or come down (ms). */
-const PLANK_MS = 130;
 /** A scaffold left standing this long comes down by itself (ms). */
 const SCAFFOLD_HOLD_MS = 5000;
 
 interface Scaffold {
-  stack: Stack;
-  /** Shows only the planks put up so far. */
-  mask: Graphics;
+  rig: ScaffoldRig;
   /** The height it is built to (Keep or Wall points). */
   value: number;
-  /** Heights above the ground where each plank begins, lowest first; the last is the very top. */
-  cuts: number[];
-  /** Planks standing (0: none). */
-  level: number;
-  /** +1 going up, -1 coming down, 0 standing. */
-  dir: -1 | 0 | 1;
-  /** Time into the current plank, or standing (ms). */
-  t: number;
-  plankMs: number;
+  /** How long it has stood complete (ms). */
+  held: number;
+  /** Tall enough to bother with. */
+  show: boolean;
 }
 
 interface Puff {
@@ -263,6 +319,9 @@ export class Castle extends Container {
   private readonly animBack = new Graphics();
   /** Flags of a painted castle: behind every tower, so the cloth never covers the painting. */
   private readonly flagsBack = new Graphics();
+  /** Painted flags (the hero's banner as cloth), behind the towers like the drawn ones; one per pole. */
+  private readonly flagLayer = new Container();
+  private paintedFlags: PaintedFlag[] = [];
   private readonly glows = new Container();
   private readonly smoke = new Container();
   private readonly frostCoat = new Graphics();
@@ -288,7 +347,7 @@ export class Castle extends Container {
   readonly sceneryFront = new Container();
   private scars: Scar[] = [];
   private scaffolds: Partial<Record<'keep' | 'wall', Scaffold>> = {};
-  /** Each time a plank of the scaffold is put up or taken down: where (scene px of the castle) and how wide. */
+  /** Each time a plank of the scaffold is laid or lifted off: where (scene px of the castle) and how wide. */
   onPlank: ((x: number, y: number, w: number, up: boolean) => void) | null = null;
   private towers: Tower[] = [];
   private puffs: Puff[] = [];
@@ -332,6 +391,7 @@ export class Castle extends Container {
       this.groundShadow,
       this.smoke,
       this.flagsBack,
+      this.flagLayer,
       this.backLayer,
       this.animBack,
       this.keepLayer,
@@ -533,121 +593,64 @@ export class Castle extends Container {
     this.layoutScars();
   }
 
-  /** Masons mend the newest wounds of a part. */
-  mend(part: 'keep' | 'wall', count: number): void {
-    for (let i = 0; i < count; i++) {
-      const last = [...this.scars].reverse().find((s) => s.part === part);
-      if (!last) return;
-      this.dropScar(last);
-    }
+  /** Masons at work on a part mend all its wounds. */
+  mend(part: 'keep' | 'wall'): void {
+    for (const s of this.scars.filter((s) => s.part === part)) this.dropScar(s);
   }
 
   /**
-   * The masons put up their scaffold against a part, plank by plank from the
-   * ground up to the height it is about to reach (`value` points). Returns how
-   * long that takes (ms; 0 with no scaffold to show). `speed` scales it.
+   * The masons put up their scaffold against a part, one timber at a time from
+   * the ground up to the height it is about to reach (`value` points). Returns
+   * how long that takes (ms; 0 with no scaffold to show). `speed` scales it.
    */
   raiseScaffold(part: 'keep' | 'wall', value: number, speed = 1): number {
-    const piece = this.kit?.scaffold;
-    if (!piece || !this.painted || !this.layoutValue) return 0;
+    const kit = this.kit?.scaffoldParts;
+    if (!kit || !this.painted || !this.layoutValue) return 0;
     let s = this.scaffolds[part];
     if (!s) {
-      const mask = new Graphics();
-      s = { stack: new Stack(piece), mask, value, cuts: [], level: 0, dir: 0, t: 0, plankMs: PLANK_MS };
-      s.stack.root.mask = mask;
-      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(s.stack.root, mask);
+      const rig = new ScaffoldRig(kit);
+      rig.onPlank = (x, y, w, up) => this.onPlank?.(x, y, w, up);
+      s = { rig, value, held: 0, show: false };
+      (part === 'keep' ? this.scaffoldKeep : this.scaffoldWall).addChild(rig.root);
       this.scaffolds[part] = s;
     }
     s.value = value;
-    s.plankMs = PLANK_MS * speed;
+    s.held = 0;
     this.layoutScaffold(part);
-    if (!s.cuts.length) {
-      s.level = 0;
-      s.dir = 0;
-      this.layoutScaffold(part);
-      return 0;
-    }
-    // Already partly up (built again before it came down): carry on from there.
-    if (s.dir < 0) s.t = 0;
-    s.level = Math.min(s.level, s.cuts.length);
-    s.dir = s.level < s.cuts.length ? 1 : 0;
-    if (s.dir === 0) s.t = 0;
-    return (s.cuts.length - s.level) * s.plankMs;
+    return s.show ? s.rig.raise(speed) : 0;
   }
 
-  /** The masons take their scaffold down, plank by plank from the top. Returns how long that takes (ms). */
+  /** The masons take their scaffold down, from the top. Returns how long that takes (ms). */
   lowerScaffold(part: 'keep' | 'wall'): number {
-    const s = this.scaffolds[part];
-    if (!s || s.level <= 0) return 0;
-    if (s.dir > 0) s.level++; // the plank on its way up is taken down first
-    s.level = Math.min(s.level, s.cuts.length);
-    s.dir = -1;
-    s.t = 0;
-    return s.level * s.plankMs;
-  }
-
-  /** Height of the scaffold shown with `n` planks up. */
-  private plankHeight(s: Scaffold, n: number): number {
-    return n <= 0 ? 0 : (s.cuts[Math.min(n, s.cuts.length) - 1] ?? 0);
+    return this.scaffolds[part]?.rig.lower() ?? 0;
   }
 
   private tickScaffold(part: 'keep' | 'wall', dt: number): void {
     const s = this.scaffolds[part];
-    if (!s) return;
-    if (s.dir === 0) {
-      if (s.level <= 0) return;
-      s.t += dt;
-      if (s.t > SCAFFOLD_HOLD_MS) this.lowerScaffold(part);
-    } else {
-      s.t += dt;
-      while (s.dir !== 0 && s.t >= s.plankMs) {
-        s.t -= s.plankMs;
-        s.level += s.dir;
-        this.plankLanded(part, s);
-        if (s.level >= s.cuts.length || s.level <= 0) {
-          s.level = Math.max(0, Math.min(s.level, s.cuts.length));
-          s.dir = 0;
-          s.t = 0;
-        }
-      }
-    }
+    if (!s || !s.rig.standing) return;
     this.layoutScaffold(part);
-  }
-
-  /** A plank is in place (or gone): the battlefield puffs a little sawdust there. */
-  private plankLanded(part: 'keep' | 'wall', s: Scaffold): void {
-    const b = this.bodies();
-    if (!b || !this.onPlank) return;
-    const up = s.dir > 0;
-    const y = b.groundY - this.plankHeight(s, up ? s.level : s.level + 1);
-    this.onPlank(b[part].x + this.facing * b[part].w * 0.12, y, b[part].w, up);
+    s.rig.tick(dt);
+    // Left standing too long (nothing took it down): it comes down by itself.
+    if (s.rig.up && (s.held += dt) > SCAFFOLD_HOLD_MS) {
+      s.held = 0;
+      s.rig.lower();
+    }
   }
 
   private layoutScaffold(part: 'keep' | 'wall'): void {
     const s = this.scaffolds[part];
     const b = this.bodies();
     const l = this.layoutValue;
+    const crown = this.kit?.scaffold?.meta;
     if (!s || !b || !l) return;
     const body = b[part];
     const w = body.w * (part === 'keep' ? 0.82 : 0.7);
     // Built to the height the part is about to reach, not the one it has now.
     const h = Math.min(s.value, l.maxPoints) * l.unit;
-    // The crane's platform sits near the top course; the crown (crane and pulley) rises above it.
-    const crown = (s.stack.piece.meta.crown * w) / s.stack.piece.meta.shaftWidth;
-    const cx = body.x + this.facing * body.w * 0.12;
-    s.stack.layout(cx, b.groundY + 2, w, Math.max(0, h - crown * 0.62), this.facing < 0, true);
-    s.cuts = h > body.w * 0.3 ? s.stack.courses().map((c) => c + 2) : [];
-    // Each plank slides up into place (or down out of sight) over the first part of its turn.
-    let shown = this.plankHeight(s, s.level);
-    if (s.dir !== 0) {
-      const next = this.plankHeight(s, s.level + s.dir);
-      const k = Math.min(1, s.t / (s.plankMs * 0.6));
-      shown += (next - shown) * (1 - (1 - k) ** 3);
-    }
-    const m = s.mask;
-    m.clear();
-    if (shown > 0.5) m.rect(cx - w * 2.2, b.groundY - shown, w * 4.4, shown + w).fill(0xffffff);
-    s.stack.root.visible = shown > 0.5;
+    s.show = h > body.w * 0.3;
+    // The crane's platform sits near the top course; the crane and pulley rise above it.
+    const above = crown ? ((crown.crown * w) / crown.shaftWidth) * 0.38 : 0;
+    s.rig.layout(body.x + this.facing * body.w * 0.12, b.groundY + 2, w, h + above, this.facing < 0);
   }
 
   private dropScar(s: Scar): void {
@@ -888,12 +891,12 @@ export class Castle extends Container {
       (spec.front ? this.keepLayer : this.backLayer).addChild(t.root);
       return t;
     });
-    // Windows, banners and ivy break up the repeating stones (sparser on the busy Keep, denser on the plain Wall).
+    // Windows, banners and ivy break up the repeating stones of the towers; the Wall wears only plants.
     if (p?.ornaments.length) {
       const seed = this.facing > 0 ? 3 : 11;
-      this.keepTower.painted?.setOrnaments(p.ornaments, seed, 0.8);
-      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7, 0.6);
-      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 0.85);
+      this.keepTower.painted?.setOrnaments(p.ornaments, seed);
+      for (const t of this.towers) t.painted?.setOrnaments(p.ornaments, seed + 5 + t.index * 7);
+      this.wallStack?.setOrnaments(p.ornaments, seed + 29, 'wall');
     }
     this.invalidate();
   }
@@ -998,12 +1001,9 @@ export class Castle extends Container {
 
     this.drawWall(l);
     if (fallen) this.clearScars();
-    // A painted castle wears painted wounds; seed a few if it is already hurt (a game joined late).
+    // A painted castle wears painted wounds, and only those of blows it has taken: none at the start
+    // of a game (nor while it rises from the ground), however low it stands.
     if (this.painted && this.kit && !fallen) {
-      if (dmg >= 1 && !this.scars.some((s) => s.part === 'keep')) {
-        this.scar('keep', 'cracks');
-        if (dmg >= 2) this.scar('keep', 'holes');
-      }
       this.cracks.clear();
       this.crackKey = '';
     } else {
@@ -2007,6 +2007,26 @@ export class Castle extends Container {
     const g = this.anim.clear();
     const back = this.animBack.clear();
     const flags = this.flagsBack.clear();
+    for (const f of this.paintedFlags) f.root.visible = false;
+    let flagIndex = 0;
+    // The hero's own banner flies where there is one; drawn cloth otherwise.
+    const cloth = (x: number, y: number, len: number, h: number, pennant: boolean, phase: number, dir: number): void => {
+      const tex = this.painted?.flag;
+      if (!tex) {
+        this.drawCloth(flags, x, y, len, h, this.bannerColor, pennant, phase, dir);
+        return;
+      }
+      let f = this.paintedFlags[flagIndex];
+      if (!f || f.texture !== tex) {
+        f?.destroy();
+        f = this.paintedFlags[flagIndex] = new PaintedFlag(tex);
+        this.flagLayer.addChild(f.root);
+      }
+      flagIndex++;
+      f.root.visible = true;
+      // The rod sits on the pole, its top finial at the pole's tip.
+      f.draw(x - dir * len * 0.04, y - h * 0.35, len, pennant ? 0.55 : 1, phase, dir);
+    };
     for (const sp of this.glowSprites) sp.visible = false;
     if (!l) return;
     const s = this.style;
@@ -2028,7 +2048,7 @@ export class Castle extends Container {
     if (painted && !fallen && !k.broken && s.signature !== 'orb') {
       // A pole off to one side flies its flag outward, clear of the roof.
       const dir = WIND;
-      this.drawCloth(flags, k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.7, k.w * 0.3, this.bannerColor, false, p, dir);
+      cloth(k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.8, k.w * 0.3, false, p, dir);
     }
     // Keep flag (the Sorceress has her orb instead).
     if (!painted && !fallen && !k.broken && s.signature !== 'orb') {
@@ -2043,7 +2063,7 @@ export class Castle extends Container {
       if (!t.shape.pennant || t.broken || t.h < 2) continue;
       if (t.painted) {
         const dir = WIND;
-        this.drawCloth(flags, t.cx + t.apexX, t.topY + t.apex + t.w * 0.05, t.w * 0.8, t.w * 0.26, this.bannerColor, true, p + t.index * 1.7, dir);
+        cloth(t.cx + t.apexX, t.topY + t.apex + t.w * 0.05, t.w * 0.8, t.w * 0.26, true, p + t.index * 1.7, dir);
         continue;
       }
       const top = t.topY + t.apex;
@@ -2057,13 +2077,17 @@ export class Castle extends Container {
       // The painting's own lights flicker like candles and fires, and go out as the castle is wrecked.
       const dmg = this.damage();
       const dim = dmg === 0 ? 1 : dmg === 1 ? 0.7 : dmg === 2 ? 0.38 : 0;
+      // Each tower on its own beat: a slow breath, a quick flutter and now and then a gust that makes it gutter.
+      const candle = (i: number): number =>
+        calm ? 1 : 0.85 + Math.sin(p * 1.6 + i * 2.7) * 0.16 + Math.sin(p * 6.3 + i * 2.1) * 0.1 + Math.sin(p * 15.7 + i * 1.3) * 0.07 - Math.max(0, Math.sin(p * 0.43 + i * 5) - 0.9) * 2.5;
       [k, ...this.towers].forEach((t, i) => {
         if (!t.painted) return;
-        const f = calm ? 1 : 0.8 + Math.sin(p * 6.3 + i * 2.1) * 0.1 + Math.sin(p * 15.7 + i * 1.3) * 0.07 + Math.sin(p * 2.1 + i) * 0.05;
-        const lit = (t.broken ? 0.12 : dim) * f;
+        const lit = (t.broken ? 0.12 : dim) * candle(i);
         t.painted.setGlow(lit * 1.2, lit * 1.05);
+        t.painted.flicker(p + i * 3.1, t.broken ? 0.15 : dim);
       });
-      this.wallStack?.setGlow(dim * (calm ? 1 : 0.85 + Math.sin(p * 5.1) * 0.1), dim);
+      this.wallStack?.setGlow(dim * candle(7), dim);
+      this.wallStack?.flicker(p + 11, dim);
       if (!fallen && !k.broken) {
         const ax = k.cx + k.apexX;
         const ay = k.topY + k.apex;

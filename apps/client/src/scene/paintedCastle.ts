@@ -1,5 +1,6 @@
 import { Assets, Container, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import { artUrl } from '../ui/assets';
+import type { ScaffoldParts, ScaffoldPartsMeta } from './scaffold';
 
 /**
  * Painted castles: each hero's Keep, back tower, Wall and ruins painted like
@@ -28,8 +29,12 @@ export interface StackedMeta {
   glow?: { crown: boolean; base: boolean };
   /** The scaffold's planks: top and bottom edge of each, in source px from the crown's top. */
   planks?: [number, number][];
+  /** The scaffold cut into its separate timbers. */
+  parts?: ScaffoldPartsMeta;
   /** The side the shaft is lit from: -1 left, 1 right, 0 unclear. */
   light?: number;
+  /** Rows at the bottom of the crown that are still plain stones, like the shaft (ornaments may climb onto them). */
+  plain?: number;
 }
 
 export interface StackedPiece {
@@ -52,10 +57,44 @@ export interface PaintedCastle {
   ruins: Texture | null;
   /** Windows, banners, lanterns and ivy laid over the plain shafts as they grow. */
   ornaments: Ornament[];
+  /** The hero's painted banner turned on its side: the cloth its flags fly (rod along the pole, at the left). */
+  flag: Texture | null;
 }
 
+/** Heroes with no plants of their own borrow these for their walls. */
+const IVY_DONOR = 'guardian';
+
 type Piece = 'keep' | 'tower1' | 'tower2' | 'tower' | 'wall' | 'scaffold';
-type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: { name: string; frames: ([number, number, number, number, OrnamentKind, number?] | null)[] }[] }>;
+type Manifest = Record<string, Partial<Record<Piece, StackedMeta>> & { ruins?: { width: number; height: number }; ornaments?: OrnamentSheet[] }>;
+interface OrnamentSheet {
+  name: string;
+  frames: ([number, number, number, number, OrnamentKind, number?] | null)[];
+  /** A `-glow` sheet holds the pieces' own lights, at the same frames. */
+  glow?: boolean;
+  /** A `-flag` image (its size) holds the banner turned on its side. */
+  flag?: [number, number] | null;
+}
+
+/** A hero's ornament sheets cut into pieces, each with its own light, and the first flag found. */
+async function ornamentsOf(hero: string, sheets: OrnamentSheet[]): Promise<{ ornaments: Ornament[]; flag: Texture | null }> {
+  const loaded = await Promise.all(
+    sheets.map(async (o) => {
+      const [t, g, flag] = await Promise.all([
+        texture(`castles/${hero}/${o.name}.webp`),
+        o.glow ? texture(`castles/${hero}/${o.name}-glow.webp`) : Promise.resolve(null),
+        o.flag ? texture(`castles/${hero}/${o.name}-flag.webp`) : Promise.resolve(null),
+      ]);
+      if (!t) return { list: [] as Ornament[], flag };
+      const list = o.frames.flatMap((f) => {
+        if (!f) return [];
+        const frame = new Rectangle(f[0], f[1], f[2], f[3]);
+        return [{ tex: new Texture({ source: t.source, frame }), glow: g ? new Texture({ source: g.source, frame: frame.clone() }) : null, kind: f[4], light: f[5] ?? 0 }];
+      });
+      return { list, flag };
+    }),
+  );
+  return { ornaments: loaded.flatMap((l) => l.list), flag: loaded.find((l) => l.flag)?.flag ?? null };
+}
 
 let foot: Texture | null = null;
 
@@ -117,13 +156,12 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
     set = loadManifest().then(async (m) => {
       const entry = m[hero];
       if (!entry?.keep) return null;
-      const sheets = await Promise.all(
-        (entry.ornaments ?? []).map(async (o) => {
-          const t = await texture(`castles/${hero}/${o.name}.webp`);
-          if (!t) return [];
-          return o.frames.flatMap((f) => (f ? [{ tex: new Texture({ source: t.source, frame: new Rectangle(f[0], f[1], f[2], f[3]) }), kind: f[4], light: f[5] ?? 0 }] : []));
-        }),
-      );
+      const { ornaments, flag } = await ornamentsOf(hero, entry.ornaments ?? []);
+      // A wall wears only plants: a hero with none painted borrows another's.
+      if (ornaments.length && !ornaments.some((o) => o.kind === 'ivy') && m[IVY_DONOR]?.ornaments) {
+        const donor = await ornamentsOf(IVY_DONOR, m[IVY_DONOR].ornaments);
+        ornaments.push(...donor.ornaments.filter((o) => o.kind === 'ivy'));
+      }
       const [keep, tower1, tower2, tower, wall, ruins] = await Promise.all([
         stacked(hero, 'keep', entry.keep),
         stacked(hero, 'tower1', entry.tower1),
@@ -132,7 +170,7 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
         stacked(hero, 'wall', entry.wall),
         entry.ruins ? texture(`castles/${hero}/ruins.webp`) : Promise.resolve(null),
       ]);
-      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments: sheets.flat() } : null;
+      return keep ? { keep, towers: [tower1 ?? tower, tower2 ?? tower], wall, ruins, ornaments, flag } : null;
     });
     sets.set(hero, set);
   }
@@ -141,20 +179,29 @@ export function paintedCastle(hero: string | null): Promise<PaintedCastle | null
 
 /**
  * How an ornament sits on a tower. win, deco: front-facing, on the shaft.
- * hang: hangs from its top (banner, ivy). edgeR / edgeL: seen from the side,
- * fixed to a wall on its left / right, so it sticks out of that edge.
- * bal: a balcony set under a window. balD: a balcony with its own door.
+ * hang: hangs from its top (chains, a rack). banner: the hero's banner, hung
+ * the same way (and the cloth of its flags). ivy: climbing plants, moss or
+ * grass, hung like a banner; the only thing a curtain wall wears.
+ * edgeR / edgeL: seen from the side, fixed to a wall on its left / right, so
+ * it sticks out of that edge. bal: a balcony set under a window. balD: a
+ * balcony with its own door.
  */
-export type OrnamentKind = 'win' | 'deco' | 'hang' | 'edgeR' | 'edgeL' | 'bal' | 'balD';
+export type OrnamentKind = 'win' | 'deco' | 'hang' | 'banner' | 'ivy' | 'edgeR' | 'edgeL' | 'bal' | 'balD';
 export interface Ornament {
   tex: Texture;
+  /** Its own light (a pane, a flame, a crystal), laid over it and made to flicker; null if it has none. */
+  glow: Texture | null;
   kind: OrnamentKind;
   /** The side it was painted lit from: -1 left, 1 right, 0 unclear. */
   light: number;
 }
 
-/** How often each kind is picked: mostly windows, with the rest for variety. */
-const KIND_WEIGHT: Record<OrnamentKind, number> = { win: 3, deco: 1.1, hang: 1, edgeR: 0.8, edgeL: 0.8, bal: 0.9, balD: 0.6 };
+/** How often each kind is picked within its turn (windows and the rest take turns up the shaft). */
+const KIND_WEIGHT: Record<OrnamentKind, number> = { win: 3, deco: 1.1, hang: 1, banner: 1, ivy: 0.8, edgeR: 0.8, edgeL: 0.8, bal: 0.9, balD: 0.6 };
+/** Kinds that open the tower: a window, or a balcony with one. */
+const OPENINGS: readonly OrnamentKind[] = ['win', 'bal', 'balD'];
+/** Where a stack stands: a tower wears anything; a curtain wall has no rooms behind it, so only plants. */
+export type OrnamentRole = 'tower' | 'wall';
 
 export type ScarKind = 'cracks' | 'holes' | 'scorch';
 
@@ -164,6 +211,8 @@ export type ScenerySheet = 'grass' | 'rocks' | 'trees' | 'farm' | 'farm2';
 export interface CastleKit {
   decals: Record<ScarKind, Texture[]>;
   scaffold: StackedPiece | null;
+  /** The scaffold's separate timbers, to put it up one board at a time. */
+  scaffoldParts: ScaffoldParts | null;
   /** Props planted around the castles, four per sheet, each standing on the bottom of its frame. */
   scenery: Partial<Record<ScenerySheet, Texture[]>>;
 }
@@ -174,7 +223,7 @@ let kit: Promise<CastleKit | null> | null = null;
 export function castleKit(): Promise<CastleKit | null> {
   kit ??= loadManifest().then(async (m) => {
     const common = (m as unknown as Record<string, { decals?: Record<string, { kind: ScarKind; frames: number[][] }>; scaffold?: StackedMeta }>)._comun;
-    if (!common) return { decals: { cracks: [], holes: [], scorch: [] }, scaffold: null, scenery: {} };
+    if (!common) return { decals: { cracks: [], holes: [], scorch: [] }, scaffold: null, scaffoldParts: null, scenery: {} };
     const decals: Record<ScarKind, Texture[]> = { cracks: [], holes: [], scorch: [] };
     await Promise.all(
       Object.entries(common.decals ?? {}).map(async ([name, sheet]) => {
@@ -184,6 +233,9 @@ export function castleKit(): Promise<CastleKit | null> {
       }),
     );
     const scaffold = await stacked('_comun', 'scaffold', common.scaffold);
+    const partsMeta = common.scaffold?.parts;
+    const partsSheet = partsMeta ? await texture('castles/_comun/scaffold-parts.webp') : null;
+    const scaffoldParts = partsMeta && partsSheet ? { meta: partsMeta, sheet: partsSheet } : null;
     const props = (m as unknown as Record<string, { props?: Record<string, { frames: number[][] }> }>)._escenario?.props ?? {};
     const scenery: Partial<Record<ScenerySheet, Texture[]>> = {};
     await Promise.all(
@@ -192,7 +244,7 @@ export function castleKit(): Promise<CastleKit | null> {
         if (t) scenery[name as ScenerySheet] = sheet.frames.map(([x, y, w, h]) => new Texture({ source: t.source, frame: new Rectangle(x!, y!, w!, h!) }));
       }),
     );
-    return { decals, scaffold, scenery };
+    return { decals, scaffold, scaffoldParts, scenery };
   });
   return kit;
 }
@@ -228,15 +280,15 @@ export class Stack {
   /** The base cropped to its lower part when the body is shorter than it. */
   private readonly baseCrop: Texture;
   private cropKey = -1;
-  /** Ornaments on the shaft, one slot per course of the climb; made when first reached. */
+  /** Ornaments on the shaft, one slot at every step of the climb; made when first reached. */
   private ornaments: Ornament[] = [];
+  private role: OrnamentRole = 'tower';
   private seed = 0;
-  private density = 0.55;
-  /** Each slot's group, built at a shaft width of 1 and scaled; null: a bare stretch. */
-  private readonly slots: ({ root: Container; half: number } | null)[] = [];
+  /** Each slot's group, built at a shaft width of 1 and scaled, and the ornament it shows. */
+  private readonly slots: ({ root: Container; half: number; pick: Ornament } | null)[] = [];
   private readonly ornamentLayer = new Container();
-  /** The last layout: scale, body height and base rows shown (for `courses`). */
-  private fit = { k: 1, h: 0, rows: 0 };
+  /** The ornaments' own lights, each with its own beat so they do not flicker in step. */
+  private lights: { sprite: Sprite; beat: number }[] = [];
 
   constructor(readonly piece: StackedPiece) {
     this.crown = new Sprite(piece.crown);
@@ -300,7 +352,6 @@ export class Stack {
         this.baseGlowCrop.update();
       }
     }
-    this.fit = { k, h: Math.max(0, h), rows };
     this.base.visible = h > 0.5;
     this.base.position.set(left, -rows * k);
     this.base.width = W;
@@ -361,59 +412,45 @@ export class Stack {
   }
 
   /**
-   * Heights above the ground (scene px, as last laid out) where each plank of
-   * a scaffold begins, lowest first, ending at the very top: cut there, the
-   * scaffold shows whole bays, each topped by its plank. Empty without planks.
+   * Lays these ornaments up the shaft at a steady step, one in every slot,
+   * windows taking turns with the rest (seeded, so the same tower always
+   * wears the same ones). A wall wears only its plants.
    */
-  courses(): number[] {
-    const m = this.piece.meta;
-    const planks = m.planks;
-    if (!planks?.length) return [];
-    const { k, h, rows } = this.fit;
-    const bay = m.shaft * k;
-    const baseH = Math.min(m.base, rows) * k;
-    const crownH = m.crown * k;
-    const cuts: number[] = [];
-    const baseTop = m.crown + m.shaft;
-    for (const [top, bottom] of planks) {
-      const mid = (top + bottom) / 2;
-      // In the base (cropped from its top when the body is short), or in the crown above the body.
-      if (mid > baseTop + 1) cuts.push(baseH - (top - baseTop) * k);
-      else if (mid < m.crown - 1) cuts.push(h + (m.crown - top) * k);
-    }
-    // The bays of the shaft, each starting where the plank between two bays does.
-    const seam = planks.find(([a, b]) => Math.abs((a + b) / 2 - baseTop) <= 2);
-    const lift = seam ? (baseTop - seam[0]) * k : 0;
-    for (let y = baseH + lift; y < h + lift - 1; y += bay) cuts.push(y);
-    if (h > baseH) cuts.push(h + lift);
-    const all = h + crownH;
-    // Planks closer than a third of a bay go up together.
-    const out: number[] = [];
-    for (const c of cuts.filter((c) => c > 0 && c < all).sort((a, b) => a - b)) {
-      if (!out.length || c - out[out.length - 1]! > bay * 0.34) out.push(c);
-    }
-    if (out.length && all - out[out.length - 1]! < bay * 0.34) out.pop();
-    out.push(all);
-    return out;
+  setOrnaments(ornaments: Ornament[], seed: number, role: OrnamentRole = 'tower'): void {
+    this.ornaments = ornaments;
+    this.role = role;
+    this.seed = seed;
+    for (const s of this.slots) s?.root.destroy({ children: true });
+    this.slots.length = 0;
+    this.lights = [];
   }
 
   /**
-   * Scatters these ornaments up the shaft (seeded, so the same tower always
-   * wears the same ones). `density`: share of slots that get one.
+   * The ornaments' lights burn like candles, lanterns and witch-fire: each
+   * breathes on its own beat with a quick flutter, and now and then gutters.
+   * `phase` is the castle's clock, `level` how brightly they burn (0 out).
    */
-  setOrnaments(ornaments: Ornament[], seed: number, density = 0.55): void {
-    this.ornaments = ornaments;
-    this.seed = seed;
-    this.density = density;
-    for (const s of this.slots) s?.root.destroy({ children: true });
-    this.slots.length = 0;
+  flicker(phase: number, level: number): void {
+    for (const l of this.lights) {
+      const b = l.beat;
+      const breath = Math.sin(phase * (1.3 + b * 0.5) + b * 9) * 0.18;
+      const flutter = Math.sin(phase * (7.1 + b * 3) + b * 4) * 0.09 + Math.sin(phase * 13.3 + b * 17) * 0.06;
+      // A gust: a brief dip on a slow cycle of its own.
+      const gust = Math.max(0, Math.sin(phase * (0.37 + b * 0.2) + b * 31) - 0.9) * 4;
+      l.sprite.alpha = Math.max(0, level * (0.95 + breath + flutter - gust * 0.45));
+    }
   }
 
   /** One slot's ornament (and the window behind a bare balcony), sized for a shaft 1 wide. */
-  private makeSlot(r: (n: number) => number): { root: Container; half: number } | null {
+  private makeSlot(i: number, r: (n: number) => number): { root: Container; half: number; pick: Ornament } | null {
     const all = this.ornaments;
     const windows = all.filter((o) => o.kind === 'win');
-    const pool = all.filter((o) => o.kind !== 'bal' || windows.length);
+    const usable = all.filter((o) => (this.role === 'wall' ? o.kind === 'ivy' : o.kind !== 'bal' || windows.length));
+    // Openings on every other slot, the rest between them; never the same piece twice running.
+    const turn = this.role === 'wall' ? usable : usable.filter((o) => OPENINGS.includes(o.kind) === (i % 2 === 0));
+    const prev = this.slots[i - 1]?.pick;
+    const fresh = (list: Ornament[]): Ornament[] => (list.length > 1 ? list.filter((o) => o !== prev) : list);
+    const pool = fresh(turn.length ? turn : usable);
     let total = 0;
     for (const o of pool) total += KIND_WEIGHT[o.kind];
     let pick = r(2) * total;
@@ -431,19 +468,26 @@ export class Stack {
       const k = Math.min(width / tex.width, maxH / tex.height);
       sp.scale.set(turned(orn) ? -k : k, k);
       root.addChild(sp);
+      if (orn.glow) {
+        // Its light, on top: a child, so it is sized, turned and moved with it.
+        const g = new Sprite(orn.glow);
+        g.anchor.set(0.5);
+        g.blendMode = 'add';
+        sp.addChild(g);
+        this.lights.push({ sprite: g, beat: r(5 + this.lights.length) });
+      }
       return sp;
     };
-    const jitter = (r(3) - 0.5) * 0.2;
     let top = 0;
     let bottom = 0;
     switch (o.kind) {
       case 'edgeR':
       case 'edgeL': {
         const sp = sprite(o, 0.55, 0.5);
-        // The fixing overlaps the edge a little; the rest sticks out into the air. Turned round, it
-        // sticks out of the other edge.
+        // The fixing sits on the stones at the edge (the shaft's corner pilasters), the rest sticks
+        // out into the air. Turned round, it sticks out of the other edge.
         const side = (o.kind === 'edgeR' ? 1 : -1) * (turned(o) ? -1 : 1);
-        sp.x = side * (0.5 + sp.width * 0.2);
+        sp.x = side * (0.22 + sp.width / 2);
         top = -sp.height / 2;
         bottom = sp.height / 2;
         break;
@@ -452,16 +496,15 @@ export class Stack {
         const win = windows[Math.floor(r(4) * windows.length)]!;
         const w = sprite(win, 0.42, 0.62);
         const b = sprite(o, 0.82, 0.5);
-        w.position.set(jitter, -w.height * 0.2);
-        b.position.set(jitter, w.y + w.height / 2 + b.height * 0.1);
+        w.position.set(0, -w.height * 0.2);
+        b.position.set(0, w.y + w.height / 2 + b.height * 0.1);
         top = w.y - w.height / 2;
         bottom = b.y + b.height / 2;
         break;
       }
       default: {
-        const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
+        const [width, maxH] = o.kind === 'win' ? [0.42, 0.62] : o.kind === 'hang' || o.kind === 'banner' || o.kind === 'ivy' ? [0.4, 0.95] : o.kind === 'balD' ? [0.8, 0.8] : [0.46, 0.55];
         const sp = sprite(o, width, maxH);
-        sp.x = jitter;
         top = -sp.height / 2;
         bottom = sp.height / 2;
       }
@@ -469,29 +512,33 @@ export class Stack {
     // Centre the group on the slot.
     for (const c of root.children) c.y -= (top + bottom) / 2;
     this.ornamentLayer.addChild(root);
-    return { root, half: (bottom - top) / 2 };
+    return { root, half: (bottom - top) / 2, pick: o };
   }
 
   private layoutOrnaments(w: number, h: number, baseH: number, crownH: number): void {
     if (!this.ornaments.length) return;
-    // One slot every ~1.15 shaft widths above the base; the top one stays clear of the crown.
-    const step = w * 1.15;
-    const top = h - Math.min(crownH * 0.15, w * 0.2);
-    const count = Math.max(0, Math.floor((h - baseH) / step) + 1);
+    const wall = this.role === 'wall';
+    // A tower: one slot every 0.9 shaft widths above the base, each filled, up to where the crown's
+    // own features begin (its lowest courses are plain stones, like the shaft). A wall: two patches
+    // of plants hanging side by side from under its battlements.
+    const step = w * 0.9;
+    const plain = ((this.piece.meta.plain ?? 0) * w) / this.piece.meta.shaftWidth;
+    const top = h + plain - Math.min(crownH * 0.15, w * 0.2);
+    const count = wall ? 2 : Math.max(0, Math.floor((top - baseH) / step) + 1);
     for (let i = 0; i < Math.max(count, this.slots.length); i++) {
       const r = (n: number): number => {
         const x = Math.sin((this.seed + 1) * 127.1 + i * 311.7 + n * 74.7) * 43758.5453;
         return x - Math.floor(x);
       };
-      if (this.slots[i] === undefined) this.slots[i] = r(0) < this.density ? this.makeSlot(r) : null;
+      if (this.slots[i] === undefined) this.slots[i] = this.makeSlot(i, r);
       const slot = this.slots[i];
       if (!slot) continue;
-      const y = baseH + step * (i + 0.5) + (r(1) - 0.5) * step * 0.25;
-      slot.root.scale.set(w);
-      slot.root.position.set(0, -y);
-      // Shown only while the courses it hangs on stand.
       const half = slot.half * w;
-      slot.root.visible = y + half < top && y - half > baseH * 0.92;
+      const y = wall ? h - half : baseH + step * (i + 0.5);
+      slot.root.scale.set(w);
+      slot.root.position.set(wall ? (i % 2 ? 0.26 : -0.26) * w : 0, -y);
+      // Shown only while the courses it hangs on stand.
+      slot.root.visible = (wall || y + half < top) && y - half > baseH * 0.92;
     }
   }
 

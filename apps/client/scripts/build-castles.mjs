@@ -171,6 +171,53 @@ function plainBand(data, width, b, share = 0.7) {
   return { crown: b.crown + best, base: b.crown + best + len };
 }
 
+/** Per-row look of the shaft's middle: mean light, saturation, and its bright and dark ends. */
+function rowFeatures(data, width, b, y) {
+  const x0 = Math.round(b.shaftLeft + b.shaftWidth * 0.1);
+  const x1 = Math.round(b.shaftLeft + b.shaftWidth * 0.9);
+  let lum = 0;
+  let sat = 0;
+  const ls = [];
+  for (let x = x0; x < x1; x++) {
+    const i = (y * width + x) * 4;
+    const l = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+    lum += l;
+    sat += Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+    ls.push(data[i + 3] > 128 ? l : -255);
+  }
+  ls.sort((a, c) => a - c);
+  const n = x1 - x0;
+  return [lum / n, sat / n, ls[Math.floor(n * 0.95)], ls[Math.floor(n * 0.05)]];
+}
+
+/**
+ * How many rows at the bottom of the crown are still plain stones, like the
+ * shaft (above them the crown's own windows, cornice or gallery begin), so
+ * ornaments may climb that far instead of stopping where the crown is cut.
+ */
+function plainCrown(data, width, b) {
+  const shaft = [];
+  for (let y = b.crown; y < b.base; y++) shaft.push(rowFeatures(data, width, b, y));
+  const stats = [0, 1, 2, 3].map((k) => {
+    const col = shaft.map((f) => f[k]);
+    const med = median(col);
+    return { med, mad: median(col.map((v) => Math.abs(v - med))) || 1 };
+  });
+  const score = (f) => f.reduce((n, v, k) => n + Math.min(6, Math.abs(v - stats[k].med) / stats[k].mad), 0);
+  const scores = shaft.map(score).sort((a, c) => a - c);
+  // The shaft's own mortar lines score high now and then; a stretch of rows all unlike it does not happen there.
+  const limit = Math.max(8, scores[Math.floor(scores.length * 0.8)] * 1.5);
+  // Walk up from the cut; a few rows in a row unlike the shaft mark where the crown's features begin.
+  const run = Math.max(6, Math.round(b.shaftWidth * 0.03));
+  let odd = 0;
+  for (let y = b.crown - 1; y >= 0; y--) {
+    if (score(rowFeatures(data, width, b, y)) > limit) {
+      if (++odd >= run) return Math.max(0, b.crown - 1 - y - run + 1);
+    } else odd = 0;
+  }
+  return b.crown;
+}
+
 /**
  * The painting is lit from above, so a band cut from it is a touch brighter at
  * one end than the other. Repeated, that slope shows as stripes, and against
@@ -352,10 +399,11 @@ function evenTile(shaft, width, b) {
  * warm sunlit sandstone or brick is never taken for a light: it would glow on
  * the crown and base but not on the shaft, a band of light ending at the cut.
  */
-async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
-  // Brightness of the neighbourhood: a lit window stands out from the stone around it.
+async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }, loose = false) {
+  // Brightness of the neighbourhood: a lit window stands out from the stone around it. Loose pieces
+  // (ornaments painted on their own) have nothing around them; the air there counts as mid-grey.
   const lumBuf = Buffer.alloc(width * height);
-  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
+  for (let i = 0, j = 0; i < buf.length; i += 4, j++) lumBuf[j] = loose && buf[i + 3] < 128 ? 110 : Math.round(0.3 * buf[i] + 0.59 * buf[i + 1] + 0.11 * buf[i + 2]);
   const around = await sharp(lumBuf, { raw: { width, height, channels: 1 } }).blur(Math.max(3, width / 40)).raw().toBuffer();
   const out = Buffer.alloc(buf.length);
   let lit = 0;
@@ -371,10 +419,10 @@ async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
     // potion, a blue crystal) only vivid.
     const dh = Math.abs(((hue(r, g, b) - stone.hue + 540) % 360) - 180);
     const floor = dh < 35 ? Math.max(80, stone.sat + 20) : 80;
-    const k =
-      Math.min(1, Math.max(0, (pop - 22) / 34)) *
-      Math.min(1, Math.max(0, (sat - floor) / 60)) *
-      Math.min(1, Math.max(0, (lum - 100) / 60));
+    // A loose piece's pane sits in its own frame, not in a dark wall, so it needs to stand out less.
+    const k = loose
+      ? Math.min(1, Math.max(0, (sat - 70) / 50)) * Math.min(1, Math.max(0, (lum - (hue(r, g, b) < 65 ? 140 : 110)) / 40))
+      : Math.min(1, Math.max(0, (pop - 22) / 34)) * Math.min(1, Math.max(0, (sat - floor) / 60)) * Math.min(1, Math.max(0, (lum - 100) / 60));
     if (k <= 0) continue;
     lit++;
     out[i] = r;
@@ -383,7 +431,25 @@ async function glowOf(buf, width, height, stone = { sat: 0, hue: 0 }) {
     out[i + 3] = Math.round(k * 255);
   }
   if (lit < 12) return null;
-  return sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+  if (loose) {
+    // A pane or a flame is a patch of light; a glint along a copper pipe or a gilt rim is a thin line.
+    // Keep only what is lit over an area.
+    const alpha = Buffer.alloc(width * height);
+    for (let i = 0, j = 0; j < alpha.length; i += 4, j++) alpha[j] = out[i + 3];
+    const spread = await sharp(alpha, { raw: { width, height, channels: 1 } }).blur(Math.max(2, width / 160)).extractChannel(0).raw().toBuffer();
+    for (let i = 0, j = 0; j < alpha.length; i += 4, j++) out[i + 3] = Math.round(out[i + 3] * Math.min(1, Math.max(0, (spread[j] - 70) / 70)));
+  }
+  // The light itself, and a soft halo it throws on the stones around, so a flicker reads at a glance.
+  const core = await sharp(out, { raw: { width, height, channels: 4 } }).blur(2).raw().toBuffer();
+  const halo = await sharp(out, { raw: { width, height, channels: 4 } }).blur(Math.max(4, Math.min(width, height) / 45)).raw().toBuffer();
+  for (let i = 0; i < core.length; i += 4) {
+    const a = Math.min(255, halo[i + 3] * 1.6);
+    if (a <= core[i + 3]) continue;
+    // Where the light itself is faint, the halo brings its colour.
+    if (core[i + 3] < 24) for (let c = 0; c < 3; c++) core[i + c] = halo[i + c];
+    core[i + 3] = a;
+  }
+  return core;
 }
 
 const webp = (data, width, height, file) => sharp(data, { raw: { width, height, channels: 4 } }).webp({ quality: 86, alphaQuality: 92 }).toFile(file);
@@ -420,6 +486,8 @@ async function stacked(input, outDir, piece, override) {
     for (let x = 0; x < width; x++) if (x < keepL || x > keepR) band[(y * width + x) * 4 + 3] = 0;
   }
   const len = b.base - b.crown;
+  // Read before the crown's lower part is eased toward the shaft's light.
+  const plain = plainCrown(data, width, b);
   const gains = rowGains(band, width, len, b);
   const stone = stoneOf(band, width, len, b);
   // The side the shaft is lit from, so ornaments can be turned to match it.
@@ -484,7 +552,7 @@ async function stacked(input, outDir, piece, override) {
   }
   if (pole) apex = { x: pole.x, y: pole.y };
   if (override?.flag) apex = { x: override.flag[0] * width, y: override.flag[1] * height };
-  return { light, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
+  return { light, plain, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
 /**
@@ -609,7 +677,9 @@ async function stoneColour(file) {
 }
 
 /** Bump when the ornament treatment changes, so cached sheets are redone. */
-const ORNAMENT_VERSION = 4;
+const ORNAMENT_VERSION = 11;
+/** Kinds that may carry a light of their own (a lit pane, a lantern, a crystal); cloth and plants never do. */
+const LIT_KINDS = new Set(['win', 'deco', 'edgeR', 'edgeL', 'bal', 'balD']);
 /** Ornament sheets are painted far finer than the walls they sit on: shrink them to about the walls' grain. */
 const ORNAMENT_SHEET = 576;
 
@@ -621,7 +691,9 @@ const ORNAMENT_SHEET = 576;
  * their darks lifted and colours pulled a little toward the stone (the same
  * air and light falls on both), and each gets a soft shadow on the wall, cast
  * away from its own light. The side each is lit from is recorded, so the
- * game can turn it to match its tower.
+ * game can turn it to match its tower. Their own lights (panes, lanterns,
+ * crystals) go to a `-glow` sheet the game makes flicker, and the hero's
+ * banner, turned on its side, becomes the cloth of the castle's flags.
  */
 async function ornamentSheet(input, outDir, name, kinds, stone) {
   const big = 1152;
@@ -711,7 +783,201 @@ async function ornamentSheet(input, outDir, name, kinds, stone) {
     frames.push(r > l && b > t && kinds[q] !== 'x' ? [x0 + l, y0 + t, r - l + 1, b - t + 1, kinds[q] ?? 'deco', light[q]] : null);
   }
   await webp(out, size, size, join(outDir, `${name}.webp`));
-  return { name, v: ORNAMENT_VERSION, frames };
+
+  // The ornaments' own lights, only on pieces that can hold one; the rest of the sheet stays dark.
+  const litOnly = Buffer.from(out);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const q = Math.floor(y / cellPx) * 3 + Math.floor(x / cellPx);
+      if (!LIT_KINDS.has(kinds[q])) litOnly[(y * size + x) * 4 + 3] = 0;
+    }
+  }
+  const glow = await glowOf(litOnly, size, size, { sat: Math.max(...ref) - Math.min(...ref) + 30, hue: hue(ref[0], ref[1], ref[2]) }, true);
+  if (glow) await webp(glow, size, size, join(outDir, `${name}-glow.webp`));
+
+  // The hero's banner, turned so the rod it hangs from runs down the flagpole and the cloth flies off it.
+  let flag = null;
+  const bq = kinds.indexOf('banner');
+  if (bq >= 0) {
+    const x0 = (bq % 3) * cpx;
+    const y0 = Math.floor(bq / 3) * cpx;
+    let l = cpx, r = -1, t = cpx, b = -1;
+    for (let y = 0; y < cpx; y++) {
+      for (let x = 0; x < cpx; x++) {
+        if (img[((y0 + y) * size + x0 + x) * 4 + 3] < 24) continue;
+        if (x < l) l = x;
+        if (x > r) r = x;
+        if (y < t) t = y;
+        if (y > b) b = y;
+      }
+    }
+    if (r > l && b > t) {
+      const file = join(outDir, `${name}-flag.webp`);
+      const info = await sharp(img, { raw: { width: size, height: size, channels: 4 } })
+        .extract({ left: x0 + l, top: y0 + t, width: r - l + 1, height: b - t + 1 })
+        .rotate(270)
+        .webp({ quality: 88, alphaQuality: 92 })
+        .toFile(file);
+      flag = [info.width, info.height];
+    }
+  }
+  return { name, v: ORNAMENT_VERSION, frames, glow: !!glow, flag };
+}
+
+/**
+ * Splits the scaffold painting into its separate timbers so the masons can put
+ * it up one board at a time: each band (from one plank's top edge to the next)
+ * gives its two post segments, the two boards of its cross brace, the plank on
+ * top and whatever else stands there (ladder, bucket, crane, stones).
+ */
+function scaffoldParts(data, width, height, posts, planks) {
+  const alpha = (x, y) => data[(y * width + x) * 4 + 3];
+  // The posts: runs of columns opaque down most of the height.
+  const runs = [];
+  for (const x of posts) {
+    const r = runs[runs.length - 1];
+    if (r && x <= r[1] + 2) r[1] = x;
+    else runs.push([x, x]);
+  }
+  const L = runs[0];
+  const R = runs[runs.length - 1];
+  const pad = 3;
+  const inPost = (x) => (x >= L[0] - pad && x <= L[1] + pad ? 0 : x >= R[0] - pad && x <= R[1] + pad ? 1 : -1);
+  // Each plank's reach: the opaque run along its middle row that holds the posts.
+  const beams = planks.map(([top, bottom]) => {
+    const y = Math.floor((top + bottom) / 2);
+    let x0 = L[0];
+    let x1 = R[1];
+    while (x0 > 0 && alpha(x0 - 1, y) > 96) x0--;
+    while (x1 < width - 1 && alpha(x1 + 1, y) > 96) x1++;
+    return { top: Math.max(0, top - 2), bottom: Math.min(height, bottom + 2), x0: x0 - 2, x1: x1 + 2 };
+  });
+  // Bands: from the top of the picture, then from each plank's top edge.
+  const tops = [0, ...beams.map((b) => b.top)];
+  const bands = tops.map((top, i) => ({ top, bottom: tops[i + 1] ?? height, beam: i > 0 ? beams[i - 1] : null, next: beams[i] ?? null }));
+  const bandOf = (y) => {
+    let i = bands.length - 1;
+    while (i > 0 && y < bands[i].top) i--;
+    return i;
+  };
+  // The ladder: two long vertical rails between the posts (nothing else there runs so far straight down).
+  let ladder = null;
+  {
+    const minRun = (bands[1] ? bands[1].bottom - bands[1].top : height / 6) * 1.4;
+    const rails = [];
+    for (let x = L[1] + pad + 1; x < R[0] - pad; x++) {
+      let best = null;
+      for (let y = 0, s = -1; y <= height; y++) {
+        const on = y < height && alpha(x, y) > 128;
+        if (on && s < 0) s = y;
+        if (!on && s >= 0) {
+          if (!best || y - s > best[1] - best[0]) best = [s, y];
+          s = -1;
+        }
+      }
+      if (best && best[1] - best[0] >= minRun) rails.push([x, ...best]);
+    }
+    if (rails.length >= 2 && rails[rails.length - 1][0] - rails[0][0] > 12) {
+      ladder = {
+        x0: rails[0][0] - 3,
+        x1: rails[rails.length - 1][0] + 3,
+        y0: Math.min(...rails.map((r) => r[1])) - 4,
+        y1: Math.max(...rails.map((r) => r[2])) + 2,
+      };
+    }
+  }
+  const inLadder = (x, y) => ladder && x >= ladder.x0 && x <= ladder.x1 && y >= ladder.y0 && y <= ladder.y1;
+  // Layers: per band, 0 left post, 1 right post, 2 brace "\", 3 brace "/", 4 plank, 5 the rest.
+  const KINDS = ['post', 'post', 'brace', 'brace', 'beam', 'extra', 'ladder'];
+  const owner = new Int16Array(width * height).fill(-1);
+  const board = Math.max(10, (L[1] - L[0]) * 0.85);
+  for (let y = 0; y < height; y++) {
+    const bi = bandOf(y);
+    const band = bands[bi];
+    for (let x = 0; x < width; x++) {
+      if (alpha(x, y) < 6) continue;
+      let k = 5;
+      const p = inPost(x);
+      if (band.beam && y < band.beam.bottom && x >= band.beam.x0 && x <= band.beam.x1) k = 4;
+      else if (p >= 0) k = p;
+      else if (inLadder(x, y)) k = 6;
+      else if (band.beam && band.next && x > L[1] && x < R[0] && band.next.top - band.beam.bottom > (R[0] - L[1]) * 0.5) {
+        // The cross brace runs corner to corner between the posts and the planks.
+        const x0 = L[1];
+        const x1 = R[0];
+        const y0 = band.beam.bottom;
+        const y1 = band.next.top;
+        const len = Math.hypot(x1 - x0, y1 - y0);
+        const dA = Math.abs((y1 - y0) * (x - x0) - (x1 - x0) * (y - y0)) / len; // "\"
+        const dB = Math.abs((y1 - y0) * (x - x0) + (x1 - x0) * (y - y1)) / len; // "/"
+        if (Math.min(dA, dB) <= board) k = dA <= board && dB <= board ? 2 : dA < dB ? 2 : 3;
+      }
+      owner[y * width + x] = k === 6 ? 6 * bands.length : bi * 6 + k;
+    }
+  }
+  const parts = [];
+  // The ladder leans on the highest band it reaches.
+  const ladderBand = ladder ? bandOf(ladder.y0 + 6) : -1;
+  for (let bi = 0; bi < bands.length; bi++) {
+    for (let k = 0; k < 7; k++) {
+      if (k === 6 && bi !== ladderBand) continue;
+      const id = k === 6 ? 6 * bands.length : bi * 6 + k;
+      const rows = k === 6 ? [0, height] : [bands[bi].top, bands[bi].bottom];
+      let x0 = width, y0 = height, x1 = -1, y1 = -1, n = 0;
+      for (let y = rows[0]; y < rows[1]; y++) {
+        for (let x = 0; x < width; x++) {
+          if (owner[y * width + x] !== id) continue;
+          if (alpha(x, y) > 40) n++;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+      if (n < 30) continue;
+      // A post segment reaches up behind its plank.
+      if (k < 2 && bands[bi].beam) y0 = Math.min(y0, bands[bi].beam.top);
+      const w = x1 - x0 + 1;
+      const h = y1 - y0 + 1;
+      const px = Buffer.alloc(w * h * 4);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          let sy = y;
+          if (owner[y * width + x] !== id) {
+            // A post carries on behind its plank: copy the post from just above the plank.
+            const beam = bands[bi].beam;
+            if (!(k < 2 && beam && y < beam.bottom && inPost(x) === k)) continue;
+            sy = Math.max(0, beam.top - 1);
+            if (alpha(x, sy) < 6) continue;
+          }
+          data.copy(px, ((y - y0) * w + x - x0) * 4, (sy * width + x) * 4, (sy * width + x) * 4 + 4);
+        }
+      }
+      parts.push({ band: bi, kind: KINDS[k], side: k === 0 || k === 2 ? -1 : k === 1 || k === 3 ? 1 : 0, x: x0, y: y0, w, h, px });
+    }
+  }
+  return { bands: bands.map((b) => [b.top, b.bottom]), parts };
+}
+
+/** Packs the parts into one sheet (shelves, 2 px apart). */
+function packParts(parts, sheetW = 1024) {
+  const sorted = [...parts].sort((a, b) => b.h - a.h);
+  let x = 0, y = 0, row = 0;
+  for (const p of sorted) {
+    if (x + p.w > sheetW) {
+      x = 0;
+      y += row + 2;
+      row = 0;
+    }
+    p.ax = x;
+    p.ay = y;
+    x += p.w + 2;
+    row = Math.max(row, p.h);
+  }
+  const sheetH = y + row;
+  const sheet = Buffer.alloc(sheetW * sheetH * 4);
+  for (const p of parts) for (let r = 0; r < p.h; r++) p.px.copy(sheet, ((p.ay + r) * sheetW + p.ax) * 4, r * p.w * 4, (r + 1) * p.w * 4);
+  return { sheet, sheetW, sheetH };
 }
 
 /**
@@ -762,7 +1028,21 @@ async function scaffold(input, outDir) {
   await webp(slice(best.a, best.b), width, best.b - best.a, join(outDir, 'scaffold-shaft.webp'));
   await webp(slice(best.b, height), width, height - best.b, join(outDir, 'scaffold-base.webp'));
   const top = rows.findIndex(Boolean);
-  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top }, planks };
+  // And its separate timbers, so it can go up one board at a time.
+  const cut = scaffoldParts(data, width, height, posts, planks);
+  const packed = packParts(cut.parts);
+  await webp(packed.sheet, packed.sheetW, packed.sheetH, join(outDir, 'scaffold-parts.webp'));
+  const parts = {
+    width,
+    height,
+    centerX: left + (right - left + 1) / 2,
+    shaftWidth: right - left + 1,
+    bands: cut.bands,
+    // The band that repeats: the one starting at the plank the shaft starts on.
+    shaftBand: 1 + planks.findIndex(([a, b]) => best.a >= a && best.a <= b),
+    pieces: cut.parts.map((q) => [q.band, q.kind, q.side, q.x, q.y, q.w, q.h, q.ax, q.ay]),
+  };
+  return { width, crown: best.a, shaft: best.b - best.a, base: height - best.b, shaftLeft: left, shaftWidth: right - left + 1, apex: { x: (left + right) / 2, y: top }, planks, parts };
 }
 
 async function shared(dir, outDir, manifest, old) {
@@ -780,8 +1060,8 @@ async function shared(dir, outDir, manifest, old) {
     const group = name === 'scaffold' ? null : m[2] ? 'decals' : 'props';
     const into = group ? (manifest[group] ??= {}) : manifest;
     const was = group ? old[group]?.[name] : old.scaffold;
-    // A scaffold cut before planks were measured is cut again.
-    if (was && (group || was.planks) && (await mtime(probe)) >= (await mtime(input))) {
+    // A scaffold cut before its timbers were separated is cut again.
+    if (was && (group || was.parts) && (await mtime(probe)) >= (await mtime(input))) {
       into[key] = was;
       continue;
     }
@@ -826,8 +1106,8 @@ export async function buildCastles(source, target) {
       const probe = join(outDir, piece === 'ruins' ? 'ruins.webp' : `${piece}-shaft.webp`);
       const stale = Math.max(await mtime(input), await mtime(join(root, 'slices.json')));
       manifest[hero] ??= {};
-      // Pieces cut before the skirts or the light side existed are cut again.
-      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined)) && (await mtime(probe)) >= stale) {
+      // Pieces cut before the skirts, the light side or the plain crown existed are cut again.
+      if (old[hero]?.[piece] && (piece === 'ruins' || (old[hero][piece].skirt && old[hero][piece].light !== undefined && old[hero][piece].plain !== undefined)) && (await mtime(probe)) >= stale) {
         manifest[hero][piece] = old[hero][piece];
         continue;
       }

@@ -50,7 +50,7 @@ export function blockReason(ctx: HandContext, cardId: string): string | null {
 
 /**
  * The local player's hand: a fan of cards that can be inspected, played or
- * discarded by tap, drag or keyboard. Cards are keyed by `uid`, so a
+ * discarded by tap or keyboard (dragging only plays). Cards are keyed by `uid`, so a
  * re-render keeps existing elements and lets them glide to their new slot.
  */
 export class Hand {
@@ -61,8 +61,6 @@ export class Hand {
   private drag: { uid: number; el: HTMLElement; startX: number; startY: number; dx: number; dy: number; active: boolean; pointer: number } | null = null;
   /** Where new cards fly in from (the deck), in CSS px. */
   deckPoint = { x: 0, y: 0 };
-  /** Drop target for discards. */
-  discardTarget: HTMLElement | null = null;
   /**
    * fan: overlapping arc (desktop). row: flat row, little or no overlap
    * (phones in landscape). scroll: a row wider than the screen that scrolls
@@ -80,7 +78,6 @@ export class Hand {
 
   onSelect: (uid: number | null) => void = () => {};
   onPlay: (uid: number) => void = () => {};
-  onDiscard: (uid: number) => void = () => {};
 
   constructor() {
     window.addEventListener('pointermove', (e) => {
@@ -353,9 +350,8 @@ export class Hand {
       }
     }
     d.el.style.transform = `translate(calc(var(--x) + ${d.dx}px), calc(var(--y) + ${d.dy}px)) scale(1.08)`;
-    const zone = this.dropZone(e.clientX, e.clientY);
+    const zone = this.dropZone(e.clientY);
     this.el.dataset.drop = zone ?? '';
-    this.discardTarget?.classList.toggle('drop-hover', zone === 'discard');
   }
 
   private dragEnd(e: PointerEvent, cancelled = false): void {
@@ -367,17 +363,14 @@ export class Hand {
     setTimeout(() => (this.suppressClick = false), 50);
     d.el.classList.remove('dragging');
     this.el.classList.remove('has-drag');
-    this.discardTarget?.classList.remove('drop-hover');
     this.el.dataset.drop = '';
-    const zone = cancelled ? null : this.dropZone(e.clientX, e.clientY);
+    const zone = cancelled ? null : this.dropZone(e.clientY);
     d.el.style.transform = '';
     if (zone === 'play') this.onPlay(d.uid);
-    else if (zone === 'discard') this.onDiscard(d.uid);
   }
 
-  private dropZone(x: number, y: number): 'play' | 'discard' | null {
-    const target = this.discardTarget?.getBoundingClientRect();
-    if (target && x >= target.left - 20 && x <= target.right + 20 && y >= target.top - 20 && y <= target.bottom + 20) return 'discard';
+  /** Dragging only plays: discarding is done from the big card view or with the Delete key. */
+  private dropZone(y: number): 'play' | null {
     const handTop = this.el.getBoundingClientRect().top;
     return y < handTop - 30 ? 'play' : null;
   }

@@ -20,6 +20,19 @@ export interface FxContext {
   side(seat: PlayerId): number;
   /** Floating text over the scene, in CSS px. */
   float(text: string, x: number, y: number, kind: 'damage' | 'build' | 'blocked' | 'info'): void;
+  /**
+   * Queues a castle's motion (scaffold, rising, falling) behind that castle's
+   * earlier motion and lets the game move on without waiting for it. Without
+   * it the motion is awaited.
+   */
+  settle?(side: number, run: () => Promise<void>): void;
+}
+
+/** Runs a castle's motion: queued behind the game when the board allows it, awaited otherwise. */
+function settle(ctx: FxContext, side: number, run: () => Promise<void>): Promise<void> {
+  if (!ctx.settle) return run();
+  ctx.settle(side, run);
+  return Promise.resolve();
 }
 
 const ms = (base: number): number => base * animScale();
@@ -301,7 +314,7 @@ export const fx = {
       field.collapse(target);
       field.shake(24);
     }
-    await field.animateCastle(target, heights.keep, heights.wall, ms(fell ? 900 : 420));
+    await settle(ctx, target, () => field.animateCastle(target, heights.keep, heights.wall, ms(fell ? 900 : 420)));
   },
 
   async structureLost(seat: PlayerId, target: 'keep' | 'wall', amount: number, ctx: FxContext, heights: { keep: number; wall: number }): Promise<void> {
@@ -312,13 +325,19 @@ export const fx = {
     ctx.field.scar(side, target, 'cracks');
     ctx.field.hitCastle(side, 0xd0b090, 0.6);
     ctx.float(`−${amount}`, at.x, at.y - 10, 'damage');
-    await ctx.field.animateCastle(side, heights.keep, heights.wall, ms(500));
+    await settle(ctx, side, () => ctx.field.animateCastle(side, heights.keep, heights.wall, ms(500)));
   },
 
   async built(seat: PlayerId, target: 'keep' | 'wall', amount: number, ctx: FxContext, heights: { keep: number; wall: number }): Promise<void> {
-    const field = ctx.field;
     const side = ctx.side(seat);
     if (legendaryNow()) holyFire(seat, ctx);
+    await settle(ctx, side, () => fx.raise(seat, target, amount, ctx, heights));
+  },
+
+  /** The masons at work: scaffold up, the castle rises inside it, scaffold down. */
+  async raise(seat: PlayerId, target: 'keep' | 'wall', amount: number, ctx: FxContext, heights: { keep: number; wall: number }): Promise<void> {
+    const field = ctx.field;
+    const side = ctx.side(seat);
     const p = pan(ctx, seat);
     // The scaffold goes up plank by plank to the new height first; then the castle rises inside it.
     await field.raiseScaffold(side, target, heights[target], animScale());
@@ -328,7 +347,7 @@ export const fx = {
     const before = field.anchor(side, target);
     const grow = field.animateCastle(side, heights.keep, heights.wall, ms(620 + Math.min(400, amount * 15)));
     field.placeBlocks(side, target, 2 + amount / 3);
-    field.mend(side, target, amount);
+    field.mend(side, target);
     // Dust where the masons work, then motes of gold up the new courses.
     const x = target === 'keep' ? base.x : before.x;
     field.burst(x, base.y - 6, { count: 4 + Math.round(amount / 4), texture: 'smoke', color: 0xb8a080, speed: 1.6, spread: Math.PI * 0.8, gravity: -0.01, size: 44, life: 1200, alpha: 0.55, area: { w: 60, h: 8 } });
@@ -352,7 +371,7 @@ export const fx = {
       ctx.field.burst(at.x, at.y, { count: 26, texture: 'crystal', color: [0xc77dff, 0x7fdcf5], speed: 3, gravity: 0, size: 14, life: 1000 });
       ctx.field.ring(at.x, at.y, 0xc77dff, 140, 800, 0.8);
     }
-    await Promise.all(seats.map((seat) => ctx.field.animateCastle(ctx.side(seat), keeps[seat], walls[seat], ms(800))));
+    await Promise.all(seats.map((seat) => settle(ctx, ctx.side(seat), () => ctx.field.animateCastle(ctx.side(seat), keeps[seat], walls[seat], ms(800)))));
   },
 
   async status(kind: 'burn' | 'frost' | 'rust' | 'shield' | 'cleanse', seat: PlayerId, ctx: FxContext, shield = 0): Promise<void> {

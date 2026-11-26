@@ -167,6 +167,14 @@ class BoardScreen implements Screen {
   private handModel: VisibleCard[] = [];
   private queue: StateUpdate[] = [];
   private busy = false;
+  /**
+   * Each castle's motion (scaffold, rising, falling) runs in order behind the
+   * events, so the turn never waits for a castle to finish building or crumbling.
+   */
+  private castleMotion: Promise<void>[] = [];
+  private castleMotionPending = 0;
+  /** Bumped when the board jumps to a state: queued castle motion is dropped. */
+  private castleMotionGen = 0;
   private awaiting = false;
   /** When the last action went out, to notice an answer that never comes. */
   private awaitingSince = 0;
@@ -224,7 +232,6 @@ class BoardScreen implements Screen {
 
     this.deckPile.append(cardBack(), h('span.pile-count'));
     this.discardPile.append(h('div.pile-empty'), h('span.pile-count'));
-    this.hand.discardTarget = this.discardPile;
     // The last card played sits on the discard pile: hover it to read it, click or tap to inspect it.
     this.discardPile.addEventListener('pointerenter', (e) => {
       if (e.pointerType === 'mouse') this.showPilePreview();
@@ -288,7 +295,6 @@ class BoardScreen implements Screen {
     }
     this.hand.onSelect = (uid) => this.onSelect(uid);
     this.hand.onPlay = (uid) => this.tryPlay(uid);
-    this.hand.onDiscard = (uid) => this.tryDiscard(uid);
   }
 
   // ---------------------------------------------------------------------------
@@ -344,6 +350,7 @@ class BoardScreen implements Screen {
 
   unmount(): void {
     this.destroyed = true;
+    this.dropCastleMotion();
     setGameContext(null);
     hideFeedbackHint();
     this.unsubscribe();
@@ -484,7 +491,31 @@ class BoardScreen implements Screen {
       field: this.field,
       side: (seat) => this.sideOf(seat),
       float: (text, x, y, kind) => this.float(text, x, y, kind),
+      settle: (side, run) => this.moveCastle(side, run),
     };
+  }
+
+  /** Queues a castle's motion behind its earlier motion; the events carry on meanwhile. */
+  private moveCastle(side: number, run: () => Promise<void>): void {
+    const gen = this.castleMotionGen;
+    this.castleMotionPending++;
+    const before = this.castleMotion[side] ?? Promise.resolve();
+    this.castleMotion[side] = before
+      .then(() => (this.destroyed || gen !== this.castleMotionGen ? undefined : run()))
+      .catch((error: unknown) => console.error('Castle animation failed', error))
+      .finally(() => {
+        if (gen !== this.castleMotionGen) return;
+        this.castleMotionPending--;
+        // The last castle came to rest after the board settled: make sure it shows the true heights.
+        if (this.castleMotionPending === 0 && !this.busy && !this.destroyed && this.shown) this.field.setCastles(this.castleValues());
+      });
+  }
+
+  /** Drops the castle motion still queued (the board jumps to a state). */
+  private dropCastleMotion(): void {
+    this.castleMotionGen++;
+    this.castleMotionPending = 0;
+    this.castleMotion = [];
   }
 
   // ---------------------------------------------------------------------------
@@ -567,7 +598,8 @@ class BoardScreen implements Screen {
     const deck = this.deckPile.getBoundingClientRect();
     this.hand.deckPoint = { x: deck.left, y: deck.top };
     this.hand.layout();
-    if (this.shown) this.field.setCastles(this.castleValues());
+    // Castles still moving keep their own heights; they end on the true ones.
+    if (this.shown && this.castleMotionPending === 0) this.field.setCastles(this.castleValues());
   }
 
   /**
@@ -729,6 +761,7 @@ class BoardScreen implements Screen {
           // The late animation must not keep changing the board when it wakes up
           // (it used to add its drawn cards to the hand a second time).
           if (this.animGen === gen) this.animGen++;
+          this.dropCastleMotion();
           reportProblem('animationTimeout', 'An update took too long to animate', { events: kinds.slice(0, 40), ...this.snapshot() });
         }
         this.view = update.view;
@@ -743,7 +776,7 @@ class BoardScreen implements Screen {
     // stalled in a background tab) never reaches its own clean-up, which left the
     // rival's card stuck in the middle of the screen until the next play.
     this.clearPlayed();
-    this.field.setCastles(this.castleValues());
+    if (this.castleMotionPending === 0) this.field.setCastles(this.castleValues());
     this.setShields(this.view);
     this.syncGraves(this.view);
     this.handSeat = this.view.viewer;
@@ -825,13 +858,31 @@ class BoardScreen implements Screen {
     return this.canAct() && (this.view?.actionsLeft ?? 1) > 0;
   }
 
-  /** "Ready" can be pressed now. */
+  /** The newest state known: the last one waiting to be animated, the one being animated, or the board's. */
+  private latestView(): PlayerView | null {
+    return this.queue.at(-1)?.view ?? (this.busy ? this.incoming : null) ?? this.view;
+  }
+
+  /**
+   * "Ready" can be pressed now. It does not wait for the animations: once the
+   * card is played the turn can be handed over while the castles still build
+   * or crumble.
+   */
   private canReady(): boolean {
-    return this.canAct() && !!this.view && canEndTurn(this.view);
+    const v = this.latestView();
+    return (
+      !!v &&
+      !this.awaiting &&
+      v.phase === 'action' &&
+      v.active === v.viewer &&
+      this.session.isLocal(v.viewer) &&
+      this.curtain.hidden === true &&
+      canEndTurn(v)
+    );
   }
 
   private endTurn(): void {
-    const view = this.view;
+    const view = this.latestView();
     if (view && this.canReady()) this.act({ type: 'endTurn', player: view.viewer });
   }
 
@@ -1114,6 +1165,7 @@ class BoardScreen implements Screen {
 
   /** Jump to a view without replaying its events (game start, resume). */
   private async snapTo(view: PlayerView, starting: boolean): Promise<void> {
+    this.dropCastleMotion();
     if (starting) {
       this.resultsShown = false;
       this.fallenShown = false;
@@ -1352,7 +1404,9 @@ class BoardScreen implements Screen {
         const p = shown[e.player];
         p[e.target] += e.amount;
         this.render();
+        // The castle builds behind the events (its own queue): only a short beat here.
         await fx.built(e.player, e.target, e.amount, ctx, this.heights(e.player));
+        await wait(220);
         break;
       }
       case 'damage': {
@@ -1988,7 +2042,7 @@ class BoardScreen implements Screen {
 
   private act(action: PlayerAction): void {
     if (this.awaiting) return;
-    if (action.type !== 'concede' && action.type !== 'choose' && !this.canAct()) return;
+    if (action.type === 'endTurn' ? !this.canReady() : action.type !== 'concede' && action.type !== 'choose' && !this.canAct()) return;
     this.closeInspect?.();
     this.hand.select(null);
     this.awaiting = action.type !== 'concede';
