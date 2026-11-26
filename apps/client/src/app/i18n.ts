@@ -20,7 +20,6 @@ const STRINGS = {
   // Campaign
   playCampaign: { es: 'Campaña', en: 'Campaign' },
   playCampaignHint: { es: 'Conquista los seis reinos del valle', en: 'Conquer the six kingdoms of the valley' },
-  betaTag: { es: 'Beta', en: 'Beta' },
   campaignTitle: { es: 'El Valle de los Seis Torreones', en: 'The Valley of Six Keeps' },
   campaignNew: { es: 'Nueva campaña', en: 'New campaign' },
   campaignNewLead: { es: 'Empiezas con la Arquitecta, 18 cartas sencillas y tu castillo. Cada territorio que conquistes te da cartas nuevas, y cada héroe que venzas se une a ti.', en: 'You start with the Architect, 18 simple cards and your castle. Every territory you conquer gives you new cards, and every hero you defeat joins you.' },

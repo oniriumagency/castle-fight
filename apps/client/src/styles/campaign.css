@@ -1,19 +1,5 @@
 /* Campaign: map of the six kingdoms, territory panel, dialogues and results. */
 
-.beta-tag {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 7px;
-  border: 1px solid var(--gold);
-  border-radius: 999px;
-  color: var(--gold-l);
-  font-family: var(--display);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
-
 .campaign-screen {
   display: flex;
   flex-direction: column;

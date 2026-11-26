@@ -1,6 +1,6 @@
 # @cardcraft-castles/campaign
 
-El modo Campaña (beta). Todo lo que no es pantalla vive aquí: el mapa, el progreso, los mazos rivales, la dificultad y los textos de la historia. No depende del navegador.
+El modo Campaña. Todo lo que no es pantalla vive aquí: el mapa, el progreso, los mazos rivales, la dificultad y los textos de la historia. No depende del navegador.
 
 - `src/data.ts`: los 6 reinos, sus 5 territorios (4 feudos y el castillo), la Corona final, los capitanes, los terrenos, las cartas iniciales y las recompensas de cada territorio. Las fronteras son las únicas rutas de ataque.
 - `src/progress.ts`: la partida guardada (`CampaignSave`), qué se puede atacar, la colección y el mazo del jugador, el mazo y la dificultad de cada rival, y cómo se arma (`battleSetup`) y se cierra (`settleBattle`) cada batalla. Al perder, el territorio secuestra una copia al azar, que se recupera al conquistarlo.

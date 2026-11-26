@@ -551,7 +551,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
       'header.campaign-bar',
       null,
       backButton(),
-      h('div.campaign-title', null, h('h1', null, t('playCampaign')), h('span.beta-tag', null, t('betaTag'))),
+      h('div.campaign-title', null, h('h1', null, t('playCampaign'))),
       h(
         'div.campaign-stats',
         null,
