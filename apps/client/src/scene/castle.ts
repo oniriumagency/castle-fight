@@ -28,7 +28,6 @@ class PaintedFlag {
     pole: Texture | null = null,
   ) {
     this.pole = pole ? new Sprite(pole) : null;
-    if (this.pole) this.root.addChild(this.pole);
     for (let i = 0; i < FLAG_STRIPS; i++) {
       const u0 = hoistRight ? 1 - i / FLAG_STRIPS : i / FLAG_STRIPS;
       const u1 = hoistRight ? 1 - (i + 1) / FLAG_STRIPS : (i + 1) / FLAG_STRIPS;
@@ -42,6 +41,8 @@ class PaintedFlag {
       this.strips.push(mesh);
       this.root.addChild(mesh);
     }
+    // The mast in front, over the edge of cloth painted around it.
+    if (this.pole) this.root.addChild(this.pole);
   }
 
   /**
