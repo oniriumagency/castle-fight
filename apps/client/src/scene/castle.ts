@@ -2122,6 +2122,11 @@ export class Castle extends Container {
       // A pole off to one side flies its flag outward, clear of the roof.
       const dir = WIND;
       cloth(k.cx + k.apexX, k.topY + k.apex + k.w * 0.04, k.w * 0.8, k.w * 0.3, false, p, dir);
+    } else if (painted && !fallen && !k.broken && this.painted?.ownFlag) {
+      // The Sorceress's dome carries her telescope at its top: her flag stands on the shoulder of the
+      // dome away from it, so it never hides the telescope.
+      const side = k.apexX > 0 ? -1 : 1;
+      cloth(k.cx + side * k.w * 0.3, k.topY - k.crown * 0.74, k.w * 0.8, k.w * 0.3, false, p, WIND);
     }
     // Keep flag (the Sorceress has her orb instead).
     if (!painted && !fallen && !k.broken && s.signature !== 'orb') {
