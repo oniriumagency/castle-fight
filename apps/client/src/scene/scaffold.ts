@@ -190,7 +190,10 @@ export class ScaffoldRig {
         .fill(0xffffff);
       this.body.mask = this.clip;
     } else {
+      // Once it is no longer a mask Pixi draws the clip like any other shape:
+      // left filled, it is a big white block over the castle.
       this.body.mask = null;
+      this.clip.clear();
     }
     this.draw();
   }
