@@ -1,5 +1,6 @@
 import { getCard, getHero, type HeroId } from '@cardcraft-castles/engine';
 import { openCredits } from '../credits';
+import { copyText } from '../../app/platform';
 import {
   BORDERS,
   CAMPAIGN_DIFFICULTIES,
@@ -489,10 +490,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
             type: 'button',
             onclick: () => {
               code.select();
-              void navigator.clipboard?.writeText(code.value).then(
-                () => toast(t('campaignCodeCopied')),
-                () => document.execCommand('copy') && toast(t('campaignCodeCopied')),
-              );
+              void copyText(code.value).then((ok) => ok && toast(t('campaignCodeCopied')));
             },
           },
           t('campaignCopyCode'),

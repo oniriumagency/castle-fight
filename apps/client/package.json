@@ -8,6 +8,7 @@
     "art": "node scripts/build-art.mjs",
     "dev": "node scripts/build-art.mjs && vite",
     "build": "node scripts/build-art.mjs && vite build",
+    "build:itch": "node scripts/build-art.mjs && vite build --mode itch && node scripts/zip-itch.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json"
   },
