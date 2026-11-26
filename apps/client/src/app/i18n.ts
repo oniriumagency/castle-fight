@@ -333,6 +333,8 @@ const STRINGS = {
   activeEvent: { es: 'Activo: {n} ronda(s) más', en: 'Active: {n} more round(s)' },
   activeEventLast: { es: 'Activo hasta el final de la ronda', en: 'Active until the end of the round' },
   comboReady: { es: 'Combo', en: 'Combo' },
+  comboTipWhen: { es: 'se activa si tu jugada anterior fue de {school}.', en: 'is on if your previous play was {school}.' },
+  comboTipBreak: { es: 'Descartar o jugar otra escuela lo rompe.', en: 'Discarding or playing another school breaks it.' },
   costUp: { es: 'Más cara', en: 'Costs more' },
   costDown: { es: 'Más barata', en: 'Costs less' },
   blockedCannotAfford: { es: 'Te falta {resource}: cuesta {cost}.', en: 'Not enough {resource}: it costs {cost}.' },

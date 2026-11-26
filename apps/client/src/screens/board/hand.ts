@@ -1,8 +1,10 @@
 import {
   RESOURCE_NAMES,
+  SCHOOL_NAMES,
   costResource,
   effectiveCost,
   getCard,
+  hasCombo,
   isComboActive,
   isConditionMet,
   playBlocker,
@@ -71,7 +73,7 @@ export class Hand {
   compact = false;
   /** Where the big hover preview goes (mouse only); null disables it. */
   previewHost: HTMLElement | null = null;
-  private preview: { uid: number; el: HTMLElement; source: HTMLElement } | null = null;
+  private preview: { uid: number; el: HTMLElement; source: HTMLElement; tip: HTMLElement | null } | null = null;
   /** Turn and active seat at the last render, to drop the preview when the turn moves on. */
   private lastTurn: string | null = null;
   private readonly spacer = h('div.hand-spacer', { 'aria-hidden': 'true' });
@@ -263,12 +265,36 @@ export class Hand {
     big.style.left = `${x - hostRect.left}px`;
     big.style.top = `${Math.max(64, handTop - w * 1.4 - 12) - hostRect.top}px`;
     host.appendChild(big);
-    this.preview = { uid, el: big, source: slot.el };
+    const tip = hasCombo(slot.cardId) ? this.comboTip(slot.cardId, host, x, w, big) : null;
+    this.preview = { uid, el: big, source: slot.el, tip };
+  }
+
+  /** Beside the preview of a card with a Combo, two lines on how the Combo works. */
+  private comboTip(cardId: string, host: HTMLElement, x: number, w: number, big: HTMLElement): HTMLElement {
+    const school = L(SCHOOL_NAMES[getCard(cardId).school]);
+    const tip = h(
+      'div.combo-tip',
+      { 'aria-hidden': 'true' },
+      h('p', null, h('b', null, t('comboReady')), ' · ', t('comboTipWhen', { school })),
+      h('p', null, t('comboTipBreak')),
+    );
+    host.appendChild(tip);
+    const hostRect = host.getBoundingClientRect();
+    const gap = 14;
+    const tipW = tip.offsetWidth;
+    // On the right of the card; on its left when the screen ends first.
+    const right = x + w + gap;
+    const left = right + tipW <= window.innerWidth - 8 ? right : x - gap - tipW;
+    tip.classList.toggle('on-left', left !== right);
+    tip.style.left = `${left - hostRect.left}px`;
+    tip.style.top = `${parseFloat(big.style.top) + w * 0.18}px`;
+    return tip;
   }
 
   hidePreview(uid?: number): void {
     if (!this.preview || (uid !== undefined && this.preview.uid !== uid)) return;
     this.preview.el.remove();
+    this.preview.tip?.remove();
     this.preview = null;
   }
 
