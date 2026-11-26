@@ -5,7 +5,8 @@ import { settings } from '../app/settings';
 import { artUrl } from '../ui/assets';
 import { DEFAULT_SKY, type SkyMood } from '../ui/theme';
 import { Castle, WIND } from './castle';
-import type { ScarKind } from './paintedCastle';
+import { castleKit, type ScarKind } from './paintedCastle';
+import { trackArt } from './artProgress';
 import {
   KEEP_STONE,
   WALL_STONE,
@@ -182,7 +183,7 @@ function isDefaultMood(mood: SkyMood): boolean {
 
 async function loadArt(path: string): Promise<Texture | null> {
   try {
-    const texture = await Assets.load<Texture>({ src: artUrl(path), parser: 'loadTextures' });
+    const texture = await trackArt(Assets.load<Texture>({ src: artUrl(path), parser: 'loadTextures' }));
     return texture?.width ? texture : null;
   } catch {
     return null;
@@ -241,6 +242,7 @@ export class Battlefield {
   private readonly mid = new Graphics();
   private readonly near = new Graphics();
   private readonly ground = new Graphics();
+  private backdropLoad: Promise<void> = Promise.resolve();
   private readonly paintedSky = new Sprite();
   /** A seamless sky, drawn instead of `paintedSky`. */
   private readonly skyTile = new TilingSprite();
@@ -352,7 +354,19 @@ export class Battlefield {
     this.skyB.alpha = 0;
 
     app.ticker.add((t) => this.update(t.deltaMS));
-    void this.loadBackdrop();
+    this.backdropLoad = this.loadBackdrop().catch(() => undefined);
+  }
+
+  /**
+   * Resolves once the paintings of what is on screen have arrived (backdrop,
+   * the standing castles, decals and scenery props), or after `maxMs`. Until
+   * then the scene would show its drawn stand-ins, so the loading screen
+   * stays up.
+   */
+  artReady(maxMs = 12_000): Promise<void> {
+    const castles = this.castles.filter((c) => c.visible).map((c) => c.whenPainted());
+    const all = Promise.all([this.backdropLoad, castleKit().catch(() => null), ...castles]).then(() => undefined);
+    return Promise.race([all, new Promise<void>((resolve) => setTimeout(resolve, maxMs))]);
   }
 
   /** Swaps the drawn sky and land for the painted layers that exist. */

@@ -1,3 +1,4 @@
+import { trackArt } from './artProgress';
 import { Assets, Container, Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
 import { artUrl } from '../ui/assets';
 import type { ScaffoldParts, ScaffoldPartsMeta } from './scaffold';
@@ -144,7 +145,7 @@ function loadManifest(): Promise<Manifest> {
 
 async function texture(path: string): Promise<Texture | null> {
   try {
-    const t = await Assets.load<Texture>({ src: artUrl(path), parser: 'loadTextures' });
+    const t = await trackArt(Assets.load<Texture>({ src: artUrl(path), parser: 'loadTextures' }));
     return t?.width ? t : null;
   } catch {
     return null;

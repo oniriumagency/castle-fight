@@ -25,6 +25,7 @@ import { toast } from './app/dom';
 import { t } from './app/i18n';
 import { initErrorReporting } from './app/errorReport';
 import { initInstall } from './app/install';
+import { hideLoader, initLoader } from './app/loader';
 import { initOffline } from './app/offline';
 import { initLandscapeOnly } from './app/orientation';
 import { settings } from './app/settings';
@@ -51,6 +52,7 @@ async function boot(): Promise<void> {
   initInstall();
   initOffline();
   initLandscapeOnly();
+  initLoader();
   await initStage();
   initFeedback();
   // Development only: drive effects and sounds from the console.
@@ -61,6 +63,18 @@ async function boot(): Promise<void> {
     if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'm') toggleMute();
   });
 
+  // The loading screen stays up until the scene's paintings are in, so the
+  // drawn stand-ins (old sky, land and castles) never flash before the art.
+  await battlefield().artReady();
+  const routed = route();
+  // One frame for the first screen to be laid out under the loading screen.
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  hideLoader();
+  await routed;
+}
+
+/** Opens the first screen: an invite's room, an unfinished game, the campaign or the menu. */
+async function route(): Promise<void> {
   // Invite link: open the room straight away.
   const roomId = roomIdFromUrl(location.href);
   if (roomId) {
@@ -95,4 +109,5 @@ async function boot(): Promise<void> {
   else flow.menu();
 }
 
-void boot();
+// Whatever happens, the loading screen never stays up for good.
+void boot().finally(hideLoader);
