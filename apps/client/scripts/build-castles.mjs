@@ -555,12 +555,74 @@ async function stacked(input, outDir, piece, override) {
   return { light, plain, glow: { crown: !!crownGlow, base: !!baseGlow }, skirt, width, crown: b.crown, shaft: shaft.height, base: height - b.base, shaftLeft: b.shaftLeft, shaftWidth: b.shaftWidth, apex };
 }
 
+function rowHas(data, width, [fx, , fw], y, alpha) {
+  for (let x = fx; x < fx + fw; x++) if (data[(y * width + x) * 4 + 3] >= alpha) return true;
+  return false;
+}
+
+/**
+ * A farm prop is painted on a slab of earth: a flat-topped plate of grass with
+ * straight sides and a dark band of soil under it. Set on the field, that plate
+ * reads as a board floating over the meadow. Where a frame has one (the rows
+ * at its bottom that run nearly its full width), the plate is worn into a soft,
+ * ragged patch of grass: full under the building, fading out toward its sides
+ * and down through the soil, so the prop sits in the field instead of on a tray.
+ * Trees, grass and rocks have no plate and are left alone.
+ */
+function settleSlab(data, width, [fx, fy, fw, fh]) {
+  const span = (y) => {
+    let l = -1;
+    let r = -1;
+    for (let x = fx; x < fx + fw; x++) {
+      if (data[(y * width + x) * 4 + 3] < 128) continue;
+      if (l < 0) l = x;
+      r = x;
+    }
+    return l < 0 ? 0 : r - l + 1;
+  };
+  // Climb from the bottom while the rows are (nearly) as wide as the frame.
+  // The last few rows may be ragged where the soil was keyed out; start at the first wide one.
+  let y = fy + fh - 1;
+  while (y > fy + fh * 0.9 && span(y) < fw * 0.86) y--;
+  let top = fy + fh;
+  for (; y > fy + fh * 0.6; y--) {
+    if (span(y) < fw * 0.86) break;
+    top = y;
+  }
+  const slab = fy + fh - top;
+  if (slab < fh * 0.04) return false;
+  // The patch reaches a little above the plate's top edge, so its corners round off too.
+  const lift = Math.round(slab * 0.35);
+  const y0 = Math.max(fy, top - lift);
+  const cx = fx + fw / 2;
+  const rx = fw * 0.5;
+  const ry = fy + fh - top;
+  for (let y = y0; y < fy + fh; y++) {
+    for (let x = fx; x < fx + fw; x++) {
+      const i = (y * width + x) * 4 + 3;
+      if (!data[i]) continue;
+      // Ragged rim: a couple of slow waves along the edge, so it is not a clean oval.
+      const wob = 1 + 0.07 * Math.sin(x * 0.11) + 0.05 * Math.sin(x * 0.037 + 1.3) + 0.04 * Math.sin(x * 0.23 + y * 0.05);
+      const u = (x - cx) / (rx * wob);
+      const v = Math.max(0, y - top) / ry;
+      const d = Math.sqrt(u * u + v * v * 1.6);
+      const k = Math.max(0, Math.min(1, (1 - d) / 0.45));
+      // Above the plate only its far corners round off; the building itself is untouched.
+      const keep = y < top ? Math.max(k, 1 - (top - y) / lift) : k;
+      data[i] = Math.round(data[i] * Math.min(1, keep * keep * (3 - 2 * keep)));
+    }
+  }
+  return true;
+}
+
 /**
  * Damage decals: 2x2 sprite sheets of cracks, holes and scorch painted on
  * magenta, shared by every castle. Cracks and holes keep their dark strokes
  * and let their pale stone fade out, so they sit on any hero's masonry.
  * Writes `_comun/<sheet>.webp` and the trimmed frame of each quadrant.
  */
+/** Bump when the scenery props' treatment changes, so their sheets are redone. */
+const PROPS_VERSION = 5;
 const DECALS = { props: null, cracks: { dark: 150, range: 90, power: 0.9 }, holes: { dark: 230, range: 120, power: 0.6 }, scorch: null };
 
 async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
@@ -595,6 +657,11 @@ async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
   if (kind === 'props') {
     for (const f of frames) {
       if (!f) continue;
+      if (settleSlab(data, width, f)) {
+        // The frame ends where the patch is still mostly there, so the prop's foot (its anchor) is on the grass.
+        while (f[3] > 8 && !rowHas(data, width, f, f[1] + f[3] - 1, 60)) f[3]--;
+        continue;
+      }
       const [fx, fy, fw, fh] = f;
       const band = Math.max(4, Math.round(fh * 0.1));
       for (let y = fy + fh - band; y < fy + fh; y++) {
@@ -604,7 +671,7 @@ async function decalSheet(input, outDir, name, kind, grid = 2, size = 1024) {
     }
   }
   await webp(data, width, height, join(outDir, `${name}.webp`));
-  return { kind, frames: grid === 2 ? frames.filter(Boolean) : frames };
+  return { kind, ...(kind === 'props' ? { v: PROPS_VERSION } : {}), frames: grid === 2 ? frames.filter(Boolean) : frames };
 }
 
 /**
@@ -1061,7 +1128,7 @@ async function shared(dir, outDir, manifest, old) {
     const into = group ? (manifest[group] ??= {}) : manifest;
     const was = group ? old[group]?.[name] : old.scaffold;
     // A scaffold cut before its timbers were separated is cut again.
-    if (was && (group || was.parts) && (await mtime(probe)) >= (await mtime(input))) {
+    if (was && (group || was.parts) && (group !== 'props' || was.v === PROPS_VERSION) && (await mtime(probe)) >= (await mtime(input))) {
       into[key] = was;
       continue;
     }

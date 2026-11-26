@@ -510,8 +510,19 @@ export class Castle extends Container {
     const seed = f > 0 ? 17 : 53;
     const r = (n: number): number => hash(seed + n * 1.618);
     const pick = <T,>(list: T[] | undefined, n: number): T | undefined => (list?.length ? list[Math.floor(r(n) * list.length) % list.length] : undefined);
-    const plant = (layer: Container, tex: Texture | undefined, x: number, y: number, size: number, byHeight: boolean, haze: number): void => {
+    const plant = (layer: Container, tex: Texture | undefined, x: number, y: number, size: number, byHeight: boolean, haze: number, shadow = false): void => {
       if (!tex) return;
+      if (shadow) {
+        // A soft shade where it meets the field, so a farm building sits on the grass instead of hovering over it.
+        const w = byHeight ? (size / tex.height) * tex.width : size;
+        const sh = new Sprite(glowTexture('16,14,10'));
+        sh.anchor.set(0.5);
+        sh.width = w * 1.05;
+        sh.height = w * 0.12;
+        sh.position.set(x, y - w * 0.015);
+        sh.alpha = 0.55 * (1 - haze * 0.5);
+        layer.addChild(sh);
+      }
       const sp = new Sprite(tex);
       sp.anchor.set(0.5, 1);
       const k = byHeight ? size / tex.height : size / tex.width;
@@ -526,9 +537,9 @@ export class Castle extends Container {
     // Furthest first, so nearer things overlap them. Out in the field toward the middle, small with
     // distance: a farmstead. Past the castle's outer side: more of it (often off screen on phones).
     const inner = (d: number): number => near + f * kw * d;
-    plant(this.sceneryBack, pick(farms, 10), inner(1.6 + r(11) * 0.6), l.groundY - kw * 0.42, kw * (0.62 + r(12) * 0.12), false, 0.48);
-    plant(this.sceneryBack, pick(farms, 13), inner(2.45 + r(14) * 0.5), l.groundY - kw * 0.38, kw * (0.5 + r(15) * 0.12), false, 0.5);
-    for (let i = 0; i < 2; i++) plant(this.sceneryBack, pick(farms, 20 + i), far - f * kw * (1 + i * 1.1 + r(22 + i) * 0.3), l.groundY - kw * 0.16, kw * (0.95 + r(24 + i) * 0.3), false, 0.32);
+    plant(this.sceneryBack, pick(farms, 10), inner(1.6 + r(11) * 0.6), l.groundY - kw * 0.22, kw * (0.62 + r(12) * 0.12), false, 0.48, true);
+    plant(this.sceneryBack, pick(farms, 13), inner(2.45 + r(14) * 0.5), l.groundY - kw * 0.2, kw * (0.5 + r(15) * 0.12), false, 0.5, true);
+    for (let i = 0; i < 2; i++) plant(this.sceneryBack, pick(farms, 20 + i), far - f * kw * (1 + i * 1.1 + r(22 + i) * 0.3), l.groundY - kw * 0.03, kw * (0.95 + r(24 + i) * 0.3), false, 0.32, true);
     const trees = sc.trees;
     plant(this.sceneryBack, pick(trees, 40), far - f * kw * (0.3 + r(41) * 0.3), l.groundY - kw * 0.06, kw * (2 + r(42) * 0.5), true, 0.18);
     // Between the Keep and the Wall, its crown above the Wall.
