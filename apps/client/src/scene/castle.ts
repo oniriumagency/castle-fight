@@ -103,6 +103,9 @@ export interface CastleLayout {
   maxPoints: number;
 }
 
+/** How long a castle stays hidden waiting for its painting before the drawn one shows instead. */
+const PAINT_WAIT_MS = 8000;
+
 /** The drawn gravestone on a fallen castle; off until there is a painted one. */
 const SHOW_GRAVESTONES = false;
 /** The wind blows the way the clouds drift (right to left): every flag streams that way, on both castles. */
@@ -337,6 +340,8 @@ export class Castle extends Container {
   private keepTower!: Tower;
   /** The hero's painted castle once loaded (null: drawn). */
   private painted: PaintedCastle | null = null;
+  /** The painting being loaded for the current hero (see `loadPainted`). */
+  private paintedLoad: Promise<void> = Promise.resolve();
   private wallStack: Stack | null = null;
   private ruinsSprite: Sprite | null = null;
   /** Soft shadow pooled under a painted castle. */
@@ -421,16 +426,37 @@ export class Castle extends Container {
     });
   }
 
-  /** Swaps in the hero's painted castle if there is one (the drawn one stands until it loads). */
+  /**
+   * Swaps in the hero's painted castle if there is one. While it loads the
+   * castle is not shown at all: the drawn castle is only a stand-in for heroes
+   * with no painting, and flashing it for a moment before the art arrived read
+   * as "the old graphics". If the painting takes too long, the drawn one shows.
+   */
   private loadPainted(): void {
     const hero = this.hero;
-    void paintedCastle(hero).then((set) => {
-      if (hero !== this.hero || set === this.painted || this.destroyed) return;
-      this.painted = set;
-      this.clearScars();
-      this.buildTowers();
-      if (this.layoutValue) this.setLayout(this.layoutValue);
-    });
+    this.renderable = false;
+    const reveal = (): void => {
+      if (hero === this.hero && !this.destroyed) this.renderable = true;
+    };
+    const late = setTimeout(reveal, PAINT_WAIT_MS);
+    this.paintedLoad = paintedCastle(hero)
+      .then((set) => {
+        if (hero !== this.hero || set === this.painted || this.destroyed) return;
+        this.painted = set;
+        this.clearScars();
+        this.buildTowers();
+        if (this.layoutValue) this.setLayout(this.layoutValue);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(late);
+        reveal();
+      });
+  }
+
+  /** Resolves once the castle shows its final look: painted, or drawn when its hero has no painting. */
+  whenPainted(): Promise<void> {
+    return this.paintedLoad;
   }
 
   get keep(): number {

@@ -8,6 +8,7 @@ import { settings } from './settings';
  */
 const STRINGS = {
   // Main menu
+  loading: { es: 'Cargando', en: 'Loading' },
   tagline: { es: 'Levanta tu castillo. Derriba el del rival.', en: 'Raise your castle. Bring down theirs.' },
   playAi: { es: 'Jugar contra la IA', en: 'Play vs AI' },
   playAiHint: { es: 'Una partida rápida contra el ordenador', en: 'A quick match against the computer' },
