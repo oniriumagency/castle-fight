@@ -1575,6 +1575,11 @@
   background: transparent;
 }
 
+/* While the panel appears, presses meant for the board (a card in hand) must not hit its buttons. */
+.results.arming .results-box {
+  pointer-events: none;
+}
+
 .results.peek .results-box > :not(.results-actions) {
   display: none;
 }

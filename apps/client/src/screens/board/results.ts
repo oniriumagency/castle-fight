@@ -93,6 +93,9 @@ function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLEle
   );
 }
 
+/** How long the results ignore presses while they appear (the fade and the panel's entrance, 0.7 s). */
+const ARMING_MS = 900;
+
 /** End of game: victory or defeat banner, why it ended, match statistics and what next. */
 export function showResults(o: ResultsOptions): void {
   const result = o.view.result ?? { winner: null, reason: 'keepDestroyed' as const };
@@ -250,10 +253,18 @@ export function showResults(o: ResultsOptions): void {
     if (need > room + 0.5) box.style.zoom = String(Math.max(0.5, Math.floor((room / need) * 1000) / 1000));
   }
   hideBtn.addEventListener('click', () => {
-    wrap.classList.toggle('peek');
-    hideBtn.textContent = wrap.classList.contains('peek') ? t('back') : t('viewBoard');
+    const peek = wrap.classList.toggle('peek');
+    // Seen from the board, the way back is a solid button that says where it goes:
+    // a plain "Back" over the hand read like part of a card.
+    hideBtn.textContent = peek ? t('viewResults') : t('viewBoard');
+    hideBtn.classList.toggle('ghost', !peek);
+    hideBtn.classList.toggle('primary', peek);
     fit();
   });
+  // The panel takes a moment to fade in over the hand. A click meant for a card in that
+  // moment used to land on "View board" and hide the results before they were ever seen.
+  wrap.classList.add('arming');
+  setTimeout(() => wrap.classList.remove('arming'), ARMING_MS);
   o.host.appendChild(wrap);
   const fitter = new ResizeObserver(() => (wrap.isConnected ? fit() : fitter.disconnect()));
   fitter.observe(wrap);

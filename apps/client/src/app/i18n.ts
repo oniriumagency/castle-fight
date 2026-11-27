@@ -496,6 +496,7 @@ const STRINGS = {
   recordResetConfirm: { es: '¿Seguro? Pulsa otra vez para borrarlo.', en: 'Sure? Press again to clear it.' },
   mainMenu: { es: 'Menú principal', en: 'Main menu' },
   viewBoard: { es: 'Ver tablero', en: 'View board' },
+  viewResults: { es: 'Ver resultados', en: 'Show results' },
 
   // Settings
   language: { es: 'Idioma', en: 'Language' },
