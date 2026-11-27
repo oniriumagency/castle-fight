@@ -1,11 +1,15 @@
 name: Preview
 
-# Publishes a test copy of the game from a branch to its own Worker on
+# Publishes a test copy of the game (the beta) to its own Worker on
 # workers.dev (`cardcraft-castles-preview`). It never touches
 # games.onirium.agency: production is only published from `main` by deploy.yml.
+# Every push to `main` also lands here, so the beta always has everything that
+# is in production; a `preview/**` branch can then put something on the beta
+# alone until the next push to `main`.
 on:
   push:
     branches:
+      - main
       - 'claude/project-thread-sqcjza'
       - 'claude/project-thread-ww9xpy'
       - 'claude/project-thread-lgg34c'

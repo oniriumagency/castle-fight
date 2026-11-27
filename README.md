@@ -62,7 +62,7 @@ Esa compilación (modo `itch`, ver `apps/client/.env.itch`) juega contra el serv
 
 ### Versión de pruebas (preview)
 
-Para probar cambios grandes sin tocar el juego publicado, el flujo [Preview](.github/workflows/preview.yml) publica la rama en un Worker aparte, `cardcraft-castles-preview`, en su dirección de `workers.dev` (sale al final del registro del flujo y en su resumen). Tiene sus propias salas y sus propios reportes, y usa los mismos dos secretos. Se publica en cada push a las ramas que lista el flujo (y a `preview/**`), y nunca toca games.onirium.agency.
+Para probar cambios grandes sin tocar el juego publicado, el flujo [Preview](.github/workflows/preview.yml) publica la rama en un Worker aparte, `cardcraft-castles-preview`, en su dirección de `workers.dev` (sale al final del registro del flujo y en su resumen). Tiene sus propias salas y sus propios reportes, y usa los mismos dos secretos. Se publica en cada push a `main` (así la beta siempre tiene todo lo que está en producción), a las ramas que lista el flujo y a `preview/**`, y nunca toca games.onirium.agency. Una rama `preview/**` deja algo solo en la beta hasta el siguiente push a `main`.
 
 ### Reportes y sugerencias de los jugadores
 
