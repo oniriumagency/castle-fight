@@ -47,6 +47,7 @@ export function openCredits(): void {
       null,
       h('h2', null, t('credits')),
       h('p.credits-lead', null, t('creditsGame')),
+      h('p.credits-lead', null, t('creditsInspired')),
       h('h3', null, t('creditsMusic')),
       h(
         'ul.credits-list',

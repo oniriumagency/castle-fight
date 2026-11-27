@@ -505,6 +505,7 @@ const STRINGS = {
   creditsOpen: { es: 'Ver créditos', en: 'View credits' },
   creditsMusic: { es: 'Música', en: 'Music' },
   creditsGame: { es: 'Un juego de Onirium', en: 'A game by Onirium' },
+  creditsInspired: { es: 'Inspirado en el juego Castle Wars de m0rkeulv', en: 'Inspired by the game Castle Wars by m0rkeulv' },
   sfxVolume: { es: 'Efectos', en: 'Effects' },
   animationSpeed: { es: 'Velocidad de animación', en: 'Animation speed' },
   speedNormal: { es: 'Normal', en: 'Normal' },
