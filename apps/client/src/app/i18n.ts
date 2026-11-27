@@ -505,7 +505,10 @@ const STRINGS = {
   creditsOpen: { es: 'Ver créditos', en: 'View credits' },
   creditsMusic: { es: 'Música', en: 'Music' },
   creditsGame: { es: 'Un juego de Onirium', en: 'A game by Onirium' },
-  creditsInspired: { es: 'Inspirado en el juego Castle Wars de m0rkeulv', en: 'Inspired by the game Castle Wars by m0rkeulv' },
+  creditsInspired: {
+    es: 'Inspirado en el juego Castle Wars de Mads S. Lundemo, a su vez basado en Ants (Mravenci) de Miroslav Němeček',
+    en: 'Inspired by the game Castle Wars by Mads S. Lundemo, itself based on Ants (Mravenci) by Miroslav Němeček',
+  },
   sfxVolume: { es: 'Efectos', en: 'Effects' },
   animationSpeed: { es: 'Velocidad de animación', en: 'Animation speed' },
   speedNormal: { es: 'Normal', en: 'Normal' },
