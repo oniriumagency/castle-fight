@@ -250,8 +250,8 @@ describe('damage', () => {
   it('a Keep at the winning height wins the game', () => {
     const { keepWin } = DEFAULT_RULES;
     const { state } = playCard(scenario({ hand: ['aguja-celeste'], you: { keep: keepWin - 10 } }), 'aguja-celeste');
-    // The Keep never grows past the winning height.
-    expect(state.players[ME].keep).toBe(keepWin);
+    // The whole build counts, even past the winning height.
+    expect(state.players[ME].keep).toBeGreaterThan(keepWin);
     expect(state.result).toEqual({ winner: ME, reason: 'keepBuilt' });
   });
 

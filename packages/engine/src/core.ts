@@ -367,7 +367,7 @@ export function changeWorkers(
   return real;
 }
 
-/** Raise a Keep (capped at the winning height) or a Wall. */
+/** Raise a Keep or a Wall. A Keep may rise past the winning height: the whole build counts. */
 export function build(
   state: GameState,
   events: GameEvent[],
@@ -378,7 +378,7 @@ export function build(
 ): void {
   const p = state.players[player];
   const before = p[target];
-  p[target] = target === 'keep' ? Math.min(state.rules.keepWin, before + amount) : before + amount;
+  p[target] = before + amount;
   const real = p[target] - before;
   if (real > 0) events.push({ type: 'built', player, target, amount: real, reason });
 }
