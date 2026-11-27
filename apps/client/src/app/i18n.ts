@@ -504,6 +504,7 @@ const STRINGS = {
   credits: { es: 'Créditos', en: 'Credits' },
   creditsOpen: { es: 'Ver créditos', en: 'View credits' },
   creditsMusic: { es: 'Música', en: 'Music' },
+  creditsPlaytesters: { es: 'Pruebas de juego', en: 'Playtesters' },
   creditsGame: { es: 'Un juego de Onirium', en: 'A game by Onirium' },
   creditsInspired: {
     es: 'Inspirado en el juego Castle Wars de Mads S. Lundemo, a su vez basado en Ants (Mravenci) de Miroslav Němeček',
