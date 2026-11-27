@@ -39,6 +39,42 @@ const cost = (from: number, to: number): LocalizedText => ({ es: `Coste ${from} 
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    id: '2026-11-27',
+    date: { es: '27 de noviembre de 2026', en: 'November 27, 2026' },
+    title: { es: 'Cartas Divinas', en: 'Divine cards' },
+    lead: {
+      es: 'Una rareza nueva, por encima de la Legendaria. Toma La Corona en la Campaña y el héroe que te llevó hasta allí te da su carta Divina.',
+      en: 'A new rarity, above Legendary. Take the Crown in the Campaign and the hero who got you there gives you their Divine card.',
+    },
+    sections: [
+      {
+        icon: 'hero',
+        title: { es: 'Una por héroe', en: 'One per hero' },
+        body: {
+          es: 'Son seis, una por héroe. Ganas la del héroe con el que vences la batalla final. Para conseguirlas todas, vuelve a tomar La Corona con otro héroe.',
+          en: 'There are six, one per hero. You win the one of the hero you beat the final battle with. To collect them all, take the Crown again with another hero.',
+        },
+        cards: [
+          { id: 'plano-de-la-corona', note: { es: 'La Arquitecta', en: 'The Architect' } },
+          { id: 'juramento-inquebrantable', note: { es: 'El Guardián', en: 'The Warden' } },
+          { id: 'piedra-filosofal', note: { es: 'El Alquimista', en: 'The Alchemist' } },
+          { id: 'invierno-eterno', note: { es: 'La Hechicera', en: 'The Sorceress' } },
+          { id: 'carga-de-la-corona', note: { es: 'El Mariscal', en: 'The Marshal' } },
+          { id: 'la-gran-mecha', note: { es: 'La Saboteadora', en: 'The Saboteur' } },
+        ],
+      },
+      {
+        icon: 'keep',
+        title: { es: 'Solo en tu mazo', en: 'Only in your deck' },
+        points: [
+          { icon: 'sword', text: { es: 'Tus cartas Divinas entran en tu mazo en cada partida: contra la IA, en línea y en la Campaña. Nadie más las tiene.', en: 'Your Divine cards join your deck in every game: against the AI, online and in the Campaign. Nobody else has them.' } },
+          { icon: 'clock', text: { es: 'Llegan pronto: cada una se baraja entre las primeras 20 cartas de tu mazo.', en: 'They come early: each one is shuffled into the first 20 cards of your deck.' } },
+          { icon: 'scroll', text: { es: 'Si ya tomaste La Corona, la carta de ese héroe ya es tuya.', en: 'If you already took the Crown, that hero’s card is already yours.' } },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-11-21',
     date: { es: '21 de noviembre de 2026', en: 'November 21, 2026' },
     title: { es: 'Héroes en equilibrio', en: 'Heroes in balance' },

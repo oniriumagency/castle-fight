@@ -10,11 +10,11 @@ import { attachCardZoom } from './cardZoom';
  * Campaign rewards dealt face down: the player taps each card to claim it.
  * It glows, bursts with light and turns over. The rarer the card, the longer
  * it charges and the bigger the burst, always in its rarity's colour
- * (common warm white, rare blue, epic purple, legendary gold).
+ * (common warm white, rare blue, epic purple, legendary gold, Divine white and sky blue).
  */
 
-const COLOR: Record<Rarity, string> = { comun: '#fff0d0', rara: '#7fc4ff', epica: '#b06cff', legendaria: '#ffb52e' };
-const LIGHT: Record<Rarity, string> = { comun: '#ffffff', rara: '#d8f0ff', epica: '#f0d8ff', legendaria: '#fff2c0' };
+const COLOR: Record<Rarity, string> = { comun: '#fff0d0', rara: '#7fc4ff', epica: '#b06cff', legendaria: '#ffb52e', divina: '#9ff3ff' };
+const LIGHT: Record<Rarity, string> = { comun: '#ffffff', rara: '#d8f0ff', epica: '#f0d8ff', legendaria: '#fff2c0', divina: '#ffffff' };
 
 /** How the reveal builds up, by rarity. */
 const STYLE: Record<Rarity, { charge: number; sparks: number; reach: number; rays: boolean; flash: number }> = {
@@ -22,6 +22,7 @@ const STYLE: Record<Rarity, { charge: number; sparks: number; reach: number; ray
   rara: { charge: 480, sparks: 24, reach: 1.25, rays: false, flash: 0 },
   epica: { charge: 760, sparks: 36, reach: 1.6, rays: true, flash: 0.18 },
   legendaria: { charge: 1150, sparks: 56, reach: 2.1, rays: true, flash: 0.42 },
+  divina: { charge: 1700, sparks: 84, reach: 2.6, rays: true, flash: 0.6 },
 };
 
 const REVEAL_SOUND: Record<Rarity, () => void> = {
@@ -31,6 +32,11 @@ const REVEAL_SOUND: Record<Rarity, () => void> = {
   legendaria: () => {
     audio.play('rarityLegendaria');
     audio.duck(0.35, 1800);
+  },
+  divina: () => {
+    audio.play('rarityLegendaria');
+    audio.play('conquestBig', 0.7, { delay: 150 });
+    audio.duck(0.3, 2600);
   },
 };
 
@@ -54,7 +60,7 @@ function burst(slot: HTMLElement, rarity: Rarity): void {
     const d = size * s.reach * (0.45 + Math.random() * 0.55);
     layer.append(
       h('span.rb-spark', {
-        style: `--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px;--s:${3 + Math.random() * (rarity === 'legendaria' ? 6 : 4)}px;--t:${650 + Math.random() * 650}ms;--c:${i % 3 ? COLOR[rarity] : LIGHT[rarity]}`,
+        style: `--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px;--s:${3 + Math.random() * (rarity === 'legendaria' || rarity === 'divina' ? 6 : 4)}px;--t:${650 + Math.random() * 650}ms;--c:${i % 3 ? COLOR[rarity] : LIGHT[rarity]}`,
       }),
     );
   }
@@ -103,7 +109,7 @@ export function rewardReveal(ids: readonly CardId[], onDone: () => void): Reward
       slot.removeAttribute('role');
       slot.removeAttribute('aria-label');
       audio.play('cardSelect');
-      if (rarity === 'epica' || rarity === 'legendaria') audio.play('uiOpen', 0.5, { delay: 80 });
+      if (rarity === 'epica' || rarity === 'legendaria' || rarity === 'divina') audio.play('uiOpen', 0.5, { delay: 80 });
       const charge = calm() ? 0 : STYLE[rarity].charge;
       setTimeout(() => {
         state = 'shown';
@@ -113,7 +119,7 @@ export function rewardReveal(ids: readonly CardId[], onDone: () => void): Reward
         audio.play('cardDraw', 0.5, { delay: 40 });
         if (!calm()) {
           burst(slot, rarity);
-          if (rarity === 'legendaria' && settings.get().screenShake) {
+          if ((rarity === 'legendaria' || rarity === 'divina') && settings.get().screenShake) {
             const box = slot.closest<HTMLElement>('.results-box');
             box?.classList.add('reward-quake');
             setTimeout(() => box?.classList.remove('reward-quake'), 520);

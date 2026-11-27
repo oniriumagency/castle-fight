@@ -1,6 +1,7 @@
 import { CARDS, DEFAULT_RULES, getCard, isCardId, isHeroId } from '@cardcraft-castles/engine';
 import type { BattleEventId, CardId, HeroId, Rules, SeatOptions } from '@cardcraft-castles/engine';
 import {
+  DIVINE_CARDS,
   FINAL_RIVALS,
   RIVAL_KINGDOMS,
   STARTING_CARDS,
@@ -365,11 +366,19 @@ export interface BattleSetup {
   captain: boolean;
 }
 
-export function battleSetup(save: CampaignSave, territoryId: string, hero: HeroId): BattleSetup {
+/**
+ * `divine`: the Divine cards the player owns (kept outside the campaign, since
+ * they outlast it); they join the player's deck like in any other game.
+ */
+export function battleSetup(save: CampaignSave, territoryId: string, hero: HeroId, divine: readonly CardId[] = []): BattleSetup {
   const territory = getTerritory(territoryId);
   if (!save.allies.includes(hero)) throw new Error(`"${hero}" has not joined the campaign yet`);
   const terrain = territory.terrain ? getTerrain(territory.terrain) : null;
-  const player: SeatOptions = { deck: playerDeck(save), ...(ultimateAwake(save) ? {} : { ultimateLocked: true }) };
+  const player: SeatOptions = {
+    deck: playerDeck(save),
+    ...(divine.length ? { exclusiveCards: divine.slice() } : {}),
+    ...(ultimateAwake(save) ? {} : { ultimateLocked: true }),
+  };
   const base = {
     territory: territoryId,
     rules: { ...terrain?.rules },
@@ -412,6 +421,8 @@ export interface BattleOutcome {
   lost: CardId | null;
   /** The Crown fell: the campaign is over. */
   finished: boolean;
+  /** The Divine card of the hero who took the Crown (the player keeps it whether or not they had it). */
+  divine: CardId | null;
 }
 
 /**
@@ -431,7 +442,7 @@ export function settleBattle(
   if (!pending || pending.id !== battleId) return null;
   const territory = getTerritory(pending.territory);
   const next: CampaignSave = { ...save, pending: null, held: { ...save.held } };
-  const outcome: BattleOutcome = { won, territory: territory.id, rewards: [], recovered: [], ally: null, awakened: false, lost: null, finished: false };
+  const outcome: BattleOutcome = { won, territory: territory.id, rewards: [], recovered: [], ally: null, awakened: false, lost: null, finished: false, divine: null };
 
   if (won) {
     const wasAwake = ultimateAwake(save);
@@ -453,6 +464,7 @@ export function settleBattle(
     if (territory.kind === 'final') {
       next.finished = true;
       outcome.finished = true;
+      outcome.divine = DIVINE_CARDS[pending.hero];
     }
     return { save: next, outcome };
   }

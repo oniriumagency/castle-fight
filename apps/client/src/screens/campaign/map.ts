@@ -1,5 +1,6 @@
 import { getCard, getHero, type HeroId } from '@cardcraft-castles/engine';
 import { openCredits } from '../credits';
+import { ownedDivine } from '../../game/divineStore';
 import { copyText } from '../../app/platform';
 import {
   BORDERS,
@@ -460,7 +461,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
       for (const key of scenes.keys) seen(key);
       save = loadCampaign()!;
       const battleId = `${id}:${Date.now().toString(36)}`;
-      const base = battleSetup(save, id, hero);
+      const base = battleSetup(save, id, hero, ownedDivine());
       // The guided first battle: the captain plays as softly as the AI can.
       const setup = tutorial.done('battle') ? base : { ...base, tier: 0 };
       save = startBattle(save, id, hero, battleId);

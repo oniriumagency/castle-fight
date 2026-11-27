@@ -25,7 +25,7 @@ import type {
 
 export const SCHOOLS: readonly School[] = ['construccion', 'asalto', 'arcano'];
 export const RESOURCES: readonly Resource[] = ['piedra', 'acero', 'mana'];
-export const RARITIES: readonly Rarity[] = ['comun', 'rara', 'epica', 'legendaria'];
+export const RARITIES: readonly Rarity[] = ['comun', 'rara', 'epica', 'legendaria', 'divina'];
 
 /** Resource that pays for the cards of each school. */
 export const SCHOOL_RESOURCE: Record<School, Resource> = {
@@ -48,7 +48,7 @@ export const DEFAULT_RULES: Readonly<Rules> = Object.freeze({
   turnSeconds: design.rules.turnSeconds,
   maxEnchantments: design.rules.maxEnchantments,
   eventEveryRounds: design.rules.eventEveryRounds,
-  deckCopies: Object.freeze({ comun: 4, rara: 3, epica: 2, legendaria: 1 }),
+  deckCopies: Object.freeze({ comun: 4, rara: 3, epica: 2, legendaria: 1, divina: 0 }),
   burnDamage: 3,
   burnMaxTurns: 6,
   frostMaxTurns: 3,

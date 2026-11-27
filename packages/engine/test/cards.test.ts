@@ -709,6 +709,45 @@ const CARD_TESTS: Record<string, () => void> = {
     expect(state.players[OPP].discard).toHaveLength(2);
     expect(state.players[OPP].keep).toBe(44);
   },
+
+  // ----- Divinas (one per hero, won by taking the Crown) ---------------------
+  'plano-de-la-corona': () => {
+    const { state } = play('plano-de-la-corona', { keepTurn: false });
+    expect([state.players[ME].keep, state.players[ME].wall]).toEqual([80, 35]);
+    expect(state.players[ME].workers).toEqual({ piedra: 3, acero: 2, mana: 2 });
+    expect(state.players[ME].resources.piedra).toBe(24);
+    expectExtraPlay(state);
+  },
+  'juramento-inquebrantable': () => {
+    const { state } = play('juramento-inquebrantable');
+    expect([state.players[ME].wall, state.players[ME].keep, state.players[ME].shield]).toEqual([50, 60, 2]);
+  },
+  'piedra-filosofal': () => {
+    const { state } = play('piedra-filosofal');
+    expect(state.players[ME].workers).toEqual({ piedra: 3, acero: 3, mana: 3 });
+    expect(state.players[ME].resources).toEqual({ piedra: 60, acero: 60, mana: 38 });
+    expect(state.players[ME].keep).toBe(58);
+  },
+  'invierno-eterno': () => {
+    const { state } = play('invierno-eterno');
+    const target = state.players[OPP];
+    expect([target.wall, target.keep]).toEqual([15, 35]);
+    expect(target.burn).toBe(4);
+    expect(target.frost).toEqual({ piedra: 2, acero: 2, mana: 2 });
+  },
+  'carga-de-la-corona': () => {
+    const { state, events } = play('carga-de-la-corona');
+    // Four hits of 11: the first takes the Wall to 4, the rest break through.
+    expect(eventsOf(events, 'damage')).toHaveLength(4);
+    expect([state.players[OPP].wall, state.players[OPP].keep]).toEqual([0, 21]);
+  },
+  'la-gran-mecha': () => {
+    const { state } = play('la-gran-mecha', { opponentHand: ['escaramuza', 'parapeto', 'catapulta'] });
+    const workers = (p: number): number => Object.values(state.players[p]!.workers).reduce((a, b) => a + b, 0);
+    expect([workers(ME), workers(OPP)]).toEqual([7, 5]);
+    expect(state.players[OPP].hand).toHaveLength(1);
+    expect(state.players[OPP].keep).toBe(35);
+  },
 };
 
 describe('cards', () => {

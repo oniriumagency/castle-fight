@@ -1269,3 +1269,21 @@
     font-size: 9px;
   }
 }
+
+/* Divine rewards (the Crown): the biggest reveal of all, in white light and sky blue. */
+.campaign-rewards li.r-divina { color: #bff4ff; }
+.reward-slot.r-divina.revealed .reward-aura { inset: -28%; opacity: 0.7; }
+.reward-slot.r-divina.charging .reward-flip { animation: reward-shake-big 0.07s linear infinite, reward-rise 1.7s ease-out forwards; }
+.reward-slot.r-divina.charging .back-side .card {
+  box-shadow: var(--drop), 0 0 18px 6px var(--rl), 0 0 60px 20px var(--rc);
+  filter: brightness(1.6) saturate(1.1);
+}
+.reward-burst.r-divina .rb-flash { width: calc(var(--size) * 2.8); height: calc(var(--size) * 2.8); animation-duration: 1.5s; }
+.reward-burst.r-divina .rb-ring { border-width: 5px; animation-duration: 1.3s; }
+.reward-burst.r-divina .rb-rays { width: calc(var(--size) * 5); height: calc(var(--size) * 5); animation-duration: 2.6s; }
+
+.campaign-divine {
+  color: #bff4ff;
+  font-weight: 700;
+  text-shadow: 0 0 12px rgb(140 225 255 / 55%);
+}

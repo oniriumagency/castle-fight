@@ -1240,6 +1240,108 @@
         "en": "Each rival discards 2 random cards and takes 4 piercing damage."
       },
       "art": "cards/quema-de-pergaminos.jpg"
+    },
+    {
+      "id": "plano-de-la-corona",
+      "school": "construccion",
+      "rarity": "divina",
+      "cost": 26,
+      "name": {
+        "es": "Plano de la Corona",
+        "en": "The Crown's Blueprint"
+      },
+      "text": {
+        "es": "+30 Castillo, +20 Muralla y +1 Cantero. Juega otra carta este turno.",
+        "en": "+30 Castle, +20 Wall and +1 Mason. Play another card this turn."
+      },
+      "art": "cards/plano-de-la-corona.jpg"
+    },
+    {
+      "id": "juramento-inquebrantable",
+      "school": "construccion",
+      "rarity": "divina",
+      "cost": 26,
+      "name": {
+        "es": "Juramento Inquebrantable",
+        "en": "Unbreakable Oath"
+      },
+      "text": {
+        "es": "+35 Muralla, +10 Castillo y Escudo: bloquea los próximos 2 ataques que recibas.",
+        "en": "+35 Wall, +10 Castle and Shield: block the next 2 attacks against you."
+      },
+      "art": "cards/juramento-inquebrantable.jpg"
+    },
+    {
+      "id": "piedra-filosofal",
+      "school": "arcano",
+      "rarity": "divina",
+      "cost": 22,
+      "name": {
+        "es": "Piedra Filosofal",
+        "en": "Philosopher's Stone"
+      },
+      "text": {
+        "es": "+1 Cantero, +1 Herrero y +1 Arcanista, +10 de cada recurso y +8 Castillo.",
+        "en": "+1 Mason, +1 Smith and +1 Arcanist, +10 of each resource and +8 Castle."
+      },
+      "art": "cards/piedra-filosofal.jpg"
+    },
+    {
+      "id": "invierno-eterno",
+      "school": "arcano",
+      "rarity": "divina",
+      "cost": 26,
+      "name": {
+        "es": "Invierno Eterno",
+        "en": "Eternal Winter"
+      },
+      "text": {
+        "es": "15 de daño perforante, Quemadura durante 4 turnos y Escarcha: ningún recurso del rival produce durante 2 turnos.",
+        "en": "15 piercing damage, Burn for 4 turns and Frost: none of your opponent's resources produce for 2 turns."
+      },
+      "textFfa": {
+        "es": "9 de daño perforante y Quemadura durante 2 turnos a cada rival. Escarcha: ningún recurso de tus rivales produce durante 2 turnos.",
+        "en": "9 piercing damage and Burn for 2 turns on each rival. Frost: none of your rivals' resources produce for 2 turns."
+      },
+      "art": "cards/invierno-eterno.jpg"
+    },
+    {
+      "id": "carga-de-la-corona",
+      "school": "asalto",
+      "rarity": "divina",
+      "cost": 26,
+      "name": {
+        "es": "Carga de la Corona",
+        "en": "The Crown's Charge"
+      },
+      "text": {
+        "es": "11 de daño, cuatro veces.",
+        "en": "11 damage, four times."
+      },
+      "textFfa": {
+        "es": "7 de daño a cada rival, cuatro veces.",
+        "en": "7 damage to each rival, four times."
+      },
+      "art": "cards/carga-de-la-corona.jpg"
+    },
+    {
+      "id": "la-gran-mecha",
+      "school": "asalto",
+      "rarity": "divina",
+      "cost": 22,
+      "name": {
+        "es": "La Gran Mecha",
+        "en": "The Great Fuse"
+      },
+      "text": {
+        "es": "Roba 1 trabajador del rival. Además, pierde 2 cartas al azar y recibe 15 de daño perforante.",
+        "en": "Steal 1 of your opponent's workers. They also discard 2 random cards and take 15 piercing damage."
+      },
+      "textFfa": {
+        "es": "Cada rival pierde 1 trabajador (tú ganas 1) y 2 cartas al azar, y recibe 9 de daño perforante.",
+        "en": "Each rival loses 1 worker (you gain 1) and 2 random cards, and takes 9 piercing damage."
+      },
+      "art": "cards/la-gran-mecha.jpg"
     }
   ],
   "heroes": [

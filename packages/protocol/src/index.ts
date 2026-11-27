@@ -258,6 +258,11 @@ export type RoomClientMessage =
       hero: HeroChoice;
       /** Public random id this browser keeps, so opponents can keep a head-to-head record. See `isPlayerId`. */
       pid?: string;
+      /**
+       * Divine cards this player won in the campaign (kept on their device):
+       * one copy of each joins their deck. See `parseDivineCards`.
+       */
+      divine?: string[];
     }
   /** Take back your seat after a disconnect, with the token from `welcome`. */
   | { type: 'resume'; v: number; token: string }

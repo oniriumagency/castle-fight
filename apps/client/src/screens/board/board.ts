@@ -1694,7 +1694,8 @@ class BoardScreen implements Screen {
     if (gen !== this.animGen || this.playedCard !== card) return;
     const landed = card.getBoundingClientRect();
     this.playBurst(cardId, combo);
-    if (getCard(cardId).rarity === 'legendaria') this.showLegendaryCall(landed);
+    const rarity = getCard(cardId).rarity;
+    if (rarity === 'legendaria' || rarity === 'divina') this.showLegendaryCall(landed, rarity === 'divina');
     await fx.cardLanded(cardId, { x: landed.left + landed.width / 2, y: landed.top + landed.height / 2 }, combo, this.fxContext());
     await wait(combo ? 520 : 380);
   }
@@ -1760,12 +1761,13 @@ class BoardScreen implements Screen {
   }
 
   /** "¡Legendaria!" bursting out over a legendary card as it lands. */
-  private showLegendaryCall(at: DOMRect): void {
+  private showLegendaryCall(at: DOMRect, divine = false): void {
+    const text = t(divine ? 'divineCall' : 'legendaryCall');
     const call = h(
       'div.legend-call',
-      { 'aria-hidden': 'true', style: `left:${at.left + at.width / 2}px;top:${at.top + Math.min(at.height * 0.22, 90)}px` },
+      { class: divine ? 'divine' : '', 'aria-hidden': 'true', style: `left:${at.left + at.width / 2}px;top:${at.top + Math.min(at.height * 0.22, 90)}px` },
       h('div.legend-call-rays'),
-      h('strong', { 'data-text': t('legendaryCall') }, t('legendaryCall')),
+      h('strong', { 'data-text': text }, text),
     );
     this.floaters.appendChild(call);
     setTimeout(() => call.remove(), 2200);

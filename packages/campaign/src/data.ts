@@ -58,6 +58,14 @@ export interface Territory {
   rewards: CardId[];
   /** Territory battles only. */
   captain?: Captain;
+  /** How the Spanish name agrees ("la Corona es tuya", "los Molinos son tuyos"): masculine singular when absent. */
+  grammar?: NameGrammar;
+}
+
+/** Gender and number of a Spanish place name (the English names only need the number). */
+export interface NameGrammar {
+  feminine?: boolean;
+  plural?: boolean;
 }
 
 export interface Terrain {
@@ -127,7 +135,40 @@ const T = (
   terrain: TerrainId | null,
   rewards: CardId[],
   captain?: Captain,
-): Territory => ({ id, kingdom, kind, name: { es, en }, x, y, terrain, rewards, ...(captain ? { captain } : {}) });
+): Territory => ({
+  id,
+  kingdom,
+  kind,
+  name: { es, en },
+  x,
+  y,
+  terrain,
+  rewards,
+  ...(captain ? { captain } : {}),
+  ...(GRAMMAR[id] ? { grammar: GRAMMAR[id] } : {}),
+});
+
+/** Territories whose Spanish name is not masculine singular. */
+const GRAMMAR: Record<string, NameGrammar> = {
+  'bastion-b': { feminine: true }, // Atalaya Gris
+  'bastion-d': { feminine: true }, // Cantera del Juramento
+  'alambiques-a': { plural: true }, // Molinos de Cobre
+  'alambiques-b': { plural: true }, // Huertos de Salitre
+  'alambiques-c': { feminine: true }, // Laguna Esmeralda
+  'alambiques-d': { feminine: true, plural: true }, // Minas Burbujeantes
+  'alambiques-castillo': { feminine: true }, // Torre de los Alambiques
+  'ceniza-a': { feminine: true }, // Ciénaga de Hollín
+  'ceniza-c': { plural: true }, // Túneles del Contrabando
+  'ceniza-castillo': { feminine: true }, // Guarida de la Mecha
+  'escarcha-c': { feminine: true, plural: true }, // Ruinas del Augur
+  'escarcha-d': { feminine: true }, // Cumbre Helada
+  'escarcha-castillo': { feminine: true }, // Torre de la Llama Helada
+  'carmesi-b': { feminine: true }, // Forja Roja
+  'carmesi-c': { feminine: true }, // Llanura de Batalla
+  'carmesi-d': { plural: true }, // Cuarteles del Norte
+  'carmesi-castillo': { feminine: true }, // Fortaleza Carmesí
+  corona: { feminine: true }, // La Corona
+};
 
 const cap = (name: string, es: string, en: string): Captain => ({ name, line: { es, en }, ...(FEMALE.has(name) ? { female: true } : {}) });
 /** The captains who are women (the rest are men). */
@@ -253,6 +294,19 @@ export function kingdomOfHero(hero: HeroId): Kingdom | null {
 
 /** Every rival kingdom, in map order. */
 export const RIVAL_KINGDOMS: readonly KingdomId[] = ['bastion', 'alambiques', 'ceniza', 'escarcha', 'carmesi'];
+
+/**
+ * The Divine card each hero earns by taking the Crown: whoever wins the final
+ * battle with a hero keeps that hero's card for good, in every game they play.
+ */
+export const DIVINE_CARDS: Readonly<Record<HeroId, CardId>> = {
+  arquitecta: 'plano-de-la-corona',
+  guardian: 'juramento-inquebrantable',
+  alquimista: 'piedra-filosofal',
+  hechicera: 'invierno-eterno',
+  mariscal: 'carga-de-la-corona',
+  saboteadora: 'la-gran-mecha',
+};
 
 /** The two heroes the Twilight takes hold of for the final battle. */
 export const FINAL_RIVALS: readonly HeroId[] = ['mariscal', 'hechicera'];

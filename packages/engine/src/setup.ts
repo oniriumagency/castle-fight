@@ -23,16 +23,28 @@ export interface GameOptions {
 export interface SeatOptions {
   /** The cards this seat's deck is built from, copies included. Default: the common deck. */
   deck?: readonly CardId[];
+  /**
+   * Cards only this player owns (the Divine cards won in the campaign), one
+   * copy each, added to the deck and shuffled into its first
+   * `EXCLUSIVE_CARD_DEPTH` cards so they show up in a normal game.
+   */
+  exclusiveCards?: readonly CardId[];
   /** Play without the hero's passive (campaign captains). */
   noPassive?: boolean;
   /** No ultimate this game: it neither charges nor can be used. */
   ultimateLocked?: boolean;
 }
 
+/** How deep in the deck an exclusive card is shuffled: it comes up within the first few turns. */
+export const EXCLUSIVE_CARD_DEPTH = 20;
+
 function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean, seat: SeatOptions = {}): PlayerState {
   const rules = state.rules;
   const passive = seat.noPassive ? {} : heroPassiveFor(hero, multiplayer);
-  const deckList = seat.deck ? seat.deck.slice().sort() : null;
+  const exclusive = [...new Set(seat.exclusiveCards ?? [])];
+  const base = seat.deck ? seat.deck.slice() : exclusive.length ? buildDeckList(rules) : null;
+  // The deck list is public (the AI reads it): it includes the exclusive cards.
+  const deckList = base ? [...base, ...exclusive].sort() : null;
   return {
     hero,
     ...(seat.noPassive ? { noPassive: true } : {}),
@@ -43,7 +55,7 @@ function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean, seat
     resources: emptyResources(rules.resourceStart),
     workers: emptyResources(rules.workerStart),
     hand: [],
-    deck: shuffle(state, deckList ? deckList.slice() : buildDeckList(rules)),
+    deck: dealExclusive(state, shuffle(state, base ? base.sort() : buildDeckList(rules)), exclusive),
     discard: [],
     enchantments: [],
     burn: 0,
@@ -59,6 +71,15 @@ function createPlayer(state: GameState, hero: HeroId, multiplayer: boolean, seat
     schoolsThisTurn: [],
     schoolsLastTurn: [],
   };
+}
+
+/** Puts each exclusive card at a random place among the next `EXCLUSIVE_CARD_DEPTH` draws (the end of the array). */
+function dealExclusive(state: GameState, deck: CardId[], cards: CardId[]): CardId[] {
+  for (const cardId of cards) {
+    const fromTop = randomInt(state, Math.min(EXCLUSIVE_CARD_DEPTH, deck.length + 1));
+    deck.splice(deck.length - fromTop, 0, cardId);
+  }
+  return deck;
 }
 
 /**
@@ -77,6 +98,9 @@ export function createGame(options: GameOptions): { state: GameState; events: Ga
     if (!seat?.deck) continue;
     if (seat.deck.length < 12) throw new Error('A custom deck needs at least 12 cards');
     for (const cardId of seat.deck) if (!isCardId(cardId)) throw new Error(`Unknown card "${cardId}"`);
+  }
+  for (const seat of options.seats ?? []) {
+    for (const cardId of seat?.exclusiveCards ?? []) if (!isCardId(cardId)) throw new Error(`Unknown card "${cardId}"`);
   }
   const rules: Rules = {
     ...DEFAULT_RULES,

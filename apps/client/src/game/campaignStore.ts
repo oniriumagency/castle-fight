@@ -1,3 +1,4 @@
+import { grantDivine, grantFromCampaign } from './divineStore';
 import { isFutureCampaign, markSeen, newCampaign, parseCampaign, settleBattle, type BattleOutcome, type CampaignDifficulty, type CampaignSave } from '@cardcraft-castles/campaign';
 
 /**
@@ -64,11 +65,13 @@ export function loadCampaign(): CampaignSave | null {
       }
       if (!current || progressOf(recovered) > progressOf(current)) {
         write(KEY, recovered);
+        grantFromCampaign(recovered);
         return recovered;
       }
     }
   }
   if (current && stored !== JSON.stringify(current)) write(KEY, current); // Upgraded or tidied: store it in the current format.
+  grantFromCampaign(current);
   return current;
 }
 
@@ -133,5 +136,6 @@ export function settleCampaignBattle(battleId: string, won: boolean): BattleOutc
   const result = settleBattle(save, battleId, won);
   if (!result) return null;
   saveCampaign(result.save);
+  if (result.outcome.divine) grantDivine(result.outcome.divine);
   return result.outcome;
 }

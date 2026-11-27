@@ -8,6 +8,7 @@ import { setScreenName } from '../app/reportContext';
 import { modal, show, type Screen } from '../app/router';
 import { battlefield } from '../app/stage';
 import { audio } from '../fx/audio';
+import { ownedDivine } from '../game/divineStore';
 import { OnlineSession, online } from '../net/online';
 import { iconSvg } from '../ui/assets';
 import { muteButton } from '../ui/muteButton';
@@ -22,7 +23,7 @@ import { flow, nickname, setRoomInUrl } from './flow';
  */
 export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
   setRoomInUrl(roomId);
-  const connection = online.joinRoom(roomId, { nickname: nickname(), hero });
+  const connection = online.joinRoom(roomId, { nickname: nickname(), hero, divine: ownedDivine() });
   const session = new OnlineSession(connection);
   let opened = false;
 

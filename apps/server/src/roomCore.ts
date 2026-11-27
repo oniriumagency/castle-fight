@@ -18,6 +18,7 @@ import {
   type GameEvent,
   type GameState,
   type HeroId,
+  type CardId,
   type PlayerId,
 } from '@cardcraft-castles/engine';
 import {
@@ -25,6 +26,7 @@ import {
   MAX_SPECTATORS,
   PROTOCOL_VERSION,
   cleanNickname,
+  parseDivineCards,
   parseRoomClientMessage,
   type ActionIntent,
   type Emote,
@@ -77,6 +79,8 @@ export interface SeatRecord {
   rematch: boolean;
   /** Turn timeouts in a row. */
   timeouts: number;
+  /** Divine cards the player brings (from `join`); absent when none. */
+  divine?: CardId[];
 }
 
 /** Everything a room stores. One record, so each change is a single write. */
@@ -217,7 +221,7 @@ export class RoomCore<S> {
     }
     switch (message.type) {
       case 'join':
-        return this.join(socket, message.v, message.nickname, message.hero, message.pid);
+        return this.join(socket, message.v, message.nickname, message.hero, message.pid, message.divine);
       case 'resume':
         return this.resume(socket, message.v, message.token);
       case 'action':
@@ -378,7 +382,7 @@ export class RoomCore<S> {
   // Messages
   // -------------------------------------------------------------------------
 
-  private join(socket: S, version: number, nickname: string, hero: HeroChoice, pid?: string): void {
+  private join(socket: S, version: number, nickname: string, hero: HeroChoice, pid?: string, divine?: string[]): void {
     if (!this.checkVersion(socket, version)) return;
     const room = this.record;
     if (this.host.seatOf(socket) !== null) return this.error(socket, 'alreadySeated', 'You already have a seat');
@@ -401,6 +405,7 @@ export class RoomCore<S> {
       left: false,
       rematch: false,
       timeouts: 0,
+      ...(divine?.length ? { divine: parseDivineCards(divine) } : {}),
     };
     this.dirty = true;
     this.host.setSeat(socket, seat);
@@ -561,6 +566,8 @@ export class RoomCore<S> {
       heroes,
       ...(winner === null ? {} : { firstPlayer: (winner + 1) % seats.length }),
       rules: { turnSeconds: room.timings.turnSeconds, manualEndTurn: true, ...(room.twilight === false ? { twilightRound: 0 } : {}) },
+      // Each player's Divine cards join their own deck only.
+      ...(seats.some((s) => s.divine?.length) ? { seats: seats.map((s) => (s.divine?.length ? { exclusiveCards: parseDivineCards(s.divine) } : {})) } : {}),
     });
     seats.forEach((s, i) => {
       s.hero = heroes[i]!;
