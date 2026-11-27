@@ -28,7 +28,12 @@ export type LocalizedText = Record<Locale, string>;
 
 export type School = 'construccion' | 'asalto' | 'arcano';
 export type Resource = 'piedra' | 'acero' | 'mana';
-export type Rarity = 'comun' | 'rara' | 'epica' | 'legendaria';
+/**
+ * `divina`: one card per hero, won by taking the Crown in the campaign with
+ * that hero. Never in the common deck (0 copies): only the player who won it
+ * brings it, through `SeatOptions.exclusiveCards`.
+ */
+export type Rarity = 'comun' | 'rara' | 'epica' | 'legendaria' | 'divina';
 export type ResourceMap = Record<Resource, number>;
 
 /** Ids come from `design/cards.json`; they are validated when the catalog loads. */

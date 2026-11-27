@@ -179,4 +179,30 @@ export const CARD_EFFECTS: Record<CardId, EffectOp[]> = {
     { op: 'discardRandom', count: 2 },
     { op: 'damage', amount: 6, kind: 'piercing' },
   ],
+  // Divine cards: one per hero, won by taking the Crown with them (never in the common deck).
+  'plano-de-la-corona': [
+    { op: 'keep', amount: 30 },
+    { op: 'wall', amount: 20 },
+    { op: 'gainWorker', worker: 'piedra', amount: 1 },
+    { op: 'extraPlay' },
+  ],
+  'juramento-inquebrantable': [{ op: 'wall', amount: 35 }, { op: 'keep', amount: 10 }, { op: 'shield', charges: 2 }],
+  'piedra-filosofal': [
+    { op: 'gainWorker', worker: 'piedra', amount: 1 },
+    { op: 'gainWorker', worker: 'acero', amount: 1 },
+    { op: 'gainWorker', worker: 'mana', amount: 1 },
+    { op: 'gainResource', resource: 'all', amount: 10 },
+    { op: 'keep', amount: 8 },
+  ],
+  'invierno-eterno': [
+    { op: 'damage', amount: 15, kind: 'piercing' },
+    { op: 'burn', turns: 4 },
+    { op: 'frost', scope: 'all', turns: 2 },
+  ],
+  'carga-de-la-corona': [{ op: 'damage', amount: 11, times: 4 }],
+  'la-gran-mecha': [
+    { op: 'stealWorker' },
+    { op: 'discardRandom', count: 2 },
+    { op: 'damage', amount: 15, kind: 'piercing' },
+  ],
 };

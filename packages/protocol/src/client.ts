@@ -555,6 +555,8 @@ export interface JoinOptions {
   hero: HeroChoice;
   /** Public browser id; `OnlineClient.joinRoom` fills it in. */
   pid?: string;
+  /** Divine cards the player won in the campaign: they join their deck. */
+  divine?: string[];
 }
 
 interface StoredSeat {

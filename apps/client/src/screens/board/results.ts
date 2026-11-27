@@ -1,4 +1,4 @@
-import { getHero, type HeroId, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
+import { getHero, type CardId, type HeroId, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
 import { callAttention } from '../../app/attention';
 import { logEvent } from '../../app/eventLog';
 import { h, html } from '../../app/dom';
@@ -11,7 +11,7 @@ import type { MatchStats } from '../../game/stats';
 import { faceImg, iconSvg } from '../../ui/assets';
 import { heroCss } from '../../ui/theme';
 import { heroSelectScreen, type HeroSelectMode } from '../heroSelect';
-import { getTerritory, type BattleOutcome } from '@cardcraft-castles/campaign';
+import { DIVINE_CARDS, getTerritory, type BattleOutcome } from '@cardcraft-castles/campaign';
 import type { LocalSession } from '../../game/localSession';
 import { cardFace } from '../../ui/card';
 import { attachCardZoom } from '../../ui/cardZoom';
@@ -66,12 +66,30 @@ function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 
   );
 }
 
+/** Cards dealt face down after a campaign battle: the territory's rewards, then the Divine card for taking the Crown. */
+const claimable = (outcome: BattleOutcome): CardId[] => [...outcome.rewards, ...(outcome.divine ? [outcome.divine] : [])];
+
+const heroOfDivine = (cardId: CardId): HeroId => (Object.keys(DIVINE_CARDS) as HeroId[]).find((hero) => DIVINE_CARDS[hero] === cardId)!;
+
 /**
  * Campaign: what the battle won or cost (cards, an ally, the ultimate waking up).
  * New cards come face down to be claimed one by one; `onClaimed` runs when all are turned.
  */
 function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLElement {
-  const name = L(getTerritory(outcome.territory).name);
+  const territory = getTerritory(outcome.territory);
+  const name = L(territory.name);
+  // "¡La Corona es tuya!", "¡Los Molinos de Cobre son tuyos!": the words agree with the place.
+  const { feminine = false, plural = false } = territory.grammar ?? {};
+  const agree = {
+    name,
+    es: plural ? 'son' : 'es',
+    tuyo: `tuy${feminine ? 'a' : 'o'}${plural ? 's' : ''}`,
+    queda: plural ? 'quedan' : 'queda',
+    lo: `${feminine ? 'la' : 'lo'}${plural ? 's' : ''}`,
+    is: plural ? 'are' : 'is',
+    keeps: plural ? 'keep' : 'keeps',
+    it: plural ? 'them' : 'it',
+  };
   const cards = (ids: readonly string[], small = false): HTMLElement =>
     h(
       'div.campaign-cards',
@@ -85,12 +103,13 @@ function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLEle
   return h(
     'div.campaign-summary',
     null,
-    outcome.won ? h('h2', null, t('campaignConqueredTitle', { name })) : null,
+    outcome.won ? h('h2', null, t('campaignConqueredTitle', agree)) : null,
     outcome.ally ? h('p.campaign-ally', null, t('campaignRewardHero', { hero: L(getHero(outcome.ally).name) })) : null,
     outcome.awakened ? h('p.campaign-awake', null, t('campaignUltimateAwake')) : null,
-    outcome.rewards.length ? rewardReveal(outcome.rewards, onClaimed).el : null,
+    outcome.divine ? h('p.campaign-divine', null, t('campaignDivine', { hero: L(getHero(heroOfDivine(outcome.divine)).name) })) : null,
+    claimable(outcome).length ? rewardReveal(claimable(outcome), onClaimed).el : null,
     outcome.recovered.length ? [h('h3', null, t('campaignRecovered')), cards(outcome.recovered, true)] : null,
-    outcome.lost ? [h('p.campaign-lost', null, t('campaignLost', { name })), cards([outcome.lost])] : null,
+    outcome.lost ? [h('p.campaign-lost', null, t('campaignLost', agree)), cards([outcome.lost])] : null,
   );
 }
 
@@ -184,7 +203,7 @@ export function showResults(o: ResultsOptions): void {
     'button.btn.big',
     {
       // Campaign rewards still face down: no way back to the map until they are claimed.
-      class: `${campaign && !(campaignOutcome && !campaignOutcome.won && o.onRetry) ? 'primary' : ''}${campaignOutcome?.rewards.length ? ' unclaimed' : ''}`,
+      class: `${campaign && !(campaignOutcome && !campaignOutcome.won && o.onRetry) ? 'primary' : ''}${campaignOutcome && claimable(campaignOutcome).length ? ' unclaimed' : ''}`,
       type: 'button',
       onclick: () => (audio.play('uiBack'), o.onExit()),
     },

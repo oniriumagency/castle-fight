@@ -28,6 +28,20 @@ describe('seating', () => {
     expect(room.core.takeDirty()).toBe(true);
   });
 
+  it('puts each player’s Divine cards in their own deck only, and drops anything else they send', () => {
+    const room = makeRoom();
+    const a = room.connect('ana');
+    const b = room.connect('bea');
+    room.send(a, { type: 'join', v: PROTOCOL_VERSION, nickname: 'Ana', hero: 'arquitecta', divine: ['la-gran-mecha', 'la-gran-mecha', 'catapulta', 'nope'] });
+    room.join(b, 'Bea', 'mariscal');
+    const [ana, bea] = room.record.game!.players;
+    const cards = (p: typeof ana): string[] => [...p!.deck, ...p!.hand.map((c) => c.cardId)];
+    expect(cards(ana).filter((id) => id === 'la-gran-mecha')).toHaveLength(1);
+    expect(cards(ana).filter((id) => id === 'catapulta')).toHaveLength(3);
+    expect(cards(bea)).not.toContain('la-gran-mecha');
+    expect(bea!.deckList).toBeUndefined();
+  });
+
   it('starts the game when the second player sits, with each view hiding the other hand', () => {
     const room = makeRoom();
     const { a, b } = room.start(['arquitecta', 'random']);

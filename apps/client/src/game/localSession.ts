@@ -15,6 +15,7 @@ import { settings } from '../app/settings';
 import type { BattleOutcome, BattleSetup } from '@cardcraft-castles/campaign';
 import { chooseAiAction, type Difficulty } from './ai';
 import { settleCampaignBattle } from './campaignStore';
+import { ownedDivine } from './divineStore';
 import { BaseSession, type MatchSession, type Seat, type SessionKind } from './session';
 
 export interface LocalOptions {
@@ -165,12 +166,15 @@ export class LocalSession extends BaseSession implements MatchSession {
     this.deadline = null;
     this.clockTurn = -1;
     const setup = this.campaign?.setup;
+    // Against the AI the player brings their Divine cards (the campaign setup already has them).
+    // On a shared device nobody does: there is no telling whose they are.
+    const divine = !setup && this.kind === 'ai' ? ownedDivine() : [];
     const { state, events } = createGame({
       seed: randomSeed(),
       heroes: this.seats.map((s) => s.hero),
       // The turn ends on "Ready", so the ultimate can still follow the card.
       rules: { ...setup?.rules, manualEndTurn: true },
-      ...(setup ? { seats: setup.seats } : {}),
+      ...(setup ? { seats: setup.seats } : divine.length ? { seats: [{ exclusiveCards: divine }] } : {}),
       ...(setup?.firstEvent ? { firstEvent: setup.firstEvent } : {}),
     });
     this.state = state;

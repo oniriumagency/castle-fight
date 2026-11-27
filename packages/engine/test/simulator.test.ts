@@ -14,6 +14,7 @@ import {
 import type { GameState } from '../src/index';
 
 const DECK_SIZE = buildDeckList(DEFAULT_RULES).length;
+const DIVINE = CARDS.filter((c) => c.rarity === 'divina').map((c) => c.id);
 
 /**
  * Things that must hold after every single action of every game. It runs
@@ -40,7 +41,7 @@ function brokenInvariants(state: GameState): string[] {
     check(p.enchantments.length <= rules.maxEnchantments, 'enchantments within max');
     check(p.hand.length <= rules.handSize, 'hand within size');
     // No card is ever created or lost.
-    check(p.hand.length + p.deck.length + p.discard.length === DECK_SIZE, 'cards conserved');
+    check(p.hand.length + p.deck.length + p.discard.length === (p.deckList?.length ?? DECK_SIZE), 'cards conserved');
   }
   const uids = state.players.flatMap((p) => p.hand.map((c) => c.uid));
   check(new Set(uids).size === uids.length, 'unique card uids');
@@ -85,6 +86,8 @@ describe('random playouts', () => {
             heroes: [a, b],
             // One game in three is fully random; the rest use the default eager policy.
             ...(game % 3 === 0 ? { policy: randomPolicy } : {}),
+            // Every other game, both players bring all six Divine cards.
+            ...(game % 2 === 0 ? { seats: [{ exclusiveCards: DIVINE }, { exclusiveCards: DIVINE }] } : {}),
             onStep: checkInvariants,
           });
           game += 1;

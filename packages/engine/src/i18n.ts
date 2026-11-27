@@ -51,6 +51,7 @@ export const RARITY_NAMES: Record<Rarity, LocalizedText> = {
   rara: { es: 'Rara', en: 'Rare' },
   epica: { es: 'Épica', en: 'Epic' },
   legendaria: { es: 'Legendaria', en: 'Legendary' },
+  divina: { es: 'Divina', en: 'Divine' },
 };
 
 /** Pick the text for a locale. */

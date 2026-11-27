@@ -3,6 +3,7 @@ import { CARDS, applyAction, createGame } from '@cardcraft-castles/engine';
 import { chooseAction, profileForTier } from '@cardcraft-castles/ai';
 import {
   BORDERS,
+  DIVINE_CARDS,
   FINAL_RIVALS,
   RIVAL_KINGDOMS,
   STARTING_CARDS,
@@ -35,9 +36,9 @@ function win(save: CampaignSave, territory: string, hero = save.hero): CampaignS
 }
 
 describe('map', () => {
-  it('hands out every card exactly once: the starting deck plus the rewards', () => {
+  it('hands out every card exactly once: the starting deck, the rewards and the Crown’s Divine cards', () => {
     const rewards = TERRITORIES.flatMap((t) => t.rewards);
-    const all = [...STARTING_CARDS, ...rewards].sort();
+    const all = [...STARTING_CARDS, ...rewards, ...Object.values(DIVINE_CARDS)].sort();
     expect(all).toEqual(CARDS.map((c) => c.id).sort());
   });
 
@@ -141,7 +142,21 @@ describe('progress', () => {
     const setup = battleSetup(save, 'corona', 'mariscal');
     expect(setup.heroes).toEqual(['mariscal', ...FINAL_RIVALS]);
     const started = startBattle(save, 'corona', 'mariscal', 'f');
-    expect(settleBattle(started, 'f', true)!.save.finished).toBe(true);
+    const settled = settleBattle(started, 'f', true)!;
+    expect(settled.save.finished).toBe(true);
+    // Taking the Crown wins the Divine card of the hero who took it.
+    expect(settled.outcome.divine).toBe('carga-de-la-corona');
+    expect(settleBattle(startBattle(save, 'corona', 'mariscal', 'g'), 'g', false)!.outcome.divine).toBeNull();
+  });
+
+  it('every hero has a Divine card, and owned ones join the player’s seat only', () => {
+    for (const hero of Object.keys(DIVINE_CARDS)) expect(CARDS.find((c) => c.id === DIVINE_CARDS[hero as keyof typeof DIVINE_CARDS])?.rarity, hero).toBe('divina');
+    expect(new Set(Object.values(DIVINE_CARDS)).size).toBe(6);
+    const save = newCampaign();
+    const setup = battleSetup(save, 'bastion-a', 'arquitecta', ['la-gran-mecha']);
+    expect(setup.seats[0]!.exclusiveCards).toEqual(['la-gran-mecha']);
+    expect(setup.seats[1]!.exclusiveCards).toBeUndefined();
+    expect(battleSetup(save, 'bastion-a', 'arquitecta').seats[0]!.exclusiveCards).toBeUndefined();
   });
 
   it('reads back what it saved and drops nonsense', () => {

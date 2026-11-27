@@ -2,7 +2,7 @@
  * Runtime checks shared by the server (which never trusts what it receives)
  * and the client (which can validate a nickname before sending it).
  */
-import { isHeroId, type PlayerId } from '@cardcraft-castles/engine';
+import { getCard, isCardId, isHeroId, type CardId, type PlayerId } from '@cardcraft-castles/engine';
 import {
   EMOTES,
   LIMITS,
@@ -92,6 +92,21 @@ export function parseActionIntent(raw: unknown): ActionIntent | null {
 }
 
 /**
+ * The Divine cards a player says they own: Divine card ids only, each once,
+ * anything else dropped. Ownership is kept on the player's device (there are
+ * no accounts), so the server trusts the list; it can never hold more than
+ * one copy of each of the six.
+ */
+export function parseDivineCards(raw: unknown): CardId[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CardId[] = [];
+  for (const id of raw.slice(0, 16)) {
+    if (typeof id === 'string' && isCardId(id) && getCard(id).rarity === 'divina' && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
  * Parse one room message from the wire. Unknown fields are dropped, so what
  * comes out is exactly the typed message. Returns `null` for anything else.
  */
@@ -105,12 +120,19 @@ export function parseRoomClientMessage(text: string): RoomClientMessage | null {
   }
   if (!isRecord(raw)) return null;
   switch (raw.type) {
-    case 'join':
+    case 'join': {
       if (typeof raw.v !== 'number' || typeof raw.nickname !== 'string' || !isHeroChoice(raw.hero)) return null;
       if (raw.pid !== undefined && !isPlayerId(raw.pid)) return null;
-      return raw.pid === undefined
-        ? { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero }
-        : { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero, pid: raw.pid };
+      const divine = parseDivineCards(raw.divine);
+      return {
+        type: 'join',
+        v: raw.v,
+        nickname: raw.nickname,
+        hero: raw.hero,
+        ...(raw.pid === undefined ? {} : { pid: raw.pid }),
+        ...(divine.length ? { divine } : {}),
+      };
+    }
     case 'resume':
       if (typeof raw.v !== 'number' || typeof raw.token !== 'string' || raw.token.length > 64) return null;
       return { type: 'resume', v: raw.v, token: raw.token };

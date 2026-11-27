@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RULES, applyAction, buildDeckList, createGame, effectiveCost, getPlayerView, isUltimateReady, legalActions } from '../src/index';
+import { CARDS, DEFAULT_RULES, EXCLUSIVE_CARD_DEPTH, applyAction, buildDeckList, createGame, effectiveCost, getPlayerView, isUltimateReady, legalActions } from '../src/index';
 import type { GameState } from '../src/index';
 import { mustApply } from '../src/testing';
 
@@ -56,4 +56,38 @@ describe('first battle event (campaign terrains)', () => {
     }
     expect(() => createGame({ seed: 1, heroes: ['arquitecta', 'guardian'], firstEvent: 'nope' as never })).toThrow();
   });
+});
+
+/** Divine cards: never in the common deck, one copy for the player who won it, early in the deck. */
+describe('exclusive cards (Divine)', () => {
+  const divine = CARDS.filter((c) => c.rarity === 'divina').map((c) => c.id);
+
+  it('the common deck has no Divine card', () => {
+    expect(divine).toHaveLength(6);
+    expect(buildDeckList(DEFAULT_RULES).some((id) => divine.includes(id))).toBe(false);
+  });
+
+  it('joins only its owner’s deck, once, within the first draws', () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const { state } = createGame({ seed, heroes: ['arquitecta', 'guardian'], seats: [{ exclusiveCards: ['plano-de-la-corona', 'plano-de-la-corona'] }] });
+      const p0 = state.players[0];
+      const all = [...p0.deck, ...p0.hand.map((c) => c.cardId)];
+      expect(all.filter((id) => id === 'plano-de-la-corona')).toHaveLength(1);
+      expect(all).toHaveLength(buildDeckList(DEFAULT_RULES).length + 1);
+      // Drawn from the end of the deck: in the hand already or among the next draws.
+      const fromTop = p0.hand.some((c) => c.cardId === 'plano-de-la-corona') ? 0 : p0.deck.length - p0.deck.lastIndexOf('plano-de-la-corona');
+      expect(p0.hand.length + fromTop).toBeLessThanOrEqual(EXCLUSIVE_CARD_DEPTH);
+      expect(p0.deckList).toContain('plano-de-la-corona');
+      const p1 = state.players[1];
+      expect([...p1.deck, ...p1.hand.map((c) => c.cardId)]).not.toContain('plano-de-la-corona');
+    }
+  });
+
+  it('adds to a campaign deck too, and rejects unknown ids', () => {
+    const { state } = createGame({ seed: 3, heroes: ['arquitecta', 'guardian'], seats: [{ deck, exclusiveCards: ['la-gran-mecha'] }] });
+    expect(state.players[0].deckList).toEqual([...deck, 'la-gran-mecha'].sort());
+    expect(() => createGame({ seed: 1, heroes: ['arquitecta', 'guardian'], seats: [{ exclusiveCards: ['nope'] }] })).toThrow();
+  });
+
+  const deck = ['escaramuza', 'escaramuza', 'parapeto', 'parapeto', 'cimientos', 'cimientos', 'chispa-arcana', 'chispa-arcana', 'hilada-de-piedra', 'hilada-de-piedra', 'carga-de-lanceros', 'carga-de-lanceros'];
 });

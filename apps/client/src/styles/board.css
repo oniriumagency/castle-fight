@@ -4011,3 +4011,30 @@
 .glossary .combo-buff {
   background: #0b7fae;
 }
+
+/* A Divine card lands: white and sky-blue light, wider than a legendary's. */
+.play-burst.r-divina {
+  --c: 200 245 255;
+  width: clamp(360px, 100vh, 860px);
+  animation-duration: 2.6s;
+}
+.play-burst.r-divina::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgb(255 255 255 / 55%) 0deg 4deg, rgb(160 235 255 / 25%) 4deg 8deg, transparent 8deg 20deg);
+  mask-image: radial-gradient(circle, #000 10%, transparent 68%);
+  -webkit-mask-image: radial-gradient(circle, #000 10%, transparent 68%);
+  animation: burstSpin 2.6s linear forwards;
+}
+.legend-call.divine strong {
+  color: #e9fbff;
+  background: linear-gradient(180deg, #ffffff 0%, #e6fcff 30%, #8fe3ff 62%, #3aa6e0 82%, #e9fbff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 #06263a) drop-shadow(0 0 14px rgb(140 225 255 / 90%)) drop-shadow(0 0 34px rgb(255 255 255 / 70%));
+}
+.legend-call.divine .legend-call-rays {
+  background: repeating-conic-gradient(from 0deg, rgb(200 245 255 / 55%) 0deg 4deg, transparent 4deg 14deg);
+}

@@ -40,7 +40,48 @@ const wait = (base: number): Promise<void> => new Promise((r) => setTimeout(r, m
 
 const DAMAGE_COLOR = { normal: 0xffa040, piercing: 0xc77dff, wallOnly: 0xffd27a } as const;
 export const SCHOOL_COLOR: Record<School, number> = { construccion: 0xf0b850, asalto: 0xff6a50, arcano: 0x7fd6f2 };
-const RARITY_COLOR = { comun: 0xfff0d0, rara: 0x7fc4ff, epica: 0xb06cff, legendaria: 0xffb52e } as const;
+const RARITY_COLOR = { comun: 0xfff0d0, rara: 0x7fc4ff, epica: 0xb06cff, legendaria: 0xffb52e, divina: 0x9ff3ff } as const;
+
+/** Colours of the big entrance of a legendary (gold and fire) and of a Divine card (white light and sky blue). */
+interface EntrancePalette {
+  rays: number;
+  flare: number;
+  flash: number;
+  ring: number;
+  ring2: number;
+  sparks: number[];
+  flameFrom: number;
+  flameTo: number;
+  fountain: number[];
+  glow: number[];
+  twinkle: number[];
+}
+const LEGENDARY_PALETTE: EntrancePalette = {
+  rays: RARITY_COLOR.legendaria,
+  flare: 0xffe080,
+  flash: 0xffc060,
+  ring: 0xffd27a,
+  ring2: 0xfff1c0,
+  sparks: [0xffe066, 0xff9a1f, 0xffffff],
+  flameFrom: 0xffe080,
+  flameTo: 0xff4a00,
+  fountain: [0xffe066, 0xffd27a, 0xfff4d0],
+  glow: [0xffd27a, 0xffb43c, 0xfff1c0],
+  twinkle: [0xffffff, 0xffe066],
+};
+const DIVINE_PALETTE: EntrancePalette = {
+  rays: RARITY_COLOR.divina,
+  flare: 0xf4feff,
+  flash: 0xd8fbff,
+  ring: 0xbff8ff,
+  ring2: 0xffffff,
+  sparks: [0xffffff, 0x9ff3ff, 0xffe9a8],
+  flameFrom: 0xffffff,
+  flameTo: 0x6fd8ff,
+  fountain: [0xffffff, 0xbff8ff, 0xfff4d0],
+  glow: [0xbff8ff, 0x7fe0ff, 0xffffff],
+  twinkle: [0xffffff, 0xbff8ff],
+};
 const SCHOOL_CUE: Record<School, Cue> = { construccion: 'playConstruccion', asalto: 'playAsalto', arcano: 'playArcano' };
 
 /** Cards whose attack looks like something specific. */
@@ -132,7 +173,9 @@ function impact(field: Battlefield, at: Point, lost: number, color: number, styl
 
 /** The card being resolved is a legendary. */
 function legendaryNow(): boolean {
-  return currentCard !== null && getCard(currentCard).rarity === 'legendaria';
+  if (currentCard === null) return false;
+  const rarity = getCard(currentCard).rarity;
+  return rarity === 'legendaria' || rarity === 'divina';
 }
 
 /** Castles already wrapped in holy fire by the current card (once per castle). */
@@ -218,25 +261,31 @@ export const fx = {
         field.burst(at.x, at.y, { count: 30, color: [RARITY_COLOR.epica, 0xe0c0ff], speed: 3, gravity: -0.03, size: 14, life: 1300, area: { w: 200, h: 260 } });
         return wait(150);
       case 'legendaria':
+      case 'divina': {
+        // Divine cards: the legendary show in heavenly white and sky blue, a little bigger.
+        const divine = card.rarity === 'divina';
+        const P = divine ? DIVINE_PALETTE : LEGENDARY_PALETTE;
+        if (divine) audio.play('conquestBig', 0.6, { delay: 120 });
         audio.play('rarityLegendaria');
-        audio.duck(0.35, 1800);
-        field.rays(at.x, at.y, RARITY_COLOR.legendaria, 720, 1900, 0.5);
-        field.flare(at.x, at.y, 0xffe080, 560, 900, 0.55);
-        field.flash(0xffc060, 0.28, 600);
-        field.ring(at.x, at.y, 0xffd27a, 260, 900, 0.9);
-        field.shake(6);
-        field.burst(at.x, at.y, { count: 50, texture: 'spark', color: [0xffe066, 0xff9a1f, 0xffffff], speed: 8, gravity: 0.06, drag: 0.95, size: 26, life: 1300 });
-        field.burst(at.x, at.y, { count: 30, texture: 'flame', color: 0xffe080, colorTo: 0xff4a00, speed: 1.5, gravity: -0.05, size: 26, life: 1200, area: { w: 220, h: 300 } });
+        audio.duck(0.35, divine ? 2400 : 1800);
+        field.rays(at.x, at.y, P.rays, 720, 1900, 0.5);
+        field.flare(at.x, at.y, P.flare, 560, 900, 0.55);
+        field.flash(P.flash, 0.28, 600);
+        field.ring(at.x, at.y, P.ring, 260, 900, 0.9);
+        field.shake(divine ? 9 : 6);
+        field.burst(at.x, at.y, { count: 50, texture: 'spark', color: P.sparks, speed: 8, gravity: 0.06, drag: 0.95, size: 26, life: 1300 });
+        field.burst(at.x, at.y, { count: 30, texture: 'flame', color: P.flameFrom, colorTo: P.flameTo, speed: 1.5, gravity: -0.05, size: 26, life: 1200, area: { w: 220, h: 300 } });
         // A second wave: a fountain of gold and embers drifting up for a while.
-        field.ring(at.x, at.y, 0xfff1c0, 420, 1200, 0.6);
-        field.burst(at.x, at.y, { count: 40, color: [0xffe066, 0xffd27a, 0xfff4d0], speed: 5, angle: -Math.PI / 2, spread: 1.2, gravity: 0.08, drag: 0.97, size: 14, life: 1700, area: { w: 120, h: 40 } });
+        field.ring(at.x, at.y, P.ring2, 420, 1200, 0.6);
+        field.burst(at.x, at.y, { count: 40, color: P.fountain, speed: 5, angle: -Math.PI / 2, spread: 1.2, gravity: 0.08, drag: 0.97, size: 14, life: 1700, area: { w: 120, h: 40 } });
         for (let i = 1; i <= 3; i++) {
           setTimeout(() => {
-            field.burst(at.x, at.y + 60, { count: 14, texture: 'glow', color: [0xffd27a, 0xffb43c, 0xfff1c0], speed: 1.4, angle: -Math.PI / 2, spread: 1.6, gravity: -0.05, size: 18, life: 1500, area: { w: 320, h: 200 } });
-            field.burst(at.x, at.y, { count: 10, texture: 'spark', color: [0xffffff, 0xffe066], speed: 6, gravity: 0.05, drag: 0.95, size: 18, life: 800 });
+            field.burst(at.x, at.y + 60, { count: 14, texture: 'glow', color: P.glow, speed: 1.4, angle: -Math.PI / 2, spread: 1.6, gravity: -0.05, size: 18, life: 1500, area: { w: 320, h: 200 } });
+            field.burst(at.x, at.y, { count: 10, texture: 'spark', color: P.twinkle, speed: 6, gravity: 0.05, drag: 0.95, size: 18, life: 800 });
           }, ms(i * 260));
         }
         return wait(450);
+      }
       default:
         return wait(0);
     }
