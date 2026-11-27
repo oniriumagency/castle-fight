@@ -109,7 +109,7 @@ export interface CastleLayout {
   wallWidth: number;
   /** Ignored: the gap comes from the hero's style. */
   gap: number;
-  /** Visual cap so a huge Wall does not leave the screen. */
+  /** Visual cap so a huge Wall does not leave the screen. The Keep has none: past the winning height it keeps rising, off the top if it must. */
   maxPoints: number;
 }
 
@@ -693,7 +693,7 @@ export class Castle extends Container {
     const body = b[part];
     const w = body.w * (part === 'keep' ? 0.82 : 0.7);
     // Built to the height the part is about to reach, not the one it has now.
-    const h = Math.min(s.value, l.maxPoints) * l.unit;
+    const h = (part === 'keep' ? s.value : Math.min(s.value, l.maxPoints)) * l.unit;
     s.show = h > body.w * 0.3;
     // The crane's platform sits near the top course; the crane and pulley rise above it.
     const above = crown ? ((crown.crown * w) / crown.shaftWidth) * 0.38 : 0;
@@ -957,7 +957,7 @@ export class Castle extends Container {
 
   private keepPx(): number {
     const l = this.layoutValue!;
-    return Math.min(this.keepValue, l.maxPoints) * l.unit;
+    return Math.max(0, this.keepValue) * l.unit;
   }
 
   private wallPx(): number {

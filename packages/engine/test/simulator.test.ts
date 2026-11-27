@@ -27,7 +27,7 @@ function brokenInvariants(state: GameState): string[] {
   };
   const { rules } = state;
   for (const p of state.players) {
-    check(p.keep >= 0 && p.keep <= rules.keepWin, 'keep within 0..keepWin');
+    check(p.keep >= 0, 'keep >= 0');
     check(p.wall >= 0, 'wall >= 0');
     for (const r of ['piedra', 'acero', 'mana'] as const) {
       check(p.resources[r] >= 0, `${r} >= 0`);
