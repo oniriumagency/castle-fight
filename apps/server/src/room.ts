@@ -228,6 +228,7 @@ export class Room extends DurableObject<Env> {
     const { record } = core;
 
     if (core.closed) {
+      await this.tellRanked(core);
       this.core = null;
       this.alarmAt = null;
       await this.ctx.storage.deleteAlarm();
@@ -235,6 +236,8 @@ export class Room extends DurableObject<Env> {
       if (!record.private) await this.tellLobby(() => this.lobby().remove(record.id));
       return;
     }
+
+    await this.tellRanked(core);
 
     // Not awaited: the output gate holds outgoing messages until the write is durable.
     if (core.takeDirty()) void this.ctx.storage.put('room', record);
@@ -260,6 +263,23 @@ export class Room extends DurableObject<Env> {
         const ok = await this.tellLobby(() => this.lobby().update(update));
         if (!ok) this.lastLobby = '';
       }
+    }
+  }
+
+  /** Ranked rooms: send the result (or the no-shows) to the queue. A failed call is tried again on the next change or alarm. */
+  private async tellRanked(core: RoomCore<WebSocket>): Promise<void> {
+    const ranked = core.record.ranked;
+    if (!ranked) return;
+    const queue = this.env.RANKED.get(this.env.RANKED.idFromName('ranked'));
+    try {
+      const pending = core.pendingRankedReport();
+      if (pending) core.rankedScored(await queue.report(pending.matchId, pending.winner));
+      else if (core.closed && !ranked.reported) {
+        ranked.reported = true;
+        await queue.abort(ranked.matchId, ranked.absent ?? []);
+      }
+    } catch (error) {
+      console.error('Ranked report failed', error);
     }
   }
 

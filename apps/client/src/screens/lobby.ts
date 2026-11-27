@@ -12,6 +12,7 @@ import { online } from '../net/online';
 import { iconSvg } from '../ui/assets';
 import { flow } from './flow';
 import { watchOnline } from './online';
+import { rankedPanel } from './ranked';
 import { openTwilightInfo } from '../game/twilight';
 
 /** Nickname for online play; asks for one if it is empty. */
@@ -46,8 +47,21 @@ function storedTurnSeconds(): number {
   return DEFAULT_TIMINGS.turnSeconds;
 }
 
-/** Live list of open rooms, with create and quick join. */
-export function lobbyScreen(): Screen {
+export type OnlineTab = 'casual' | 'ranked';
+
+const TAB_KEY = 'cardcraft-castles:online-tab';
+
+export function storedTab(): OnlineTab {
+  try {
+    return localStorage.getItem(TAB_KEY) === 'ranked' ? 'ranked' : 'casual';
+  } catch {
+    return 'casual';
+  }
+}
+
+/** Online play in two modes: Casual (the live list of open rooms, with create and quick join) and Ranked. */
+export function lobbyScreen(initialTab: OnlineTab = storedTab()): Screen {
+  let tab = initialTab;
   let connection: LobbyConnection | null = null;
   let rooms: readonly RoomSummary[] = [];
   let stats: LobbyStats | null = null;
@@ -260,56 +274,116 @@ export function lobbyScreen(): Screen {
     }
   };
 
+  const rankedNick = h('input', { type: 'text', maxlength: 20, placeholder: t('nicknamePlaceholder'), value: settings.get().nickname });
+  const ranked = rankedPanel(rankedNick, requireNickname);
+  const tabs = h('div.segmented.online-tabs', { role: 'tablist', 'aria-label': t('onlineModes') });
+  const renderTabs = (): void => {
+    tabs.replaceChildren(
+      ...(['casual', 'ranked'] as const).map((id) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            role: 'tab',
+            'aria-pressed': String(id === tab),
+            'aria-selected': String(id === tab),
+            onclick: () => setTab(id),
+          },
+          id === 'casual' ? t('modeCasual') : t('modeRanked'),
+        ),
+      ),
+    );
+  };
+  const casualBody = h(
+    'div.lobby-body',
+    null,
+    h(
+      'section.lobby-rooms.panel',
+      null,
+      h('div.lobby-rooms-head', null, h('h2', null, t('lobbyTitle')), statsLine),
+      list,
+    ),
+    h(
+      'aside.lobby-side.panel',
+      null,
+      h('label.field', null, t('nickname'), nickname),
+      turnNotificationOffer(),
+      h('button.btn.primary.big', { type: 'button', onclick: () => void quickJoin() }, html(iconSvg('sword')), t('quickJoin')),
+      h('div.ornament', null, t('createRoom')),
+      h('label.field', null, t('roomName'), roomName),
+      h('div.field', null, h('span', null, t('roomSize')), sizePicker),
+      h('div.field', null, h('span', null, t('turnTime')), turnPicker),
+      h(
+        'div.twilight-row',
+        null,
+        h(
+          'label.check.twilight-toggle',
+          null,
+          twilightToggle,
+          h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightRound }))),
+        ),
+        h(
+          'button.help-btn',
+          {
+            type: 'button',
+            'aria-label': t('twilightHelp'),
+            title: t('twilightHelp'),
+            onclick: () => openTwilightInfo(DEFAULT_RULES),
+          },
+          '?',
+        ),
+      ),
+      h('label.check', null, privateToggle, h('span', null, t('privateRoom'))),
+      h('button.btn.big', { type: 'button', onclick: () => void create() }, t('createRoom')),
+    ),
+    );
+
+  const mountTab = (): void => {
+    if (tab === 'casual') {
+      nickname.value = settings.get().nickname;
+      casualBody.hidden = false;
+      ranked.el.hidden = true;
+      state = 'connecting';
+      renderList();
+      connect();
+    } else {
+      rankedNick.value = settings.get().nickname;
+      casualBody.hidden = true;
+      ranked.el.hidden = false;
+      ranked.mount();
+    }
+  };
+  const unmountTab = (): void => {
+    if (tab === 'casual') {
+      connection?.close();
+      connection = null;
+    } else ranked.unmount();
+  };
+  const setTab = (next: OnlineTab): void => {
+    if (next === tab) return;
+    audio.play('uiClick');
+    unmountTab();
+    tab = next;
+    try {
+      localStorage.setItem(TAB_KEY, tab);
+    } catch {
+      // Not critical.
+    }
+    renderTabs();
+    mountTab();
+  };
+  renderTabs();
+
   el.append(
     h(
       'header.screen-head',
       null,
       h('button.btn.icon-only', { type: 'button', 'aria-label': t('back'), onclick: () => (audio.play('uiBack'), flow.menu()) }, html(iconSvg('arrow'))),
       h('h1', null, t('playOnline')),
+      tabs,
     ),
-    h(
-      'div.lobby-body',
-      null,
-      h(
-        'section.lobby-rooms.panel',
-        null,
-        h('div.lobby-rooms-head', null, h('h2', null, t('lobbyTitle')), statsLine),
-        list,
-      ),
-      h(
-        'aside.lobby-side.panel',
-        null,
-        h('label.field', null, t('nickname'), nickname),
-        turnNotificationOffer(),
-        h('button.btn.primary.big', { type: 'button', onclick: () => void quickJoin() }, html(iconSvg('sword')), t('quickJoin')),
-        h('div.ornament', null, t('createRoom')),
-        h('label.field', null, t('roomName'), roomName),
-        h('div.field', null, h('span', null, t('roomSize')), sizePicker),
-        h('div.field', null, h('span', null, t('turnTime')), turnPicker),
-        h(
-          'div.twilight-row',
-          null,
-          h(
-            'label.check.twilight-toggle',
-            null,
-            twilightToggle,
-            h('span', null, html(iconSvg('sunset')), ' ', t('twilightName'), h('small', null, t('twilightToggleHint', { start: DEFAULT_RULES.twilightRound }))),
-          ),
-          h(
-            'button.help-btn',
-            {
-              type: 'button',
-              'aria-label': t('twilightHelp'),
-              title: t('twilightHelp'),
-              onclick: () => openTwilightInfo(DEFAULT_RULES),
-            },
-            '?',
-          ),
-        ),
-        h('label.check', null, privateToggle, h('span', null, t('privateRoom'))),
-        h('button.btn.big', { type: 'button', onclick: () => void create() }, t('createRoom')),
-      ),
-    ),
+    casualBody,
+    ranked.el,
   );
 
   return {
@@ -317,11 +391,10 @@ export function lobbyScreen(): Screen {
     mount() {
       audio.music('menu');
       battlefield().layout();
-      renderList();
-      connect();
+      mountTab();
     },
     unmount() {
-      connection?.close();
+      unmountTab();
     },
     resize() {
       requestAnimationFrame(() => battlefield().layout());

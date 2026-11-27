@@ -3,6 +3,7 @@
 Servidor online de Cardcraft: Castles. Es un Worker de Cloudflare con dos tipos de Durable Object y cabe en el plan gratuito.
 
 - **`Lobby`** (uno solo): la lista de salas públicas, que empuja en vivo a todos los clientes conectados, la creación de salas, la partida rápida y los límites por IP.
+- **`Ranked`** (uno solo): el modo clasificado. Guarda los perfiles y las partidas en SQLite, lleva la cola de búsqueda y los retos, y puntúa cada partida clasificada.
 - **`Room`** (uno por sala): la partida. Aplica cada jugada con el motor, envía a cada jugador solo su vista, lleva el reloj de turno, guarda los asientos para reconectar y organiza la revancha.
 
 El cliente no habla el protocolo a mano: usa el SDK de [`@cardcraft-castles/protocol/client`](../../packages/protocol/README.md).
@@ -18,6 +19,7 @@ El cliente no habla el protocolo a mano: usa el SDK de [`@cardcraft-castles/prot
 | `POST /api/quick-join` | Devuelve la sala que más lleva esperando rival, o crea una: `{ nickname, clientId? }`. |
 | `WS /api/lobby` | Lista en vivo: una instantánea al conectar y después solo los cambios. |
 | `WS /api/rooms/:id/ws` | La sala. Mensajes en `packages/protocol/src/index.ts`. |
+| `WS /api/ranked/ws` | La cola del clasificado: perfil, búsqueda, retos y tabla. Mensajes en `packages/protocol/src/ranked.ts`. |
 
 Los errores HTTP siempre tienen la forma `{ error: { code, message, retryAfterMs? } }`.
 
@@ -31,6 +33,19 @@ Los errores HTTP siempre tienen la forma `{ error: { code, message, retryAfterMs
 6. **Cierre.** La sala se borra cuando se van los dos, 15 min después de la última partida, a los 30 min si nadie se une, o a los 2 min si nadie llega a sentarse.
 
 Toda la lógica está en `src/roomCore.ts`, que no depende de Cloudflare y se prueba con sockets y reloj falsos. `src/room.ts` solo la conecta con el Durable Object: guarda el registro, programa la alarma y avisa al lobby.
+
+## Clasificado
+
+No hay cuentas. El perfil vive en el servidor y se abre con un secreto que guarda el navegador; ese secreto es también el **código de recuperación** que el jugador copia a otro dispositivo. Solo se guarda su hash. El perfil se crea con la primera búsqueda.
+
+- **Puntaje Elo.** Todos empiezan en 1000; K = 32 (±16 entre iguales), y 1,5 veces más en las 10 primeras partidas. Cuanto más favorito eres, menos ganas y más pierdes. Mínimo 100.
+- **Búsqueda.** Empareja rivales a ±100 puntos, y el margen crece 50 cada 10 s hasta ±400. Quien más lleva esperando va primero, con el rival más cercano.
+- **Retos.** A los 30 s de buscar ves quién más busca, con lo que ganarías o perderías, y puedes retar a cualquiera a 600 puntos o menos. El retado decide; el reto caduca a los 20 s.
+- **Partidas.** Siempre 1 contra 1, 30 s por turno y Furia del Ocaso. La cola crea una sala privada y da a cada jugador un **ticket** que le sienta en su asiento con su nombre (`Apodo#1234`). No hay revancha. Al terminar, la sala manda el ganador a `Ranked.report` y enseña los puntos a los dos.
+- **Abusos.** Desde la misma IP las partidas no puntúan ni se emparejan solas. Entre los mismos dos perfiles solo puntúan 3 partidas cada 24 h. Quien no se sienta en 30 s, o sale antes de empezar, no puede buscar durante 1 min. Rendirse, desconectarse o agotar el tiempo es una derrota normal. Cada IP puede crear 5 perfiles por hora.
+- **Ligas y temporadas.** Bronce (<900), Plata, Oro (1100), Diamante (1300) y Leyenda (1500). Cada temporada dura dos meses (la 1 es noviembre y diciembre de 2026); al empezar la siguiente, cada puntaje se acerca a mitad de camino hacia 1000. La tabla muestra a los 50 mejores de la temporada.
+
+Toda la lógica está en `src/rankedCore.ts` (sin Cloudflare, probada con sockets y reloj falsos); `src/ranked.ts` la conecta con SQLite y con el Durable Object. La alarma solo suena mientras alguien busca, cuando su margen crece. Cada partida escribe tres filas.
 
 ## Límites contra abusos
 

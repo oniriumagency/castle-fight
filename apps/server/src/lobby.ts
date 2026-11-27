@@ -63,7 +63,7 @@ interface Attachment {
   ip: string;
 }
 
-function newRoomId(): string {
+export function newRoomId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   return Array.from(bytes, (b) => ROOM_ID_ALPHABET[b % ROOM_ID_ALPHABET.length]).join('');
 }

@@ -18,6 +18,8 @@ import type {
 } from '@cardcraft-castles/engine';
 
 export * from './validate';
+export * from './ranked';
+import type { RankedRoomInfo } from './ranked';
 
 /** Bumped on every breaking change; the server rejects other versions. */
 export const PROTOCOL_VERSION = 3;
@@ -40,6 +42,8 @@ export const ROUTES = {
   lobbySocket: '/api/lobby',
   /** WebSocket of one room (`RoomClientMessage` / `RoomServerMessage`). */
   roomSocket: (roomId: string): string => `/api/rooms/${roomId}/ws`,
+  /** WebSocket of the ranked queue (`RankedClientMessage` / `RankedServerMessage`). */
+  rankedSocket: '/api/ranked/ws',
 } as const;
 
 /** Room ids are 8 characters from this alphabet (no 0/o, 1/l/i). */
@@ -258,6 +262,8 @@ export type RoomClientMessage =
       hero: HeroChoice;
       /** Public random id this browser keeps, so opponents can keep a head-to-head record. See `isPlayerId`. */
       pid?: string;
+      /** Ranked rooms only: the ticket from the queue's `matched`, which says which seat is yours. */
+      ticket?: string;
     }
   /** Take back your seat after a disconnect, with the token from `welcome`. */
   | { type: 'resume'; v: number; token: string }
@@ -327,6 +333,8 @@ export interface RoomInfo {
   timings: RoomTimings;
   /** People watching without a seat. Absent from old servers: 0. */
   spectators?: number;
+  /** Present in ranked rooms only: no rematch, and the rating change once the game ends. */
+  ranked?: RankedRoomInfo;
 }
 
 /** Spectators a room lets in at once. */
@@ -347,6 +355,8 @@ export type RoomErrorCode =
   | 'rateLimited'
   /** The room already has `MAX_SPECTATORS` watching. */
   | 'tooManySpectators'
+  /** A ranked room: the ticket is missing or belongs to nobody. */
+  | 'badTicket'
   | EngineErrorCode;
 
 export type RoomServerMessage =

@@ -1,7 +1,8 @@
 /**
  * Cardcraft: Castles server: a Cloudflare Worker that routes requests to two
  * kinds of Durable Objects, one `Lobby` (the room directory, room creation
- * and quick join) and one `Room` per match (the authoritative game).
+ * and quick join) and one `Room` per match (the authoritative game), plus
+ * `Ranked` (the ranked queue and its profiles) and `Reports`.
  */
 import { CARDS, GAME_TITLE } from '@cardcraft-castles/engine';
 import {
@@ -23,6 +24,7 @@ import { handleReports } from './reportsApi';
 export { Lobby } from './lobby';
 export { Room } from './room';
 export { Reports } from './reports';
+export { Ranked } from './ranked';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -114,6 +116,11 @@ export default {
       if (path === '/api/lobby') {
         if (!isSocketUpgrade(request)) return fail(426, 'badRequest', 'Expected a WebSocket');
         return lobby.fetch(request);
+      }
+
+      if (path === '/api/ranked/ws') {
+        if (!isSocketUpgrade(request)) return fail(426, 'badRequest', 'Expected a WebSocket');
+        return env.RANKED.get(env.RANKED.idFromName('ranked')).fetch(request);
       }
 
       if (path === '/api/rooms') {

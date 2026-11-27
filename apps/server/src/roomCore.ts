@@ -24,6 +24,7 @@ import {
   CLOSE_CODES,
   MAX_SPECTATORS,
   PROTOCOL_VERSION,
+  RANKED_RULES,
   cleanNickname,
   parseRoomClientMessage,
   type ActionIntent,
@@ -31,6 +32,7 @@ import {
   type ForfeitCause,
   type GameEnding,
   type HeroChoice,
+  type RankedSeatResult,
   type RoomErrorCode,
   type RoomInfo,
   type RoomServerMessage,
@@ -100,6 +102,22 @@ export interface RoomRecord {
   timings: RoomTimings;
   /** Twilight Fury; missing in rooms stored by older versions: on. */
   twilight?: boolean;
+  /** Ranked rooms only (made by the ranked queue). */
+  ranked?: RankedRecord;
+}
+
+export interface RankedRecord {
+  matchId: string;
+  rated: boolean;
+  /** Per seat: the display name (`Nick#1234`) and the ticket that claims it. */
+  names: string[];
+  tickets: string[];
+  /** The rating change, once the queue has scored the game. */
+  result: (RankedSeatResult | null)[] | null;
+  /** The queue has the result (or knows the game never started). */
+  reported: boolean;
+  /** Seats nobody took before the room gave up (sent to the queue as no-shows). */
+  absent?: number[];
 }
 
 /** What the lobby needs: the public summary plus whether quick join may use it. */
@@ -139,13 +157,16 @@ export interface NewRoom {
   size?: number;
   /** Twilight Fury (default on). */
   twilight?: boolean;
+  /** Made by the ranked queue: seats are claimed with tickets. */
+  ranked?: { matchId: string; rated: boolean; names: string[]; tickets: string[] };
 }
 
 export function newRoomRecord(room: NewRoom, now: number): RoomRecord {
-  const { size = 2, ...rest } = room;
+  const { size = 2, ranked, ...rest } = room;
   return {
     version: 1,
     ...rest,
+    ...(ranked ? { ranked: { ...ranked, result: null, reported: false } } : {}),
     createdAt: now,
     status: 'waiting',
     seats: Array.from({ length: size }, () => null),
@@ -217,6 +238,7 @@ export class RoomCore<S> {
     }
     switch (message.type) {
       case 'join':
+        if (this.record.ranked) return this.joinRanked(socket, message.v, message.hero, message.ticket, message.pid);
         return this.join(socket, message.v, message.nickname, message.hero, message.pid);
       case 'resume':
         return this.resume(socket, message.v, message.token);
@@ -287,6 +309,12 @@ export class RoomCore<S> {
       this.broadcastRoom();
     }
 
+    // A ranked room whose players did not both sit in time gives up.
+    if (room.status === 'waiting' && room.ranked && now >= room.createdAt + RANKED_RULES.joinWithinMs) {
+      room.ranked.absent = this.seatIds().filter((seat) => room.seats[seat] === null || room.seats[seat]!.reconnectBy !== null);
+      return this.closeRoom();
+    }
+
     // Cleanup.
     if (room.status === 'waiting') {
       const nobody = room.seats.every((s) => s === null);
@@ -308,6 +336,7 @@ export class RoomCore<S> {
     for (const seat of room.seats) if (seat?.reconnectBy != null) times.push(seat.reconnectBy);
     if (room.status === 'waiting') {
       times.push(room.createdAt + ROOM_LIMITS.waitingTtlMs);
+      if (room.ranked) times.push(room.createdAt + RANKED_RULES.joinWithinMs);
       if (room.seats.every((s) => s === null)) times.push(room.createdAt + ROOM_LIMITS.emptyRoomMs);
     }
     if (room.status === 'finished' && room.endedAt !== null) times.push(room.endedAt + ROOM_LIMITS.finishedTtlMs);
@@ -345,6 +374,7 @@ export class RoomCore<S> {
       ending: room.ending,
       timings: room.timings,
       spectators: this.spectators().length,
+      ...(room.ranked ? { ranked: { rated: room.ranked.rated, result: room.ranked.result } } : {}),
     };
   }
 
@@ -409,6 +439,66 @@ export class RoomCore<S> {
     else this.broadcastRoom();
   }
 
+  /**
+   * A seat in a ranked room: the ticket from the queue says which one, and the
+   * name comes from the profile, never from the client. The ticket also takes
+   * the seat back (a reload that lost its token).
+   */
+  private joinRanked(socket: S, version: number, hero: HeroChoice, ticket: string | undefined, pid?: string): void {
+    if (!this.checkVersion(socket, version)) return;
+    const room = this.record;
+    const ranked = room.ranked!;
+    const seat = ticket ? ranked.tickets.indexOf(ticket) : -1;
+    if (seat < 0) {
+      this.error(socket, 'badTicket', 'This ranked game is not yours');
+      this.host.close(socket, CLOSE_CODES.roomFull, 'Not your ranked game');
+      return;
+    }
+    const current = this.host.seatOf(socket);
+    if (current !== null && current !== seat) return this.error(socket, 'alreadySeated', 'You already have a seat');
+    const existing = room.seats[seat];
+    if (existing) {
+      if (existing.left) return this.error(socket, 'badToken', 'That seat is no longer yours');
+      return this.resume(socket, version, existing.token);
+    }
+    if (room.status !== 'waiting') return this.error(socket, 'roomFull', 'The room is full');
+    this.host.setWatching(socket, false);
+    room.seats[seat] = {
+      nickname: ranked.names[seat] ?? `Jugador ${seat + 1}`,
+      pid: pid ?? null,
+      choice: hero,
+      hero: null,
+      token: this.host.randomToken(),
+      reconnectBy: null,
+      left: false,
+      rematch: false,
+      timeouts: 0,
+    };
+    this.dirty = true;
+    this.host.setSeat(socket, seat);
+    this.welcome(socket, seat);
+    if (room.seats.every((s) => s !== null)) this.startGame();
+    else this.broadcastRoom();
+  }
+
+  /** A ranked game to score: the queue has not got its result yet. */
+  pendingRankedReport(): { matchId: string; winner: number | null } | null {
+    const room = this.record;
+    if (!room.ranked || room.ranked.reported || room.games === 0 || !room.game?.result) return null;
+    return { matchId: room.ranked.matchId, winner: room.game.result.winner };
+  }
+
+  /** The queue scored the game: show everyone the new ratings. */
+  rankedScored(info: { rated: boolean; result: (RankedSeatResult | null)[] | null } | null): void {
+    const ranked = this.record.ranked;
+    if (!ranked) return;
+    ranked.reported = true;
+    ranked.rated = info?.rated ?? false;
+    ranked.result = info?.result ?? null;
+    this.dirty = true;
+    if (this.record.status !== 'closed') this.broadcastRoom();
+  }
+
   private resume(socket: S, version: number, token: string): void {
     if (!this.checkVersion(socket, version)) return;
     const room = this.record;
@@ -460,7 +550,8 @@ export class RoomCore<S> {
     const room = this.record;
     const me = room.seats[seat]!;
     const others = room.seats.filter((_, i) => i !== seat);
-    if (room.status !== 'finished' || others.some((s) => !s || s.left)) {
+    // Ranked: every game comes from the queue.
+    if (room.ranked || room.status !== 'finished' || others.some((s) => !s || s.left)) {
       return this.error(socket, 'rematchUnavailable', 'A rematch is not possible now');
     }
     me.rematch = true;
@@ -495,6 +586,11 @@ export class RoomCore<S> {
     this.dirty = true;
     switch (room.status) {
       case 'waiting':
+        // Walking out of a ranked game before it starts calls it off, and counts as a no-show.
+        if (room.ranked) {
+          room.ranked.absent = [seat];
+          return this.closeRoom();
+        }
         room.seats[seat] = null;
         if (room.seats.every((s) => s === null)) return this.closeRoom();
         break;
