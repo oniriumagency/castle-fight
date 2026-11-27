@@ -14,6 +14,7 @@ import {
   type HeroChoice,
   type RoomClientMessage,
 } from './index';
+import { RANKED_ID_PATTERN, type RankedClientMessage } from './ranked';
 
 /**
  * Normalise user-typed text: drops control and invisible characters, caps
@@ -108,9 +109,15 @@ export function parseRoomClientMessage(text: string): RoomClientMessage | null {
     case 'join':
       if (typeof raw.v !== 'number' || typeof raw.nickname !== 'string' || !isHeroChoice(raw.hero)) return null;
       if (raw.pid !== undefined && !isPlayerId(raw.pid)) return null;
-      return raw.pid === undefined
-        ? { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero }
-        : { type: 'join', v: raw.v, nickname: raw.nickname, hero: raw.hero, pid: raw.pid };
+      if (raw.ticket !== undefined && (typeof raw.ticket !== 'string' || raw.ticket.length > 64)) return null;
+      return {
+        type: 'join',
+        v: raw.v,
+        nickname: raw.nickname,
+        hero: raw.hero,
+        ...(raw.pid === undefined ? {} : { pid: raw.pid }),
+        ...(raw.ticket === undefined ? {} : { ticket: raw.ticket as string }),
+      };
     case 'resume':
       if (typeof raw.v !== 'number' || typeof raw.token !== 'string' || raw.token.length > 64) return null;
       return { type: 'resume', v: raw.v, token: raw.token };
@@ -151,4 +158,35 @@ export function cleanTwilight(raw: unknown): boolean {
 /** A turn length a host may choose (one of `TURN_SECONDS_OPTIONS`), or null. */
 export function cleanTurnSeconds(raw: unknown): number | null {
   return typeof raw === 'number' && (TURN_SECONDS_OPTIONS as readonly number[]).includes(raw) ? raw : null;
+}
+
+/** Parse one message of the ranked queue, or `null`. Unknown fields are dropped. */
+export function parseRankedClientMessage(text: string): RankedClientMessage | null {
+  if (text.length > 1024) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!isRecord(raw)) return null;
+  const isId = (value: unknown): value is string => typeof value === 'string' && RANKED_ID_PATTERN.test(value);
+  switch (raw.type) {
+    case 'hello':
+      if (typeof raw.v !== 'number') return null;
+      if (raw.secret !== null && (typeof raw.secret !== 'string' || raw.secret.length > 64)) return null;
+      return { type: 'hello', v: raw.v, secret: raw.secret as string | null };
+    case 'search':
+      if (typeof raw.nickname !== 'string' || !isHeroChoice(raw.hero)) return null;
+      return { type: 'search', nickname: raw.nickname, hero: raw.hero };
+    case 'cancel':
+    case 'top':
+      return { type: raw.type };
+    case 'challenge':
+      return isId(raw.target) ? { type: 'challenge', target: raw.target } : null;
+    case 'answer':
+      return isId(raw.from) && typeof raw.accept === 'boolean' ? { type: 'answer', from: raw.from, accept: raw.accept } : null;
+    default:
+      return null;
+  }
 }

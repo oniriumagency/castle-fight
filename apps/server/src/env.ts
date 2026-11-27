@@ -1,5 +1,6 @@
 import { DEFAULT_TIMINGS, type RoomTimings } from '@cardcraft-castles/protocol';
 import type { Lobby } from './lobby';
+import type { Ranked } from './ranked';
 import type { Reports } from './reports';
 import type { Room } from './room';
 
@@ -7,6 +8,8 @@ export interface Env {
   LOBBY: DurableObjectNamespace<Lobby>;
   ROOM: DurableObjectNamespace<Room>;
   REPORTS: DurableObjectNamespace<Reports>;
+  /** The single ranked queue and its profiles (see src/ranked.ts). */
+  RANKED: DurableObjectNamespace<Ranked>;
   /**
    * Secret that opens `/reportes`, where the players' reports are read. Set it
    * in Cloudflare (Workers & Pages → cardcraft-castles → Settings → Variables

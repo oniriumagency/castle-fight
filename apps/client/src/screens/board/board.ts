@@ -2688,8 +2688,13 @@ class BoardScreen implements Screen {
     const campaign = (this.session as { campaign?: unknown }).campaign;
     void import('../flow').then(({ flow }) => {
       if (campaign) flow.campaign((this.session as { campaignOutcome?: BattleOutcome | null }).campaignOutcome ?? null, retry);
-      else if (this.session.kind === 'online') flow.lobby();
-      else flow.menu();
+      else if (this.session.kind === 'online') {
+        const room = (this.session as { room?: { id: string; ranked?: unknown } | null }).room;
+        if (room?.ranked) {
+          void import('../online').then((m) => m.forgetTicket(room.id));
+          flow.lobby('ranked');
+        } else flow.lobby();
+      } else flow.menu();
     });
   }
 }

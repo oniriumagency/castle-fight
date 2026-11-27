@@ -16,6 +16,8 @@ import type { LocalSession } from '../../game/localSession';
 import { cardFace } from '../../ui/card';
 import { attachCardZoom } from '../../ui/cardZoom';
 import { withFireworks } from '../../ui/avatarFireworks';
+import type { RoomInfo } from '@cardcraft-castles/protocol';
+import { tierBadge } from '../ranked';
 
 export interface ResultsOptions {
   host: HTMLElement;
@@ -179,6 +181,39 @@ export function showResults(o: ResultsOptions): void {
     requestAnimationFrame(() => requestAnimationFrame(() => screen.el.classList.add('in')));
   });
 
+  // Ranked: no rematch (every game comes from the queue), and the rating change once the server has it.
+  const rankedRoom = (): RoomInfo['ranked'] | undefined => (o.session as { room?: RoomInfo | null }).room?.ranked;
+  const ranked = !watching && !!rankedRoom();
+  const rankedLine = ranked ? h('div.results-ranked') : null;
+  const renderRanked = (): boolean => {
+    const info = rankedRoom();
+    if (!rankedLine || !info) return true;
+    if (!info.rated) {
+      rankedLine.replaceChildren(h('span', null, t('rankedUnratedHint')));
+      return true;
+    }
+    const mine = info.result?.[o.view.viewer] ?? null;
+    if (!mine) {
+      rankedLine.replaceChildren(h('span.spinner'), h('span', null, t('rankedPending')));
+      return false;
+    }
+    rankedLine.className = `results-ranked ${mine.delta >= 0 ? 'up' : 'down'}`;
+    rankedLine.replaceChildren(
+      tierBadge(mine.after),
+      h('span', null, t('rankedResult', { before: mine.before, after: mine.after })),
+      h('strong', null, mine.delta > 0 ? `+${mine.delta}` : mine.delta < 0 ? `−${-mine.delta}` : '±0'),
+    );
+    return true;
+  };
+  if (rankedLine && !renderRanked()) {
+    const timer = setInterval(() => {
+      if (renderRanked() || !wrap.isConnected) {
+        clearInterval(timer);
+        if (wrap.isConnected) fit();
+      }
+    }, 400);
+  }
+
   const hideBtn = h('button.btn.ghost', { type: 'button' }, t('viewBoard'));
   const backBtn = h(
     'button.btn.big',
@@ -209,6 +244,7 @@ export function showResults(o: ResultsOptions): void {
         ),
       ),
     ),
+    rankedLine,
     headToHead,
     campaignOutcome
       ? campaignSummary(campaignOutcome, () => {
@@ -235,7 +271,7 @@ export function showResults(o: ResultsOptions): void {
     h(
       'div.results-actions',
       null,
-      watching || campaign ? null : rematchBtn,
+      watching || campaign || ranked ? null : rematchBtn,
       campaignOutcome && !campaignOutcome.won && o.onRetry
         ? h('button.btn.big.primary', { type: 'button', onclick: () => (audio.play('uiClick'), o.onRetry!()) }, t('campaignRetry'))
         : null,
@@ -292,7 +328,7 @@ export function showResults(o: ResultsOptions): void {
   );
 
   // Online: when the opponent asks for a rematch, say so loud and clear (even with the board in view or the tab in the background).
-  if (o.session.kind === 'online' && !watching) {
+  if (o.session.kind === 'online' && !watching && !ranked) {
     let announced = false;
     const timer = setInterval(() => {
       if (!wrap.isConnected) return clearInterval(timer);

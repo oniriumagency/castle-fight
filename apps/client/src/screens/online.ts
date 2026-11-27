@@ -20,9 +20,19 @@ import { flow, nickname, setRoomInUrl } from './flow';
  * opens with the first game state; if this browser already had a seat there
  * (reload, dropped connection) the SDK resumes it and the board opens at once.
  */
-export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
+export function joinOnline(roomId: string, hero: HeroId | 'random', ticket?: string): void {
   setRoomInUrl(roomId);
-  const connection = online.joinRoom(roomId, { nickname: nickname(), hero });
+  // A ranked seat is claimed with the queue's ticket; kept so a reload can claim it again.
+  const key = `${TICKET_PREFIX}${roomId}`;
+  try {
+    if (ticket) localStorage.setItem(key, ticket);
+    else ticket = localStorage.getItem(key) ?? undefined;
+  } catch {
+    // Storage blocked: the seat token still resumes within this tab.
+  }
+  const ranked = !!ticket;
+  const back = (): void => flow.lobby(ranked ? 'ranked' : undefined);
+  const connection = online.joinRoom(roomId, { nickname: nickname(), hero, ...(ticket ? { ticket } : {}) });
   const session = new OnlineSession(connection);
   let opened = false;
 
@@ -42,21 +52,32 @@ export function joinOnline(roomId: string, hero: HeroId | 'random'): void {
       watchOnline(roomId);
       return;
     }
-    toast(message || t('connectionLost'), 'warn', 4000);
+    toast(ranked && reason === 'roomClosed' ? t('rankedNoShow') : message || t('connectionLost'), 'warn', 4000);
     audio.play('error');
-    flow.lobby();
+    back();
   });
   const cleanup = (): void => {
     offState();
     offClosed();
   };
 
-  setScreenName('onlineWaiting');
+  setScreenName(ranked ? 'rankedWaiting' : 'onlineWaiting');
   show(waitingScreen(session, () => {
     cleanup();
     session.leave();
-    flow.lobby();
-  }));
+    back();
+  }, false, ranked));
+}
+
+const TICKET_PREFIX = 'cardcraft-castles:ranked-ticket:';
+
+/** Forget the stored ticket of a ranked room once it is over. */
+export function forgetTicket(roomId: string): void {
+  try {
+    localStorage.removeItem(`${TICKET_PREFIX}${roomId}`);
+  } catch {
+    // Nothing stored either.
+  }
 }
 
 /**
@@ -100,7 +121,7 @@ export function watchOnline(roomId: string): void {
   }, true));
 }
 
-function waitingScreen(session: OnlineSession, cancel: () => void, watching = false): Screen {
+function waitingScreen(session: OnlineSession, cancel: () => void, watching = false, ranked = false): Screen {
   const el = h('div.waiting-screen');
   const seatsBox = h('div.waiting-seats');
   const link = online.inviteUrl(session.connection.roomId, INVITE_PAGE);
@@ -153,8 +174,8 @@ function waitingScreen(session: OnlineSession, cancel: () => void, watching = fa
       h('h1', null, watching ? t('watchingWaitTitle') : t('waitingTitle')),
       h('div.spinner.big'),
       seatsBox,
-      h('p', null, t('waitingHint')),
-      h(
+      ranked ? h('p', null, t('rankedFound')) : h('p', null, t('waitingHint')),
+      ranked ? null : h(
         'div.invite',
         null,
         h('input', { type: 'text', readonly: true, value: link, 'aria-label': t('copyLink'), onfocus: (e: Event) => (e.target as HTMLInputElement).select() }),

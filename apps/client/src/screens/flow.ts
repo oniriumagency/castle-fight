@@ -14,7 +14,7 @@ import type { BattleOutcome } from '@cardcraft-castles/campaign';
 import { campaignScreen } from './campaign/map';
 import { boardScreen } from './board/board';
 import { heroSelectScreen, type HeroSelectMode } from './heroSelect';
-import { lobbyScreen } from './lobby';
+import { lobbyScreen, type OnlineTab } from './lobby';
 import { menuScreen } from './menu';
 
 export function randomHero(except?: HeroId): HeroId {
@@ -48,10 +48,17 @@ export const flow = {
     show(menuScreen());
   },
 
-  lobby(): void {
+  /** Online play; `tab` opens Casual or Ranked (default: the last one used). */
+  lobby(tab?: OnlineTab): void {
     setRoomInUrl(null);
-    setScreenName('lobby');
-    show(lobbyScreen());
+    setScreenName(tab === 'ranked' ? 'lobby (ranked)' : 'lobby');
+    show(lobbyScreen(tab));
+  },
+
+  /** Search for a ranked game with the hero just picked. */
+  rankedSearch(hero: HeroId | 'random'): void {
+    setRoomInUrl(null);
+    void import('./ranked').then((m) => m.rankedSearch(hero));
   },
 
   heroSelect(mode: HeroSelectMode, roomId?: string): void {

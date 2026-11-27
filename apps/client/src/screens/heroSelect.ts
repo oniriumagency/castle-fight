@@ -13,7 +13,7 @@ import { flow } from './flow';
 import { requireNickname } from './lobby';
 
 /** `ffa`: free-for-all, you against two AIs. */
-export type HeroSelectMode = 'ai' | 'ffa' | 'local' | 'online';
+export type HeroSelectMode = 'ai' | 'ffa' | 'local' | 'online' | 'ranked';
 
 const LAST_HERO = 'cardcraft-castles:last-hero';
 const LAST_LEVEL = 'cardcraft-castles:last-level';
@@ -69,7 +69,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
    * Kept across rebuilds so typing is never lost; saved for next time.
    */
   const nickInput =
-    mode === 'online' && !rematch
+    (mode === 'online' || mode === 'ranked') && !rematch
       ? h('input', {
           type: 'text',
           maxlength: 20,
@@ -94,6 +94,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
     const base = mode === 'local' ? t('chooseHeroFor', { who: step === 0 ? t('player1') : t('player2') }) : t('chooseHero');
     if (rematch) return `${t('rematch')} · ${base}`;
     if (mode === 'ffa') return `${t('playFfa')} · ${base}`;
+    if (mode === 'ranked') return `${t('modeRanked')} · ${base}`;
     return base;
   };
 
@@ -131,6 +132,8 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
         return;
       }
       flow.startLocal([firstPick!, picked]);
+    } else if (mode === 'ranked') {
+      flow.rankedSearch(picked);
     } else if (roomId) {
       void import('./online').then((m) => m.joinOnline(roomId, picked));
     }
@@ -155,7 +158,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
         h(
           'button.btn.primary.big',
           { type: 'button', onclick: confirm },
-          mode === 'local' && step === 0 ? t('confirm') : rematch ? t(mode === 'online' ? 'rematch' : 'startGame') : t('startGame'),
+          mode === 'local' && step === 0 ? t('confirm') : rematch ? t(mode === 'online' ? 'rematch' : 'startGame') : mode === 'ranked' ? t('rankedSearch') : t('startGame'),
         ),
       ),
     );
@@ -267,6 +270,7 @@ export function heroSelectScreen(mode: HeroSelectMode, roomId?: string, rematch?
     }
     if (rematch) return rematch.onBack();
     if (mode === 'online') flow.lobby();
+    else if (mode === 'ranked') flow.lobby('ranked');
     else flow.menu();
   };
 

@@ -42,6 +42,18 @@ import {
   type RoomServerMessage,
   type RoomSummary,
 } from './index';
+import {
+  RANKED_SECRET_KEY,
+  formatRecoveryCode,
+  parseRecoveryCode,
+  type RankedClientMessage,
+  type RankedErrorCode,
+  type RankedLeaderboard,
+  type RankedMatch,
+  type RankedProfile,
+  type RankedSearcher,
+  type RankedServerMessage,
+} from './ranked';
 import { isPlayerId, isRoomId } from './validate';
 
 // ---------------------------------------------------------------------------
@@ -555,6 +567,8 @@ export interface JoinOptions {
   hero: HeroChoice;
   /** Public browser id; `OnlineClient.joinRoom` fills it in. */
   pid?: string;
+  /** Ranked rooms: the ticket from `RankedConnection`'s `matched`. */
+  ticket?: string;
 }
 
 interface StoredSeat {
@@ -828,6 +842,167 @@ export class RoomConnection extends ManagedSocket<RoomEvents> {
 }
 
 // ---------------------------------------------------------------------------
+// Ranked queue
+// ---------------------------------------------------------------------------
+
+export interface RankedEvents {
+  status: ConnectionStatus;
+  /** Your ranked profile; null until your first search makes one. */
+  profile: RankedProfile | null;
+  /** Where your search stands. `since` is on the local clock. */
+  queue: RankedQueueState;
+  /** Someone challenges you; `expiresAt` is on the local clock. */
+  challenged: { from: RankedSearcher; expiresAt: number };
+  challengeEnded: { target: string; reason: 'declined' | 'expired' | 'gone' };
+  challengeWithdrawn: { from: string };
+  /** Your game is ready: `OnlineClient.joinRoom(match.roomId, { ..., ticket: match.ticket })`. */
+  matched: RankedMatch;
+  top: RankedLeaderboard;
+  error: { code: RankedErrorCode; message: string };
+}
+
+export interface RankedQueueState {
+  searching: boolean;
+  since: number | null;
+  window: number;
+  challengesOpen: boolean;
+  players: RankedSearcher[];
+  count: number;
+}
+
+/**
+ * The ranked queue. It says hello with this browser's secret (if it has a
+ * profile), keeps the secret a first search hands out, and forgets one the
+ * server no longer knows.
+ */
+export class RankedConnection extends ManagedSocket<RankedEvents> {
+  private currentProfile: RankedProfile | null = null;
+  private currentQueue: RankedQueueState = { searching: false, since: null, window: 0, challengesOpen: false, players: [], count: 0 };
+  private clockOffset = 0;
+  /** Search to start again after a reconnection. */
+  private wanted: { nickname: string; hero: HeroChoice } | null = null;
+
+  constructor(url: string, platform: Platform) {
+    super(url, platform);
+    this.start();
+  }
+
+  get profile(): RankedProfile | null {
+    return this.currentProfile;
+  }
+
+  get queue(): RankedQueueState {
+    return this.currentQueue;
+  }
+
+  /** This browser's recovery code (`ABCD-EFGH-…`), or null without a profile. */
+  get recoveryCode(): string | null {
+    const secret = this.platform.storage.getItem(RANKED_SECRET_KEY);
+    return secret ? formatRecoveryCode(secret) : null;
+  }
+
+  search(nickname: string, hero: HeroChoice): boolean {
+    this.wanted = { nickname, hero };
+    return this.send({ type: 'search', nickname, hero });
+  }
+
+  cancel(): boolean {
+    this.wanted = null;
+    return this.send({ type: 'cancel' });
+  }
+
+  challenge(target: string): boolean {
+    return this.send({ type: 'challenge', target });
+  }
+
+  answer(from: string, accept: boolean): boolean {
+    return this.send({ type: 'answer', from, accept });
+  }
+
+  requestTop(): boolean {
+    return this.send({ type: 'top' });
+  }
+
+  /** Use the profile of a recovery code from another device. False when the code is not valid. */
+  useRecoveryCode(code: string): boolean {
+    const secret = parseRecoveryCode(code);
+    if (!secret) return false;
+    this.platform.storage.setItem(RANKED_SECRET_KEY, secret);
+    this.wanted = null;
+    this.hello();
+    return true;
+  }
+
+  protected onOpen(): void {
+    this.hello();
+    if (this.wanted) this.send({ type: 'search', ...this.wanted });
+  }
+
+  protected onTerminalClose(code: number, reason: string): void {
+    this.emit('error', { code: code === CLOSE_CODES.outdated ? 'outdated' : 'busy', message: reason });
+  }
+
+  protected onMessage(raw: unknown): void {
+    const message = raw as RankedServerMessage;
+    switch (message.type) {
+      case 'profile':
+        this.clockOffset = message.now - Date.now();
+        if (message.secret) this.platform.storage.setItem(RANKED_SECRET_KEY, message.secret);
+        this.currentProfile = message.profile
+          ? { ...message.profile, cooldownUntil: message.profile.cooldownUntil === null ? null : message.profile.cooldownUntil - this.clockOffset }
+          : null;
+        this.emit('profile', this.currentProfile);
+        break;
+      case 'queue':
+        this.clockOffset = message.now - Date.now();
+        this.currentQueue = {
+          searching: message.searching,
+          since: message.since === null ? null : message.since - this.clockOffset,
+          window: message.window,
+          challengesOpen: message.challengesOpen,
+          players: message.players,
+          count: message.count,
+        };
+        if (!message.searching) this.wanted = null;
+        this.emit('queue', this.currentQueue);
+        break;
+      case 'challenged':
+        this.clockOffset = message.now - Date.now();
+        this.emit('challenged', { from: message.from, expiresAt: message.expiresAt - this.clockOffset });
+        break;
+      case 'challengeEnded':
+        this.emit('challengeEnded', { target: message.target, reason: message.reason });
+        break;
+      case 'challengeWithdrawn':
+        this.emit('challengeWithdrawn', { from: message.from });
+        break;
+      case 'matched':
+        this.wanted = null;
+        this.emit('matched', message.match);
+        break;
+      case 'top':
+        this.emit('top', message.leaderboard);
+        break;
+      case 'error':
+        if (message.code === 'unknownProfile') this.platform.storage.removeItem(RANKED_SECRET_KEY);
+        if (message.code === 'cooldown' || message.code === 'busy' || message.code === 'rateLimited') this.wanted = null;
+        this.emit('error', { code: message.code, message: message.message });
+        break;
+      default:
+        break;
+    }
+  }
+
+  private hello(): void {
+    this.send({ type: 'hello', v: PROTOCOL_VERSION, secret: this.platform.storage.getItem(RANKED_SECRET_KEY) });
+  }
+
+  private send(message: RankedClientMessage): boolean {
+    return this.sendRaw(JSON.stringify(message));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
@@ -916,6 +1091,11 @@ export class OnlineClient {
   /** Find a public room waiting for an opponent, or create one. Then call `joinRoom`. */
   quickJoin(request: { nickname: string }): Promise<QuickJoinResponse> {
     return this.request<QuickJoinResponse>('POST', ROUTES.quickJoin, { ...request, clientId: this.clientId });
+  }
+
+  /** The ranked queue: your profile, searching and challenges. */
+  connectRanked(): RankedConnection {
+    return new RankedConnection(this.socketUrl(ROUTES.rankedSocket), this.platform);
   }
 
   connectLobby(): LobbyConnection {
