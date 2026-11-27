@@ -430,6 +430,17 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
     tutorial.mark('map');
   };
 
+  /** Once, back on the map after the first captain falls: where the hero for each battle is chosen. */
+  const heroPickTip = async (): Promise<void> => {
+    if (!save || save.wins < 1 || save.allies.length > 1 || tutorial.tipSeen('heroPick')) return;
+    // On a phone the picker sits low in the side panel: bring it into view first.
+    el.querySelector('.campaign-heroes')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const coach = createCoach(() => tutorial.skipAll());
+    const ok = await coach.show({ target: () => el.querySelector('.campaign-heroes'), text: t('tutTipHeroPick'), pad: 10 });
+    if (ok) tutorial.markTip('heroPick');
+    coach.close();
+  };
+
   /** Once, after the first ally joins: the hero picker. */
   const alliesTip = async (): Promise<void> => {
     if (!save || save.allies.length < 2 || tutorial.tipSeen('allies')) return;
@@ -607,6 +618,7 @@ export function campaignScreen(after: BattleOutcome | null = null, retry = false
         void playDialogue(lines, after.won && getTerritory(after.territory).kind === 'final' ? SCENE_ART.epilogue : undefined).then(async () => {
           await menuTip();
           await alliesTip();
+          if (after.won) await heroPickTip();
         });
       } else if (save && !save.seen.includes('prologue')) {
         // The first start of the game: the comic, then the guide on the map.
