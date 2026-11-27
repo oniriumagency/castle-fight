@@ -5,6 +5,7 @@
  * nickname they chose.
  */
 import { recentProblems } from './errorReport';
+import { logEvent, recentEvents } from './eventLog';
 import { settings } from './settings';
 
 export type GameContext = Record<string, string | number | boolean | null>;
@@ -20,6 +21,7 @@ export function setGameContext(provider: (() => GameContext) | null): void {
 /** The screen being shown (menu, lobby, heroSelect, board…). */
 export function setScreenName(name: string): void {
   screenName = name;
+  logEvent(`screen: ${name}`);
 }
 
 function browserOf(ua: string): string {
@@ -48,7 +50,22 @@ function osOf(ua: string): string {
   return 'Desconocido';
 }
 
+/** The server takes at most this much context (REPORT_LIMITS.maxContextBytes is 8192), with room to spare. */
+const CONTEXT_BUDGET = 7600;
+
 export function reportContext(): GameContext {
+  const base = baseContext();
+  // The latest events, as many as fit: the oldest are dropped first.
+  const events = recentEvents();
+  while (events.length) {
+    const withEvents = { ...base, events: events.join('\n') };
+    if (new TextEncoder().encode(JSON.stringify(withEvents)).length <= CONTEXT_BUDGET) return withEvents;
+    events.shift();
+  }
+  return base;
+}
+
+function baseContext(): GameContext {
   const ua = navigator.userAgent;
   let game: GameContext = {};
   try {

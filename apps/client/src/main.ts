@@ -24,6 +24,7 @@ import './styles/tutorial.css';
 import { toast } from './app/dom';
 import { t } from './app/i18n';
 import { initErrorReporting } from './app/errorReport';
+import { initEventLog } from './app/eventLog';
 import { initInstall } from './app/install';
 import { hideLoader, initLoader } from './app/loader';
 import { initOffline } from './app/offline';
@@ -49,6 +50,7 @@ async function boot(): Promise<void> {
   applyDocumentSettings();
   settings.subscribe(applyDocumentSettings);
   initErrorReporting();
+  initEventLog();
   initInstall();
   initOffline();
   initLandscapeOnly();
