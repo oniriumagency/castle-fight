@@ -37,6 +37,12 @@ export const MUSIC_CREDITS: readonly MusicCredit[] = [
   },
 ];
 
+/** Friends who played early builds and told us what worked. */
+const PLAYTESTERS: readonly { label: string; url: string }[] = [
+  { label: 'Ryukcat', url: 'https://ryukcat.click/' },
+  { label: 'Slashersoul', url: 'https://ascua.co/' },
+];
+
 const link = (l: { label: string; url: string }): HTMLElement => h('a', { href: l.url, target: '_blank', rel: 'noopener' }, l.label);
 
 /** Credits dialog, opened from the settings. */
@@ -47,6 +53,9 @@ export function openCredits(): void {
       null,
       h('h2', null, t('credits')),
       h('p.credits-lead', null, t('creditsGame')),
+      h('p.credits-lead', null, t('creditsInspired')),
+      h('h3', null, t('creditsPlaytesters')),
+      h('ul.credits-list', null, PLAYTESTERS.map((p) => h('li', null, link(p)))),
       h('h3', null, t('creditsMusic')),
       h(
         'ul.credits-list',
