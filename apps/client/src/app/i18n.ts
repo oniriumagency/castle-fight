@@ -103,6 +103,10 @@ const STRINGS = {
     en: 'The first hero has fallen! The main menu is open: quick games against the AI, online play and more. The campaign waits for you here whenever you like.',
   },
   tutTipAllies: { es: 'Ya tienes un aliado. Antes de desafiar un territorio puedes elegir qué héroe va a la batalla.', en: 'You have an ally now. Before challenging a territory you can choose which hero goes into battle.' },
+  tutTipHeroPick: {
+    es: 'Aquí eliges qué héroe va a cada batalla. Por ahora solo estoy yo, pero cuando conquistes el castillo de un reino su héroe se unirá a ti y podrás escogerlo aquí.',
+    en: 'Here you choose which hero goes into each battle. For now it is only me, but when you conquer a kingdom’s castle its hero will join you and you can pick them here.',
+  },
   dialogueNext: { es: 'Siguiente', en: 'Next' },
   dialogueSkip: { es: 'Saltar', en: 'Skip' },
   captainNoPowers: { es: 'Los capitanes no tienen pasiva ni definitiva: pelean con las cartas de su reino.', en: 'Captains have no passive or ultimate: they fight with their kingdom’s cards.' },
