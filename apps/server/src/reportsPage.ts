@@ -67,7 +67,7 @@ export const REPORTS_PAGE = /* html */ `<!doctype html>
   const CONTEXT_LABELS = {
     version: 'Versión', screen: 'Pantalla', mode: 'Modo', difficulty: 'Dificultad', hero: 'Héroe', rivals: 'Rivales', turn: 'Turno', gameOver: 'Partida terminada',
     room: 'Sala', nickname: 'Apodo', locale: 'Idioma', browser: 'Navegador', os: 'Sistema', viewport: 'Ventana', screenSize: 'Pantalla física',
-    pixelRatio: 'Densidad', touch: 'Táctil', standalone: 'Instalada', url: 'Dirección', userAgent: 'User agent', recentErrors: 'Errores recientes',
+    pixelRatio: 'Densidad', touch: 'Táctil', standalone: 'Instalada', url: 'Dirección', userAgent: 'User agent', recentErrors: 'Errores recientes', events: 'Últimos eventos',
   };
   const app = document.getElementById('app');
   let key = '';
@@ -155,7 +155,7 @@ export const REPORTS_PAGE = /* html */ `<!doctype html>
     const keys = Object.keys(context).filter((k) => context[k] !== null && context[k] !== '' && context[k] !== undefined);
     if (!keys.length) return null;
     const ordered = Object.keys(CONTEXT_LABELS).filter((k) => keys.includes(k)).concat(keys.filter((k) => !(k in CONTEXT_LABELS)));
-    return el('dl', null, ordered.map((k) => [el('dt', null, CONTEXT_LABELS[k] || k), el('dd', { style: k === 'recentErrors' ? 'white-space:pre-wrap' : null }, describeValue(context[k]))]));
+    return el('dl', null, ordered.map((k) => [el('dt', null, CONTEXT_LABELS[k] || k), el('dd', { style: k === 'recentErrors' || k === 'events' ? 'white-space:pre-wrap' : null }, describeValue(context[k]))]));
   }
 
   function summary(context) {

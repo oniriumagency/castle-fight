@@ -1,5 +1,6 @@
 import { getHero, type HeroId, type PlayerId, type PlayerView } from '@cardcraft-castles/engine';
 import { callAttention } from '../../app/attention';
+import { logEvent } from '../../app/eventLog';
 import { h, html } from '../../app/dom';
 import { L, t } from '../../app/i18n';
 import { audio } from '../../fx/audio';
@@ -93,7 +94,7 @@ function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLEle
   );
 }
 
-/** How long the results ignore presses while they appear (the fade and the panel's entrance, 0.7 s). */
+/** How long the results ignore presses once they start to appear (the fade and the panel's entrance, 0.7 s). */
 const ARMING_MS = 900;
 
 /** End of game: victory or defeat banner, why it ended, match statistics and what next. */
@@ -211,6 +212,7 @@ export function showResults(o: ResultsOptions): void {
     headToHead,
     campaignOutcome
       ? campaignSummary(campaignOutcome, () => {
+          logEvent('results: rewards claimed');
           backBtn.classList.remove('unclaimed');
           fit();
         })
@@ -254,6 +256,7 @@ export function showResults(o: ResultsOptions): void {
   }
   hideBtn.addEventListener('click', () => {
     const peek = wrap.classList.toggle('peek');
+    logEvent(peek ? 'results: board view' : 'results: back to results');
     // Seen from the board, the way back is a solid button that says where it goes:
     // a plain "Back" over the hand read like part of a card.
     hideBtn.textContent = peek ? t('viewResults') : t('viewBoard');
@@ -263,13 +266,30 @@ export function showResults(o: ResultsOptions): void {
   });
   // The panel takes a moment to fade in over the hand. A click meant for a card in that
   // moment used to land on "View board" and hide the results before they were ever seen.
-  wrap.classList.add('arming');
-  setTimeout(() => wrap.classList.remove('arming'), ARMING_MS);
+  // Judged by when the press happened (not when the page got round to it), counted from the
+  // first frame the panel shows, so a busy end of game cannot let a stale press through.
+  let armedFrom = Infinity;
+  wrap.addEventListener(
+    'click',
+    (e) => {
+      if (e.timeStamp >= armedFrom) return;
+      e.stopPropagation();
+      e.preventDefault();
+      logEvent('results: press ignored while appearing');
+    },
+    { capture: true },
+  );
+  logEvent(`results: ${outcome}${campaignOutcome ? ` (campaign ${campaignOutcome.territory}, ${campaignOutcome.rewards.length} rewards)` : ''}${o.fallen ? ' (fallen)' : ''}`);
   o.host.appendChild(wrap);
   const fitter = new ResizeObserver(() => (wrap.isConnected ? fit() : fitter.disconnect()));
   fitter.observe(wrap);
   void document.fonts?.ready.then(fit);
-  requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('in')));
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      wrap.classList.add('in');
+      armedFrom = performance.now() + ARMING_MS;
+    }),
+  );
 
   // Online: when the opponent asks for a rematch, say so loud and clear (even with the board in view or the tab in the background).
   if (o.session.kind === 'online' && !watching) {

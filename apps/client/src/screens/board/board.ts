@@ -61,6 +61,7 @@ import {
 } from '../../ui/card';
 import { closeX } from '../../ui/closeX';
 import { reportProblem } from '../../app/errorReport';
+import { logEvent } from '../../app/eventLog';
 import { heroCss, skyFor } from '../../ui/theme';
 import { openHowToPlay } from '../howToPlay';
 import { openSettings } from '../settingsModal';
@@ -798,6 +799,7 @@ class BoardScreen implements Screen {
       if (!this.resultsShown) {
         this.resultsShown = true;
         const winner = view.result.winner;
+        logEvent(`game over: turn ${view.turn}, winner ${winner === null ? 'none' : this.name(winner)} (${view.result.reason})`);
         const announce = !this.fallenShown;
         if (announce) fx.gameOver(winner === null ? null : this.session.kind === 'local' || this.session.spectator ? true : this.session.isLocal(winner), winner === null ? null : this.sideOf(winner), this.fxContext());
         // After an early defeat the results are already up: only the rivals' fight ended.
@@ -1288,6 +1290,7 @@ class BoardScreen implements Screen {
     const ctx = this.fxContext();
     switch (e.type) {
       case 'turnStarted': {
+        logEvent(`turn: ${this.name(e.player)}`);
         this.clearPlayed();
         this.shownActive = e.player;
         this.render();
@@ -1373,6 +1376,7 @@ class BoardScreen implements Screen {
         break;
       }
       case 'cardPlayed': {
+        logEvent(`card: ${this.name(e.player)} plays ${e.cardId}`);
         const p = shown[e.player];
         p.resources[e.resource] = Math.max(0, p.resources[e.resource] - e.cost);
         p.hand = p.hand.filter((c) => c.uid !== e.uid);
