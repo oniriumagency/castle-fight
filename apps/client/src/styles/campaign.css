@@ -792,7 +792,12 @@
 }
 
 .results-box.campaign .campaign-summary .campaign-cards .card {
-  --w: clamp(84px, min(13vw, 21vh), 150px);
+  --w: clamp(76px, min(13vw, 19vh), 150px);
+}
+
+/* Cards won back: a small reminder under the rewards, so the whole panel fits the window. */
+.results-box.campaign .campaign-summary .recovered-cards .card {
+  --w: clamp(44px, min(7vw, 10vh), 84px);
 }
 
 .campaign-zoom-hint {
@@ -877,7 +882,11 @@
   }
 
   .results-box.campaign .campaign-summary .campaign-cards .card {
-    --w: clamp(64px, 24vh, 100px);
+    --w: clamp(52px, 21vh, 100px);
+  }
+
+  .results-box.campaign .campaign-summary .recovered-cards .card {
+    --w: clamp(36px, 11vh, 56px);
   }
 
   .campaign-zoom-hint {

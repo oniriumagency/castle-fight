@@ -71,10 +71,10 @@ function keepRecord(o: ResultsOptions, opponent: PlayerId, outcome: 'victory' | 
  */
 function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLElement {
   const name = L(getTerritory(outcome.territory).name);
-  const cards = (ids: readonly string[]): HTMLElement =>
+  const cards = (ids: readonly string[], small = false): HTMLElement =>
     h(
       'div.campaign-cards',
-      null,
+      { class: small ? 'recovered-cards' : '' },
       ids.map((id) => {
         const face = cardFace(id);
         attachCardZoom(face, id);
@@ -88,7 +88,7 @@ function campaignSummary(outcome: BattleOutcome, onClaimed: () => void): HTMLEle
     outcome.ally ? h('p.campaign-ally', null, t('campaignRewardHero', { hero: L(getHero(outcome.ally).name) })) : null,
     outcome.awakened ? h('p.campaign-awake', null, t('campaignUltimateAwake')) : null,
     outcome.rewards.length ? rewardReveal(outcome.rewards, onClaimed).el : null,
-    outcome.recovered.length ? [h('h3', null, t('campaignRecovered')), cards(outcome.recovered)] : null,
+    outcome.recovered.length ? [h('h3', null, t('campaignRecovered')), cards(outcome.recovered, true)] : null,
     outcome.lost ? [h('p.campaign-lost', null, t('campaignLost', { name })), cards([outcome.lost])] : null,
   );
 }
@@ -206,7 +206,12 @@ export function showResults(o: ResultsOptions): void {
       ),
     ),
     headToHead,
-    campaignOutcome ? campaignSummary(campaignOutcome, () => backBtn.classList.remove('unclaimed')) : null,
+    campaignOutcome
+      ? campaignSummary(campaignOutcome, () => {
+          backBtn.classList.remove('unclaimed');
+          fit();
+        })
+      : null,
     h(
       'table.results-stats',
       null,
@@ -234,11 +239,25 @@ export function showResults(o: ResultsOptions): void {
     ),
   );
   const wrap = h('div.results', { class: outcome }, box);
+  // Never a scrollbar: when the panel is still taller than the window (short phones, a long reward list),
+  // it shrinks as a whole until it fits.
+  function fit(): void {
+    box.style.removeProperty('zoom');
+    if (wrap.classList.contains('peek')) return;
+    const pad = getComputedStyle(wrap);
+    const room = wrap.clientHeight - parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom);
+    const need = box.offsetHeight;
+    if (need > room + 0.5) box.style.zoom = String(Math.max(0.5, Math.floor((room / need) * 1000) / 1000));
+  }
   hideBtn.addEventListener('click', () => {
     wrap.classList.toggle('peek');
     hideBtn.textContent = wrap.classList.contains('peek') ? t('back') : t('viewBoard');
+    fit();
   });
   o.host.appendChild(wrap);
+  const fitter = new ResizeObserver(() => (wrap.isConnected ? fit() : fitter.disconnect()));
+  fitter.observe(wrap);
+  void document.fonts?.ready.then(fit);
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('in')));
 
   // Online: when the opponent asks for a rematch, say so loud and clear (even with the board in view or the tab in the background).
